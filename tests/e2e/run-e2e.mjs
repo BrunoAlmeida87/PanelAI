@@ -234,7 +234,7 @@ async function flows(browser, label, opts) {
           new Promise((ok) => { const r = indexedDB.open('panelai', 1); r.onsuccess = () => { r.result.close(); ok('open ok'); }; r.onerror = () => ok('err ' + r.error); r.onblocked = () => ok('blocked'); }),
           new Promise((ok) => setTimeout(() => ok('open timeout'), 3000)),
         ]);
-        return { res, idb, ctrl: !!navigator.serviceWorker.controller };
+        return { res, idb, ctrl: !!navigator.serviceWorker.controller, boot: globalThis.__panelaiBoot };
       });
       console.log('DIAG', JSON.stringify(diag));
     }

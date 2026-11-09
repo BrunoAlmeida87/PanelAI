@@ -2,7 +2,7 @@
 // Todo o estado fica em memória e é gravado no IndexedDB a cada alteração
 // (write-through), registro por registro. A interface assina as mudanças.
 
-import { useEffect, useState } from 'preact/hooks';
+import { useSyncExternalStore } from 'preact/compat';
 import { initDB, loadAll, writeBatch } from './db.js';
 import { buildSeed } from '../data/seed.js';
 import { DEFAULT_SETTINGS } from '../models/constants.js';
@@ -38,11 +38,14 @@ export function subscribe(fn) {
   return () => listeners.delete(fn);
 }
 
-/** Hook: re-renderiza o componente quando o estado muda. */
+/**
+ * Hook: re-renderiza o componente quando o estado muda.
+ * useSyncExternalStore confere o estado no momento da inscrição, então uma
+ * mudança ocorrida entre a renderização e a inscrição (ex.: carregamento muito
+ * rápido do IndexedDB) não se perde.
+ */
 export function useStore() {
-  const [, force] = useState(0);
-  useEffect(() => subscribe(() => force((n) => n + 1)), []);
-  return state;
+  return useSyncExternalStore(subscribe, getState);
 }
 
 // ---------- Persistência ----------

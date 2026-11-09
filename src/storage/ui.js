@@ -1,6 +1,6 @@
 // Estado de interface compartilhado entre as telas (semana selecionada).
 
-import { useEffect, useState } from 'preact/hooks';
+import { useSyncExternalStore } from 'preact/compat';
 import { addDays, isValidISODate, todayISO, weekStartOf } from '../utils/dates.js';
 
 const KEY = 'panelai.weekId';
@@ -33,11 +33,11 @@ export function setWeekId(id) {
 export const shiftWeek = (n) => setWeekId(addDays(weekId, 7 * n));
 export const goToCurrentWeek = () => setWeekId(weekStartOf(todayISO()));
 
+function subscribeWeek(fn) {
+  listeners.add(fn);
+  return () => listeners.delete(fn);
+}
+
 export function useWeekId() {
-  const [w, setW] = useState(weekId);
-  useEffect(() => {
-    listeners.add(setW);
-    return () => listeners.delete(setW);
-  }, []);
-  return w;
+  return useSyncExternalStore(subscribeWeek, getWeekId);
 }
