@@ -1,0 +1,70 @@
+.print-only {
+  display: none;
+}
+
+@media print {
+  @page {
+    margin: 12mm;
+  }
+  body {
+    background: #fff;
+    font-size: 11pt;
+  }
+  .app-header,
+  .bottom-nav,
+  .toast-region,
+  .skip-link,
+  dialog,
+  .main > * > *:not(.print-only) {
+    display: none !important;
+  }
+  .main {
+    padding: 0 !important;
+    max-width: none;
+  }
+  .print-only {
+    display: block !important;
+    color: #000;
+  }
+  .print-only h1 {
+    font-size: 16pt;
+    margin-bottom: 10pt;
+  }
+  .print-table {
+    width: 100%;
+    border-collapse: collapse;
+    table-layout: fixed;
+    font-size: 9pt;
+  }
+  .print-table th,
+  .print-table td {
+    border: 1px solid #999;
+    padding: 4pt;
+    vertical-align: top;
+    text-align: left;
+  }
+  .print-group h2 {
+    font-size: 13pt;
+    margin: 10pt 0 4pt;
+  }
+  .print-cat {
+    break-inside: avoid;
+    margin-bottom: 6pt;
+  }
+  .print-cat h3 {
+    font-size: 10pt;
+    text-transform: uppercase;
+    margin: 6pt 0 2pt;
+  }
+  .print-cat ul {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    columns: 2;
+  }
+  .print-foot {
+    margin-top: 12pt;
+    font-size: 8pt;
+    color: #555;
+  }
+}

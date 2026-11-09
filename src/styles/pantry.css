@@ -1,0 +1,146 @@
+/* ---------- Despensa ---------- */
+.pantry-tabs {
+  margin-bottom: 16px;
+}
+.filters-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 12px;
+}
+.filters-bar .search-input {
+  min-width: 200px;
+}
+@media (max-width: 599px) {
+  .filters-bar .search-input {
+    flex-basis: 100%;
+  }
+  .filters-bar .select {
+    flex: 1;
+  }
+}
+.stock-table .name-cell strong {
+  display: block;
+}
+.stock-table .name-cell span {
+  font-size: var(--fs-xs);
+  color: var(--text-2);
+}
+.stock-table td.num {
+  white-space: nowrap;
+}
+.stock-cards {
+  display: grid;
+  gap: 8px;
+}
+@media (min-width: 600px) {
+  .stock-cards {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+.stock-card {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 10px;
+  align-items: center;
+  padding: 12px;
+}
+.stock-card .sc-name {
+  font-weight: 600;
+}
+.stock-card .sc-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+  margin-top: 4px;
+  font-size: var(--fs-xs);
+  color: var(--text-2);
+}
+.stock-card .sc-controls {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  justify-content: space-between;
+}
+
+.count-list {
+  display: grid;
+  gap: 12px;
+}
+.count-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 8px 12px;
+  align-items: center;
+  padding: 10px 14px;
+  border-top: 1px solid var(--border);
+}
+.count-row .cr-name {
+  font-weight: 560;
+}
+.count-row .cr-reg {
+  font-size: var(--fs-xs);
+  color: var(--text-2);
+}
+.count-row .cr-input {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.count-row .cr-input .input {
+  width: 96px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.count-row .cr-input .unit {
+  min-width: 46px;
+  font-size: var(--fs-sm);
+  color: var(--text-2);
+}
+.count-row.counted {
+  background: var(--green-xlight);
+}
+.count-row.diff .cr-reg {
+  color: var(--coral-dark);
+}
+
+.monthly-row {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 4px 12px;
+  align-items: center;
+  padding: 10px 14px;
+  border-top: 1px solid var(--border);
+  min-height: 60px;
+}
+.monthly-row .mr-name {
+  font-weight: 560;
+}
+.monthly-row .mr-meta {
+  font-size: var(--fs-xs);
+  color: var(--text-2);
+}
+.monthly-row .mr-qty {
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  white-space: nowrap;
+}
+.monthly-row .mr-edit {
+  grid-column: 2 / -1;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.monthly-row.checked .mr-name {
+  text-decoration: line-through;
+  color: var(--text-2);
+}
+.monthly-row label {
+  display: contents;
+  cursor: pointer;
+}
