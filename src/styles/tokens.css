@@ -1,0 +1,80 @@
+/* Tokens de design do PanelAI */
+:root {
+  /* Paleta oficial */
+  --bg: #faf9f6;
+  --surface: #ffffff;
+  --green: #789582;
+  --green-dark: #52765d;
+  --green-light: #e7efe8;
+  --green-xlight: #f2f6f2;
+  --coral: #dca49b;
+  --coral-dark: #a8645a;
+  --coral-light: #f9e9e5;
+  --text: #30332f;
+  --text-2: #747874;
+  --border: #e8e7e2;
+  --border-strong: #d6d5cf;
+
+  /* Cores de apoio (estados e categorias) */
+  --amber: #b8893a;
+  --amber-light: #f7efdc;
+  --blue: #5f7f96;
+  --blue-light: #e8eff4;
+  --danger: #b5524a;
+  --danger-light: #f7e4e1;
+  --muted-surface: #f4f3ef;
+
+  --focus: 0 0 0 3px rgba(82, 118, 93, 0.35);
+
+  /* Tipografia */
+  --font: 'Inter Variable', Inter, ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --fs-xs: 0.75rem;
+  --fs-sm: 0.8125rem;
+  --fs-md: 0.9375rem;
+  --fs-lg: 1.0625rem;
+  --fs-xl: 1.375rem;
+  --fs-2xl: 1.75rem;
+
+  /* Forma e profundidade */
+  --r-sm: 8px;
+  --r-md: 12px;
+  --r-lg: 16px;
+  --r-xl: 22px;
+  --shadow-sm: 0 1px 2px rgba(48, 51, 47, 0.05);
+  --shadow-md: 0 2px 4px rgba(48, 51, 47, 0.04), 0 6px 18px rgba(48, 51, 47, 0.06);
+  --shadow-lg: 0 12px 40px rgba(48, 51, 47, 0.16);
+
+  /* Espaçamento */
+  --s1: 4px;
+  --s2: 8px;
+  --s3: 12px;
+  --s4: 16px;
+  --s5: 20px;
+  --s6: 24px;
+  --s8: 32px;
+
+  --gutter: 16px;
+  --header-h: 56px;
+  --bottom-nav-h: 64px;
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-left: env(safe-area-inset-left, 0px);
+  --safe-right: env(safe-area-inset-right, 0px);
+  --touch: 44px;
+  --ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --vvh: 100dvh;
+}
+
+@media (min-width: 600px) {
+  :root {
+    --gutter: 24px;
+  }
+}
+
+@media (min-width: 900px) {
+  :root {
+    --header-h: 64px;
+    --bottom-nav-h: 0px;
+    --gutter: 32px;
+  }
+}

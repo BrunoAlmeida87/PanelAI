@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 360 96" role="img" aria-labelledby="t">
+  <title id="t">PanelAI</title>
+  <rect x="4" y="4" width="88" height="88" rx="22" fill="#E7EFE8"/>
+  <g fill="none" stroke="#789582" stroke-linecap="round" stroke-linejoin="round" stroke-width="5.5">
+    <path d="M28 44c0-8 9-13 20-13s20 5 20 13"/>
+    <path d="M24 44h48"/>
+    <path d="M48 31v-3"/>
+    <path d="M28 51h40v12c0 8-7 15-15 15h-10c-8 0-15-7-15-15z"/>
+    <path d="M28 56h-6M68 56h6"/>
+  </g>
+  <text x="112" y="63" font-family="Inter, 'Segoe UI', system-ui, -apple-system, sans-serif" font-size="44" font-weight="650" letter-spacing="-1" fill="#30332F">Panel<tspan fill="#52765D">AI</tspan></text>
+</svg>

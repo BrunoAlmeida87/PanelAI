@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="t">
+  <title id="t">PanelAI</title>
+  <rect width="512" height="512" rx="120" fill="#E7EFE8"/>
+  <g fill="none" stroke="#789582" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M214 120c-14-16 14-28 0-46M256 120c-14-16 14-28 0-46M298 120c-14-16 14-28 0-46" stroke-width="16" opacity=".55"/>
+    <path d="M150 232c0-44 47-72 106-72s106 28 106 72" stroke-width="26"/>
+    <path d="M128 232h256" stroke-width="26"/>
+    <path d="M256 160v-14" stroke-width="26"/>
+    <path d="M150 270h212v66c0 44-36 80-80 80h-52c-44 0-80-36-80-80z" stroke-width="26"/>
+    <path d="M150 296h-34M362 296h34" stroke-width="26"/>
+  </g>
+</svg>
