@@ -122,3 +122,153 @@ revoke all on function public.panelai_pull(text, bigint, integer) from public;
 grant execute on function public.panelai_house(text) to anon, authenticated;
 grant execute on function public.panelai_push(text, jsonb) to anon, authenticated;
 grant execute on function public.panelai_pull(text, bigint, integer) to anon, authenticated;
+
+-- ---------------------------------------------------------------------------
+-- Quadro (display): resumo do dia, somente leitura.
+--
+-- O quadro não recebe o código da casa. Ele usa um "token do quadro", que só
+-- permite ler o resumo abaixo — não dá para alterar dados nem ler o restante.
+-- ---------------------------------------------------------------------------
+
+create table if not exists public.panelai_panels (
+  token_hash text        primary key,        -- sha256 do token do quadro
+  house      text        not null,
+  created_at timestamptz not null default now()
+);
+alter table public.panelai_panels enable row level security;
+revoke all on public.panelai_panels from anon, authenticated;
+
+-- Gera (ou devolve) o token do quadro de uma casa. Exige o código da casa.
+create or replace function public.panelai_panel_token(p_code text)
+returns text
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  h text := public.panelai_house(p_code);
+  tok text := substr(encode(sha256(convert_to('painel:' || p_code, 'UTF8')), 'hex'), 1, 40);
+begin
+  insert into public.panelai_panels (token_hash, house)
+  values (encode(sha256(convert_to(tok, 'UTF8')), 'hex'), h)
+  on conflict (token_hash) do nothing;
+  return tok;
+end;
+$$;
+
+-- Texto de uma refeição do cardápio (mesma regra do app).
+create or replace function public.panelai_entry_label(p_house text, e jsonb)
+returns text
+language sql
+stable
+set search_path = public
+as $$
+  select case e->>'kind'
+    when 'recipe' then coalesce(
+      (select r.data->>'name' from public.panelai_records r
+        where r.house = p_house and r.collection = 'recipes' and r.id = e->>'recipeId' and not r.deleted),
+      'Receita removida')
+    when 'marmita' then 'Marmita: ' || coalesce(
+      (select r.data->>'name'
+         from public.panelai_records m
+         join public.panelai_records r
+           on r.house = m.house and r.collection = 'recipes' and r.id = m.data->>'recipeId' and not r.deleted
+        where m.house = p_house and m.collection = 'marmitas' and m.id = e->>'marmitaId' and not m.deleted),
+      'Marmita')
+    when 'out' then case when coalesce(e->>'text', '') <> '' then 'Fora: ' || (e->>'text') else 'Fora de casa' end
+    when 'text' then coalesce(nullif(e->>'text', ''), 'Refeição livre')
+    else ''
+  end;
+$$;
+
+-- Refeições de um dia: [{ slot, label, items: [texto, ...] }], só as preenchidas, na ordem do dia.
+create or replace function public.panelai_day_meals(p_house text, p_date date)
+returns jsonb
+language sql
+stable
+set search_path = public
+as $$
+  with w as (
+    select t.data->'meals'->to_char(p_date, 'YYYY-MM-DD') as day
+    from public.panelai_records t
+    where t.house = p_house and t.collection = 'weeks' and not t.deleted
+      -- a semana é identificada pela data da segunda-feira
+      and t.id = to_char(p_date - (extract(isodow from p_date)::int - 1), 'YYYY-MM-DD')
+  ),
+  slots (ord, id, label) as (
+    values (1, 'lanche_manha', 'Lanche da manhã'), (2, 'almoco', 'Almoço'),
+           (3, 'lanche_tarde', 'Lanche da tarde'), (4, 'jantar', 'Jantar')
+  )
+  select coalesce(
+    jsonb_agg(jsonb_build_object('slot', s.id, 'label', s.label, 'items', i.items) order by s.ord),
+    '[]'::jsonb)
+  from slots s
+  cross join w
+  cross join lateral (
+    select jsonb_agg(public.panelai_entry_label(p_house, x.entry) order by x.n) as items
+    from jsonb_array_elements(
+      case when jsonb_typeof(w.day->s.id) = 'array' then w.day->s.id else '[]'::jsonb end
+    ) with ordinality as x(entry, n)
+  ) i
+  where i.items is not null;
+$$;
+
+-- Resumo para o quadro: refeições de hoje e de amanhã e recados que valem hoje.
+-- `version` muda só quando o conteúdo muda: o quadro pode pular o redesenho.
+create or replace function public.panelai_panel(p_token text, p_date date default null, p_tz text default 'America/Sao_Paulo')
+returns jsonb
+language plpgsql
+stable
+security definer
+set search_path = public
+as $$
+declare
+  h text;
+  d date := coalesce(p_date, (now() at time zone p_tz)::date);
+  d_text text;
+  body jsonb;
+  updated timestamptz;
+begin
+  select p.house into h
+  from public.panelai_panels p
+  where p.token_hash = encode(sha256(convert_to(coalesce(p_token, ''), 'UTF8')), 'hex');
+  if h is null then
+    raise exception 'quadro_invalido';
+  end if;
+  d_text := to_char(d, 'YYYY-MM-DD');
+
+  body := jsonb_build_object(
+    'date', d_text,
+    'weekday', extract(dow from d)::int,               -- 0 = domingo
+    'meals', public.panelai_day_meals(h, d),
+    'tomorrow', public.panelai_day_meals(h, d + 1),
+    'notes', (
+      select coalesce(jsonb_agg(
+               jsonb_build_object(
+                 'text', n.data->>'text',
+                 'author', coalesce(n.data->>'author', ''),
+                 'pinned', coalesce((n.data->>'pinned')::boolean, false))
+               order by coalesce((n.data->>'pinned')::boolean, false) desc, n.data->>'updatedAt' desc),
+             '[]'::jsonb)
+      from public.panelai_records n
+      where n.house = h and n.collection = 'notes' and not n.deleted
+        and (n.data->>'startDate' is null or n.data->>'startDate' <= d_text)
+        and (n.data->>'endDate' is null or n.data->>'endDate' >= d_text)
+        and (jsonb_typeof(n.data->'weekdays') is distinct from 'array'
+             or jsonb_array_length(n.data->'weekdays') = 0
+             or n.data->'weekdays' @> to_jsonb(extract(dow from d)::int))
+    )
+  );
+
+  select max(t.changed_at) into updated from public.panelai_records t where t.house = h;
+  return body || jsonb_build_object('version', md5(body::text), 'updatedAt', updated);
+end;
+$$;
+
+-- As funções auxiliares recebem o identificador interno da casa: só o banco as chama.
+revoke all on function public.panelai_entry_label(text, jsonb) from public, anon, authenticated;
+revoke all on function public.panelai_day_meals(text, date) from public, anon, authenticated;
+revoke all on function public.panelai_panel_token(text) from public;
+revoke all on function public.panelai_panel(text, date, text) from public;
+grant execute on function public.panelai_panel_token(text) to anon, authenticated;
+grant execute on function public.panelai_panel(text, date, text) to anon, authenticated;

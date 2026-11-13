@@ -232,6 +232,17 @@ export function inviteLink() {
   return `${location.origin}${location.pathname}#/ajustes?casa=${encodeInvite(cfg)}`;
 }
 
+/**
+ * Dados de acesso para o quadro (display): endereço, chave pública e um token
+ * que só permite ler o resumo do dia. Também devolve o resumo atual, para conferência.
+ */
+export async function panelAccess() {
+  if (!cfg) throw new SyncError('Conecte este aparelho a uma casa primeiro.');
+  const remote = createRemote(cfg);
+  const token = await remote.panelToken(cfg.code);
+  return { endpoint: `${cfg.url}/rest/v1/rpc/panelai_panel`, key: cfg.key, token, preview: await remote.panel(token) };
+}
+
 /** Liga a sincronização automática. Chamar uma vez, depois de carregar o banco. */
 export function startSync() {
   setPersistHook(persistHook);

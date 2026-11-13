@@ -68,6 +68,33 @@ Opcional: para o site publicado já vir com endereço e chave preenchidos, crie 
 - O que sincroniza: ingredientes, receitas (com foto), estoque, semanas (cardápio e lista), marmitas, movimentações, compras, recados e configurações da casa. Rascunho de contagem, sessão do mercado do mês e preferências de tela ficam em cada aparelho.
 - "Importar", "Restaurar demonstração" e "Começar do zero" em um aparelho conectado valem para a casa inteira (o app avisa antes).
 
+**Quadro (display)**
+
+Para um display (e-ink, tablet na parede) mostrar o cardápio e os recados, o banco tem a função `panelai_panel`, que devolve só o resumo do dia. Em **Configurações → Sincronização na nuvem → Dados para o quadro** o app mostra o endereço, a chave e um **token do quadro** — somente leitura, diferente do código da casa — junto com uma prévia do que o quadro vai exibir.
+
+```bash
+curl -X POST 'https://SEU-PROJETO.supabase.co/rest/v1/rpc/panelai_panel' \
+  -H 'apikey: SUA_CHAVE_PUBLICA' -H 'Content-Type: application/json' \
+  -d '{"p_token":"TOKEN_DO_QUADRO"}'
+```
+
+```json
+{
+  "date": "2026-11-13",
+  "weekday": 5,
+  "meals": [{ "slot": "almoco", "label": "Almoço", "items": ["Arroz branco", "Feijão carioca"] }],
+  "tomorrow": [{ "slot": "jantar", "label": "Jantar", "items": ["Fora: Pizza"] }],
+  "notes": [{ "text": "Lixo reciclável", "author": "", "pinned": true }],
+  "version": "f683c3ef826f0dd8730f3fbf8a647773",
+  "updatedAt": "2026-11-13T12:40:11+00:00"
+}
+```
+
+- `meals` e `tomorrow` trazem só as refeições preenchidas, na ordem do dia; `weekday` usa 0 = domingo.
+- `version` só muda quando o conteúdo muda: o quadro pode guardar o último valor e pular o redesenho (economiza bateria no e-ink).
+- Parâmetros opcionais: `p_date` (`"AAAA-MM-DD"`, padrão hoje) e `p_tz` (fuso para decidir "hoje", padrão `America/Sao_Paulo`).
+- Quem já tinha instalado o SQL antes desta função precisa executar `supabase/panelai.sql` de novo (não apaga dados).
+
 **Segurança**
 
 - A "casa" é identificada por um código secreto longo, gerado no aparelho. Quem tem o código (ou o link de convite, que o contém) lê e altera os dados: compartilhe só com quem mora com você.

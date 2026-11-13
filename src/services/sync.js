@@ -199,6 +199,7 @@ function explain(status, body) {
     return 'O projeto não tem as funções do PanelAI. Rode o arquivo supabase/panelai.sql no SQL Editor do Supabase.';
   }
   if (/codigo_invalido/.test(msg)) return 'Código da casa inválido.';
+  if (/quadro_invalido/.test(msg)) return 'Token do quadro inválido.';
   return msg ? `Erro do servidor: ${msg}` : `Erro do servidor (${status}).`;
 }
 
@@ -230,6 +231,16 @@ export function createRemote({ url, key, fetch: fetchFn = globalThis.fetch }) {
       const r = await rpc('panelai_pull', { p_code: code, p_since: since, p_limit: limit });
       if (!r || !Array.isArray(r.records)) throw new SyncError('Resposta inesperada do servidor.');
       return { records: r.records, cursor: Number(r.cursor) || since, more: !!r.more };
+    },
+    /** Token somente leitura para o quadro (display) desta casa. */
+    async panelToken(code) {
+      const token = await rpc('panelai_panel_token', { p_code: code });
+      if (typeof token !== 'string' || !token) throw new SyncError('Resposta inesperada do servidor.');
+      return token;
+    },
+    /** Resumo do dia que o quadro mostra: { date, weekday, meals, tomorrow, notes, version, updatedAt }. */
+    panel(token, date = null) {
+      return rpc('panelai_panel', date ? { p_token: token, p_date: date } : { p_token: token });
     },
     /** Envia registros { collection, id, data, deleted, changedAt }. */
     push(code, records) {

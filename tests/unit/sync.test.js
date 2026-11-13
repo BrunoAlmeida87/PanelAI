@@ -160,6 +160,24 @@ describe('cliente do servidor', () => {
     expect(calls[1].body.p_records).toEqual([{ collection: 'recipes', id: 'r1', data: { id: 'r1' }, deleted: false, changedAt: T1 }]);
   });
 
+  it('pede o token do quadro e lê o resumo do dia', async () => {
+    const bodies = [];
+    const fetch = async (url, init) => {
+      bodies.push([url.split('/').pop(), JSON.parse(init.body)]);
+      return ok(url.endsWith('token') ? 'tok123' : { date: '2026-11-13', meals: [] });
+    };
+    const r = createRemote({ url: 'https://x', key: 'k', fetch });
+    expect(await r.panelToken('codigo')).toBe('tok123');
+    expect((await r.panel('tok123')).date).toBe('2026-11-13');
+    await r.panel('tok123', '2026-11-14');
+    expect(bodies).toEqual([
+      ['panelai_panel_token', { p_code: 'codigo' }],
+      ['panelai_panel', { p_token: 'tok123' }],
+      ['panelai_panel', { p_token: 'tok123', p_date: '2026-11-14' }],
+    ]);
+    await expect(createRemote({ url: 'https://x', key: 'k', fetch: async () => ok(null) }).panelToken('c')).rejects.toBeInstanceOf(SyncError);
+  });
+
   it('chaves novas (publishable) não vão no Authorization', async () => {
     let headers;
     const fetch = async (_url, init) => ((headers = init.headers), ok({ records: [], cursor: 0, more: false }));

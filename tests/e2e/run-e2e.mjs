@@ -511,6 +511,37 @@ async function notesAndSync(browser) {
     assert(pa === '4' && pb === '4', `A=${pa} B=${pb}`);
   });
 
+  await step('[quadro] token só de leitura devolve refeições e recados do dia', async () => {
+    currentPage = A;
+    await A.goto(`${BASE}#/ajustes`);
+    await A.getByRole('button', { name: 'Dados para o quadro' }).click();
+    const dlg = A.getByRole('dialog', { name: 'Dados para o quadro' });
+    await dlg.waitFor({ timeout: 15000 });
+    const text = await dlg.locator('.panel-access').textContent();
+    const endpoint = /Endereço: (\S+)/.exec(text)[1];
+    const token = /Token do quadro: (\S+)/.exec(text)[1];
+    assert((await dlg.textContent()).includes('Recado E2E do computador'), 'prévia sem o recado');
+    await A.screenshot({ path: path.join(outDir, 'quadro-dados.png') });
+    await dlg.getByRole('button', { name: 'Fechar', exact: true }).last().click();
+
+    const call = (body) => fetch(endpoint, { method: 'POST', headers: { apikey: srv.apiKey, 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+    const panel = await (await call({ p_token: token })).json();
+    assert(panel.notes.some((n) => n.text === 'Recado E2E do computador' && n.pinned), 'recado fixado ausente');
+    assert(!panel.notes.some((n) => n.text === 'Recado de amanhã'), 'recado de amanhã não deveria aparecer hoje');
+    assert(Array.isArray(panel.meals) && Array.isArray(panel.tomorrow) && panel.version && panel.date, 'formato inesperado');
+    // A semana de demonstração tem strogonoff no almoço de terça.
+    const monday = new Date(`${panel.date}T12:00:00`);
+    monday.setDate(monday.getDate() - ((monday.getDay() + 6) % 7) + 1);
+    const tue = `${monday.getFullYear()}-${String(monday.getMonth() + 1).padStart(2, '0')}-${String(monday.getDate()).padStart(2, '0')}`;
+    const tuesday = await (await call({ p_token: token, p_date: tue })).json();
+    const lunch = tuesday.meals.find((m) => m.slot === 'almoco');
+    assert(lunch?.items.includes('Strogonoff de frango'), `almoço de terça: ${JSON.stringify(tuesday.meals)}`);
+    assert((await call({ p_token: 'token-errado' })).status === 400, 'token errado deveria ser recusado');
+    const cfg = await A.evaluate(() => JSON.parse(localStorage.getItem('panelai.sync')));
+    assert((await call({ p_token: cfg.code })).status === 400, 'o código da casa não deveria servir como token');
+    return `${panel.meals.length} refeições hoje, ${panel.notes.length} recados`;
+  });
+
   await step('[nuvem] desconectar mantém os dados e para de sincronizar', async () => {
     await B.goto(`${BASE}#/ajustes`);
     await B.getByRole('button', { name: 'Desconectar' }).click();

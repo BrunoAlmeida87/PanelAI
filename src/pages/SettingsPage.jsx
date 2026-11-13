@@ -1,18 +1,18 @@
 // Configurações, dados (exportar/importar) e informações do aplicativo.
 
 import { useEffect, useRef, useState } from 'preact/hooks';
-import { Cloud, Copy, Download, Upload, History, Keyboard, Link2, RefreshCw, RotateCcw, Eraser, Smartphone, HardDrive, Info, Unplug } from 'lucide-preact';
+import { Cloud, Copy, Monitor, Download, Upload, History, Keyboard, Link2, RefreshCw, RotateCcw, Eraser, Smartphone, HardDrive, Info, Unplug } from 'lucide-preact';
 import { useStore } from '../storage/store.js';
 import { updateSettings, exportData, importData, resetDemo, startFresh } from '../storage/actions.js';
 import { validateBackup } from '../services/backup.js';
 import { decodeInvite } from '../services/sync.js';
 import { copyText } from '../services/share.js';
-import { createHouse, defaultServer, disconnect, getSyncConfig, inviteLink, joinHouse, syncNow, useSyncStatus } from '../storage/sync.js';
+import { createHouse, defaultServer, disconnect, getSyncConfig, inviteLink, joinHouse, panelAccess, syncNow, useSyncStatus } from '../storage/sync.js';
 import { formatDateTime } from '../utils/dates.js';
 import { navigate } from '../utils/router.js';
 import { WEEKDAY_SHORT, todayISO } from '../utils/dates.js';
 import { usePref } from '../utils/hooks.js';
-import { Chip, Segmented, Stepper, toast, confirmDialog } from '../components/ui.jsx';
+import { Chip, Modal, Segmented, Stepper, toast, confirmDialog } from '../components/ui.jsx';
 import { ShortcutsModal } from '../App.jsx';
 import { getInstallPrompt, onInstallPromptChange } from '../utils/install.js';
 
@@ -259,6 +259,7 @@ function SyncSection({ invite }) {
   const [inviteText, setInviteText] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  const [panel, setPanel] = useState(null);
 
   const run = async (fn, okMessage) => {
     setBusy(true);
@@ -342,6 +343,25 @@ function SyncSection({ invite }) {
             >
               <Copy size={16} /> Copiar link de convite
             </button>
+            <button
+              type="button"
+              class="btn btn-secondary"
+              disabled={busy}
+              onClick={async () => {
+                setBusy(true);
+                setError('');
+                try {
+                  await syncNow(); // o quadro lê da nuvem: envia antes o que estiver pendente
+                  setPanel(await panelAccess());
+                } catch (err) {
+                  setError(String(err?.message ?? err));
+                } finally {
+                  setBusy(false);
+                }
+              }}
+            >
+              <Monitor size={16} /> Dados para o quadro
+            </button>
             <button type="button" class="btn btn-danger-ghost" disabled={busy} onClick={leave}>
               <Unplug size={16} /> Desconectar
             </button>
@@ -395,6 +415,79 @@ function SyncSection({ invite }) {
       {error && (
         <p class="form-error" role="alert">{error}</p>
       )}
+      <PanelModal panel={panel} onClose={() => setPanel(null)} />
     </section>
+  );
+}
+
+/** Texto com tudo o que o firmware do quadro precisa para ler o resumo do dia. */
+function panelText({ endpoint, key, token }) {
+  return [
+    'PanelAI — acesso do quadro (somente leitura)',
+    `Endereço: ${endpoint}`,
+    `Chave (cabeçalho apikey): ${key}`,
+    `Token do quadro: ${token}`,
+    '',
+    'Exemplo:',
+    `curl -X POST '${endpoint}' -H 'apikey: ${key}' -H 'Content-Type: application/json' -d '{"p_token":"${token}"}'`,
+  ].join('\n');
+}
+
+function PanelModal({ panel, onClose }) {
+  if (!panel) return null;
+  const { preview } = panel;
+  const meals = (list) =>
+    list?.length ? (
+      <ul class="mini-list">
+        {list.map((m) => (
+          <li key={m.slot}>
+            <span>{m.label}</span>
+            <span style="text-align:right">{m.items.join(' + ')}</span>
+          </li>
+        ))}
+      </ul>
+    ) : (
+      <p class="small muted">Nada planejado.</p>
+    );
+  return (
+    <Modal
+      open
+      onClose={onClose}
+      title="Dados para o quadro"
+      subtitle="O token só permite ler o resumo do dia. Não dá acesso para alterar nada."
+      footer={
+        <>
+          <button type="button" class="btn btn-secondary" onClick={onClose}>
+            Fechar
+          </button>
+          <button type="button" class="btn btn-primary" onClick={async () => toast((await copyText(panelText(panel))) ? 'Dados do quadro copiados' : 'Não foi possível copiar')}>
+            <Copy size={16} /> Copiar
+          </button>
+        </>
+      }
+    >
+      <div class="form-section">
+        <pre class="panel-access">{panelText(panel)}</pre>
+        <div>
+          <h3 class="section-title">O que o quadro mostra agora ({preview.date.split('-').reverse().join('/')})</h3>
+          <p class="label">Hoje</p>
+          {meals(preview.meals)}
+          <p class="label" style="margin-top:12px">Amanhã</p>
+          {meals(preview.tomorrow)}
+          <p class="label" style="margin-top:12px">Recados</p>
+          {preview.notes?.length ? (
+            <ul class="mini-list">
+              {preview.notes.map((n, i) => (
+                <li key={i}>
+                  <span>{n.text}</span>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p class="small muted">Nenhum recado para hoje.</p>
+          )}
+        </div>
+      </div>
+    </Modal>
   );
 }

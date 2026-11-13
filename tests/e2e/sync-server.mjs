@@ -1,6 +1,7 @@
 // Servidor de sincronização de teste: imita, em memória, as funções
-// panelai_push e panelai_pull de supabase/panelai.sql (mesmo contrato HTTP do Supabase).
+// panelai_push, panelai_pull, panelai_panel_token e panelai_panel de supabase/panelai.sql (mesmo contrato HTTP do Supabase).
 
+import { createHash } from 'node:crypto';
 import { createServer } from 'node:http';
 
 const COLLECTIONS = new Set(['ingredients', 'recipes', 'pantry', 'weeks', 'marmitas', 'movements', 'purchases', 'notes', 'settings']);
@@ -19,7 +20,52 @@ export function startSyncServer(port, { apiKey = 'chave-de-teste' } = {}) {
     return houses.get(code);
   };
 
+  const panels = new Map(); // token → código da casa
+  const iso = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  const SLOTS = [['lanche_manha', 'Lanche da manhã'], ['almoco', 'Almoço'], ['lanche_tarde', 'Lanche da tarde'], ['jantar', 'Jantar']];
+
+  function dayMeals(h, date) {
+    const get = (collection, id) => {
+      const r = h.get(`${collection}:${id}`);
+      return r && !r.deleted ? r.data : null;
+    };
+    const d = new Date(`${date}T12:00:00`);
+    const monday = new Date(d);
+    monday.setDate(d.getDate() - ((d.getDay() + 6) % 7));
+    const day = get('weeks', iso(monday))?.meals?.[date] ?? {};
+    const label = (e) => {
+      if (e.kind === 'recipe') return get('recipes', e.recipeId)?.name ?? 'Receita removida';
+      if (e.kind === 'marmita') return `Marmita: ${get('recipes', get('marmitas', e.marmitaId)?.recipeId)?.name ?? 'Marmita'}`;
+      if (e.kind === 'out') return e.text ? `Fora: ${e.text}` : 'Fora de casa';
+      return e.kind === 'text' ? e.text || 'Refeição livre' : '';
+    };
+    return SLOTS.filter(([id]) => day[id]?.length).map(([slot, name]) => ({ slot, label: name, items: day[slot].map(label) }));
+  }
+
   const rpc = {
+    panelai_panel_token({ p_code }) {
+      house(p_code);
+      const token = `quadro-${Buffer.from(p_code).toString('hex').slice(0, 33)}`;
+      panels.set(token, p_code);
+      return token;
+    },
+    panelai_panel({ p_token, p_date }) {
+      if (!panels.has(p_token)) throw new Error('quadro_invalido');
+      const h = house(panels.get(p_token));
+      const date = p_date ?? iso(new Date());
+      const d = new Date(`${date}T12:00:00`);
+      const next = new Date(d);
+      next.setDate(d.getDate() + 1);
+      const notes = [...h.values()]
+        .filter((r) => r.collection === 'notes' && !r.deleted)
+        .map((r) => r.data)
+        .filter((n) => (!n.startDate || n.startDate <= date) && (!n.endDate || n.endDate >= date) && (!n.weekdays?.length || n.weekdays.includes(d.getDay())))
+        .sort((a, b) => Number(!!b.pinned) - Number(!!a.pinned) || ((a.updatedAt ?? '') < (b.updatedAt ?? '') ? 1 : -1))
+        .map((n) => ({ text: n.text, author: n.author ?? '', pinned: !!n.pinned }));
+      const body = { date, weekday: d.getDay(), meals: dayMeals(h, date), tomorrow: dayMeals(h, iso(next)), notes };
+      const updatedAt = [...h.values()].map((r) => r.changedAt).sort().pop() ?? null;
+      return { ...body, version: createHash('md5').update(JSON.stringify(body)).digest('hex'), updatedAt };
+    },
     panelai_push({ p_code, p_records }) {
       const h = house(p_code);
       let saved = 0;
