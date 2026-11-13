@@ -2,6 +2,7 @@
 
 import { CATEGORY_IDS, MARMITA_STATUS, MEAL_SLOT_IDS } from '../models/constants.js';
 import { validateRecipe } from '../models/recipe.js';
+import { normalizeNote, validateNote } from './notes.js';
 import { isUnit } from '../models/units.js';
 import { isValidISODate, weekStartOf } from '../utils/dates.js';
 
@@ -22,6 +23,7 @@ export function buildBackup(data, now = new Date()) {
       marmitas: Object.values(data.marmitas ?? {}),
       movements: data.movements ?? [],
       purchases: data.purchases ?? [],
+      notes: Object.values(data.notes ?? {}),
       settings: data.settings ?? {},
     },
   };
@@ -135,8 +137,22 @@ export function validateBackup(raw) {
 
   const movements = d.movements.filter((m) => isObj(m) && isStr(m.id));
   const purchases = d.purchases.filter((p) => isObj(p) && isStr(p.id));
+  // Recados são opcionais: backups antigos não têm essa coleção.
+  const notes = {};
+  if (d.notes != null && !Array.isArray(d.notes)) errors.push('Coleção "notes" inválida.');
+  (Array.isArray(d.notes) ? d.notes : []).forEach((n, idx) => {
+    if (!isObj(n) || !isStr(n.id)) {
+      errors.push(`Recado #${idx + 1}: dados inválidos.`);
+      return;
+    }
+    const note = normalizeNote(n);
+    const errs = validateNote(note);
+    if (errs.length) errors.push(`Recado #${idx + 1}: ${errs[0]}`);
+    else notes[note.id] = note;
+  });
+
   const settings = isObj(d.settings) ? d.settings : {};
 
   if (errors.length) return { ok: false, errors: errors.slice(0, 20) };
-  return { ok: true, errors: [], data: { ingredients, recipes, pantry, weeks, marmitas, movements, purchases, settings } };
+  return { ok: true, errors: [], data: { ingredients, recipes, pantry, weeks, marmitas, movements, purchases, notes, settings } };
 }

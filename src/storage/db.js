@@ -3,7 +3,8 @@
 // usamos memória e avisamos o usuário de que os dados não serão mantidos.
 
 const DB_NAME = 'panelai';
-const DB_VERSION = 1;
+// v2: recados (notes) e fila de sincronização (outbox).
+const DB_VERSION = 2;
 
 export const STORES = {
   ingredients: 'id',
@@ -13,7 +14,10 @@ export const STORES = {
   marmitas: 'id',
   movements: 'id',
   purchases: 'id',
+  notes: 'id',
   meta: 'key',
+  // Alterações locais ainda não enviadas para a nuvem (ver storage/sync.js).
+  outbox: 'key',
 };
 
 let dbPromise = null;
@@ -73,6 +77,12 @@ export async function getAll(store) {
   return reqToPromise(db.transaction(store, 'readonly').objectStore(store).getAll());
 }
 
+export async function getAllKeys(store) {
+  if (memory) return [...memory[store].keys()];
+  const db = await dbPromise;
+  return reqToPromise(db.transaction(store, 'readonly').objectStore(store).getAllKeys());
+}
+
 /**
  * Aplica um lote de operações atomicamente.
  * ops: [{ store, type: 'put' | 'delete' | 'clear', value?, key? }]
@@ -105,6 +115,6 @@ export const remove = (store, key) => writeBatch([{ store, type: 'delete', key }
 
 export async function loadAll() {
   const out = {};
-  for (const s of Object.keys(STORES)) out[s] = await getAll(s);
+  for (const s of Object.keys(STORES)) if (s !== 'outbox') out[s] = await getAll(s);
   return out;
 }

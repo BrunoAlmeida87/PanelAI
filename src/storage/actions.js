@@ -15,6 +15,7 @@ import {
 } from '../services/planning.js';
 import { applyStockDelta, newPantryItem, setStock } from '../services/pantry.js';
 import { buildBackup } from '../services/backup.js';
+import { normalizeNote } from '../services/notes.js';
 import { buildSeed } from '../data/seed.js';
 import { DEFAULT_SETTINGS } from '../models/constants.js';
 import { convert } from '../models/units.js';
@@ -481,6 +482,28 @@ export function finalizeMonthly(lines) {
   return { purchase: withSession, errors };
 }
 
+// ---------- Recados ----------
+
+export function saveNote(data) {
+  const now = new Date().toISOString();
+  const note = { ...normalizeNote(data), id: data.id ?? uid('recado'), createdAt: data.createdAt ?? now, updatedAt: now };
+  setState((s) => ({ notes: { ...s.notes, [note.id]: note } }));
+  persist([{ store: 'notes', type: 'put', value: note }]);
+  return note;
+}
+
+/** Exclui e devolve o recado para permitir "Desfazer". */
+export function deleteNote(id) {
+  const s = getState();
+  const note = s.notes[id];
+  if (!note) return null;
+  const notes = { ...s.notes };
+  delete notes[id];
+  setState({ notes });
+  persist([{ store: 'notes', type: 'delete', key: id }]);
+  return note;
+}
+
 // ---------- Configurações e dados ----------
 
 export function updateSettings(patch) {
@@ -505,7 +528,7 @@ export async function resetDemo() {
   applyFullData(seed);
 }
 
-/** Apaga cardápios, estoque e histórico, mantendo receitas e catálogo. */
+/** Apaga cardápios, estoque e histórico, mantendo receitas, catálogo e recados. */
 export async function startFresh() {
   const s = getState();
   const data = {
@@ -516,6 +539,7 @@ export async function startFresh() {
     marmitas: {},
     movements: [],
     purchases: [],
+    notes: s.notes,
     settings: s.settings,
   };
   await persist(seedOps(data));

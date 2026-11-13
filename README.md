@@ -4,11 +4,11 @@
 
 # PanelAI
 
-Organização alimentar e doméstica em um só lugar: **cardápio da semana, receitas, lista de compras, despensa e mercado do mês** — integrados. Ao escolher uma receita, o PanelAI ajusta as porções, soma os ingredientes repetidos, compara com o estoque e atualiza a lista de compras automaticamente.
+Organização alimentar e doméstica em um só lugar: **cardápio da semana, receitas, lista de compras, despensa, mercado do mês e recados** — integrados. Ao escolher uma receita, o PanelAI ajusta as porções, soma os ingredientes repetidos, compara com o estoque e atualiza a lista de compras automaticamente.
 
 **Site publicado:** https://brunoalmeida87.github.io/PanelAI/
 
-Funciona no computador e no celular (layouts diferentes para cada um), pode ser instalado como aplicativo (PWA) e funciona offline depois do primeiro acesso. Os dados ficam salvos no próprio navegador.
+Funciona no computador e no celular (layouts diferentes para cada um), pode ser instalado como aplicativo (PWA) e funciona offline depois do primeiro acesso. Os dados ficam salvos no próprio navegador e, se você ligar a sincronização na nuvem, iguais em todos os aparelhos da casa.
 
 ---
 
@@ -20,7 +20,8 @@ Funciona no computador e no celular (layouts diferentes para cada um), pode ser 
 | **Lista da semana** | Gerada do cardápio: ingredientes somados, convertidos e comparados com o estoque. Agrupada por dia de mercado e categoria. Marcação com um toque, itens avulsos, ajuste manual de quantidade, "já tenho em casa", rastreio de quais receitas geraram cada item, registro da compra no estoque, WhatsApp e impressão. |
 | **Mercado do mês** | **Estoque** (quantidade, mínimo, desejado, última atualização), **Contagem** (inventário da despensa com rascunho salvo) e **No mercado** (compras recorrentes com reposição calculada e finalização única). |
 | **Receitas** | Pratos e lanches com ingredientes estruturados, porções, tempo, dificuldade, proteína, composição, modo de preparo, marmita, congelamento, preparo antecipado e imagem opcional. Busca, filtros, favoritas, duplicar, excluir e **"Com o que tenho"** (sugestões pelo estoque). |
-| **Configurações e histórico** | Pessoas na casa, dias de mercado, exportar/importar JSON, restaurar demonstração, compras concluídas, movimentações de estoque e semanas anteriores. |
+| **Recados** | Avisos curtos para quem mora na casa: texto, autor, fixar no topo, validade (de/até) e repetição por dia da semana ("lixo toda terça"). Os recados de hoje aparecem no topo do cardápio. |
+| **Configurações e histórico** | Pessoas na casa, dias de mercado, sincronização na nuvem, exportar/importar JSON, restaurar demonstração, compras concluídas, movimentações de estoque e semanas anteriores. |
 
 ## Regras de cálculo
 
@@ -35,8 +36,8 @@ Funciona no computador e no celular (layouts diferentes para cada um), pode ser 
 
 ## Celular e computador
 
-- **Computador (≥ 900 px):** navegação superior, calendário com 7 colunas (4 em telas médias), indicadores lado a lado, lista em colunas por categoria, despensa em tabela editável, filtros laterais nas receitas, modais centralizados e atalhos de teclado (`1`–`4` módulos, `←`/`→` semanas, `T` semana atual, `/` buscar, `N` nova receita, `?` ajuda).
-- **Celular (< 600 px):** barra inferior fixa (Cardápio, Compras, Despensa, Receitas) respeitando áreas seguras, cardápio **um dia por vez** com seletor de dias e gesto de deslizar (ou resumo da semana), seletores em tela cheia com rodapé fixo, lista de compras com linhas grandes (tocar marca), categorias recolhíveis, contagem de restantes fixa no topo, estoque em cartões com botões − / +, filtros em painel.
+- **Computador (≥ 900 px):** navegação superior, calendário com 7 colunas (4 em telas médias), indicadores lado a lado, lista em colunas por categoria, despensa em tabela editável, filtros laterais nas receitas, modais centralizados e atalhos de teclado (`1`–`5` módulos, `←`/`→` semanas, `T` semana atual, `/` buscar, `N` nova receita, `?` ajuda).
+- **Celular (< 600 px):** barra inferior fixa (Cardápio, Compras, Despensa, Receitas, Recados) respeitando áreas seguras, cardápio **um dia por vez** com seletor de dias e gesto de deslizar (ou resumo da semana), seletores em tela cheia com rodapé fixo, lista de compras com linhas grandes (tocar marca), categorias recolhíveis, contagem de restantes fixa no topo, estoque em cartões com botões − / +, filtros em painel.
 - **Tablet (600–899 px):** barra inferior e calendário em 2 colunas.
 - Alvos de toque ≥ 44 px, foco visível, rótulos acessíveis, respeito a "reduzir movimento", retrato e paisagem.
 
@@ -44,7 +45,34 @@ Funciona no computador e no celular (layouts diferentes para cada um), pode ser 
 
 - Dados estruturados em **IndexedDB**; preferências simples de interface em `localStorage`.
 - **Exportar:** Configurações → *Exportar (JSON)*. **Importar:** Configurações → *Importar*. O arquivo é validado antes de qualquer alteração; arquivos inválidos são recusados sem mexer nos dados.
-- Não há sincronização entre aparelhos (o GitHub Pages é hospedagem estática). Para levar os dados a outro aparelho, exporte e importe. A camada `src/storage` concentra a persistência para permitir um serviço de sincronização no futuro.
+- Sem configurar nada, os dados ficam só no aparelho. A sincronização entre aparelhos é opcional (abaixo).
+
+## Sincronização na nuvem (opcional)
+
+O site continua hospedado no GitHub Pages; os dados passam a ter uma cópia em um banco na nuvem (Supabase, plano gratuito). Cada aparelho continua funcionando offline com o seu banco local e troca apenas as alterações.
+
+**Configurar uma vez**
+
+1. Crie um projeto em [supabase.com](https://supabase.com).
+2. No projeto, abra **SQL Editor**, cole o conteúdo de [`supabase/panelai.sql`](supabase/panelai.sql) e execute.
+3. Em **Project Settings → API**, copie o endereço do projeto (`https://….supabase.co`) e a chave **pública** (publishable / anon). Nunca use a chave secreta (secret / service_role) no site.
+4. No PanelAI do aparelho que tem os dados: **Configurações → Sincronização na nuvem → Primeiro aparelho: criar a casa**, cole endereço e chave e confirme. Os dados desse aparelho viram os dados da casa.
+5. Toque em **Copiar link de convite** e abra o link nos outros aparelhos. Cada um substitui os dados locais pelos da casa e passa a sincronizar.
+
+Opcional: para o site publicado já vir com endereço e chave preenchidos, crie as variáveis `PANELAI_SYNC_URL` e `PANELAI_SYNC_KEY` em **Settings → Secrets and variables → Actions → Variables** do repositório.
+
+**Como funciona**
+
+- Cada alteração local também entra em uma fila de envio (`outbox`, no IndexedDB). O envio acontece logo após a alteração, ao abrir o app, ao voltar para ele, quando a internet retorna e a cada minuto com o app visível. Sem internet, a fila espera.
+- A sincronização é por registro (uma receita, uma semana, um recado, um item do estoque…). Se dois aparelhos alteram o **mesmo** registro, vence a alteração mais recente; registros diferentes nunca se sobrescrevem. Exclusões também são propagadas.
+- O que sincroniza: ingredientes, receitas (com foto), estoque, semanas (cardápio e lista), marmitas, movimentações, compras, recados e configurações da casa. Rascunho de contagem, sessão do mercado do mês e preferências de tela ficam em cada aparelho.
+- "Importar", "Restaurar demonstração" e "Começar do zero" em um aparelho conectado valem para a casa inteira (o app avisa antes).
+
+**Segurança**
+
+- A "casa" é identificada por um código secreto longo, gerado no aparelho. Quem tem o código (ou o link de convite, que o contém) lê e altera os dados: compartilhe só com quem mora com você.
+- O site nunca acessa a tabela diretamente (RLS ligado, sem políticas); ele só chama duas funções do banco, `panelai_pull` e `panelai_push`, que exigem o código. O servidor guarda apenas o hash do código.
+- Não há login nem recuperação: se todos os aparelhos forem desconectados e o link se perder, os dados da nuvem ficam inacessíveis (os dados locais e o backup em JSON continuam valendo).
 
 ## Instalar como aplicativo
 
@@ -69,7 +97,7 @@ Testes de ponta a ponta e responsividade (Playwright com Chromium instalado no a
 npm run build && npm run test:e2e
 ```
 
-Cobrem os fluxos em desktop (1440 px) e celular (Pixel 7): criar receita, selecionar refeição, alterar porções, navegar entre semanas, gerar lista, rastrear ingrediente, marcar comprados, registrar compra, atualizar estoque, contagem, compra mensal, exportar, importar, persistência após recarregar, barra inferior sem sobrepor conteúdo, modal com teclado virtual, orientação paisagem, gesto de deslizar, atalhos e foco; ausência de rolagem horizontal em 360, 390, 430, 768, 1024 e 1440 px; e funcionamento offline. Capturas ficam em `tests/e2e/output/`.
+Cobrem os fluxos em desktop (1440 px) e celular (Pixel 7): recados, sincronização entre dois aparelhos (com um servidor de teste em memória que imita as funções do Supabase), criar receita, selecionar refeição, alterar porções, navegar entre semanas, gerar lista, rastrear ingrediente, marcar comprados, registrar compra, atualizar estoque, contagem, compra mensal, exportar, importar, persistência após recarregar, barra inferior sem sobrepor conteúdo, modal com teclado virtual, orientação paisagem, gesto de deslizar, atalhos e foco; ausência de rolagem horizontal em 360, 390, 430, 768, 1024 e 1440 px; e funcionamento offline. Capturas ficam em `tests/e2e/output/`.
 
 Ícones PNG são gerados a partir dos SVGs com `npm run icons`.
 

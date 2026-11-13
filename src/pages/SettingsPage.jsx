@@ -1,10 +1,15 @@
 // Configurações, dados (exportar/importar) e informações do aplicativo.
 
 import { useEffect, useRef, useState } from 'preact/hooks';
-import { Download, Upload, History, Keyboard, RotateCcw, Eraser, Smartphone, HardDrive, Info } from 'lucide-preact';
+import { Cloud, Copy, Download, Upload, History, Keyboard, Link2, RefreshCw, RotateCcw, Eraser, Smartphone, HardDrive, Info, Unplug } from 'lucide-preact';
 import { useStore } from '../storage/store.js';
 import { updateSettings, exportData, importData, resetDemo, startFresh } from '../storage/actions.js';
 import { validateBackup } from '../services/backup.js';
+import { decodeInvite } from '../services/sync.js';
+import { copyText } from '../services/share.js';
+import { createHouse, defaultServer, disconnect, getSyncConfig, inviteLink, joinHouse, syncNow, useSyncStatus } from '../storage/sync.js';
+import { formatDateTime } from '../utils/dates.js';
+import { navigate } from '../utils/router.js';
 import { WEEKDAY_SHORT, todayISO } from '../utils/dates.js';
 import { usePref } from '../utils/hooks.js';
 import { Chip, Segmented, Stepper, toast, confirmDialog } from '../components/ui.jsx';
@@ -13,7 +18,7 @@ import { getInstallPrompt, onInstallPromptChange } from '../utils/install.js';
 
 const MARKET_ORDER = [1, 2, 3, 4, 5, 6, 0];
 
-export function SettingsPage() {
+export function SettingsPage({ params = {} }) {
   const s = useStore();
   const [mobileView, setMobileView] = usePref('menuMobileView', 'day');
   const [shortcuts, setShortcuts] = useState(false);
@@ -63,7 +68,7 @@ export function SettingsPage() {
     const d = result.data;
     const ok = await confirmDialog({
       title: 'Importar dados',
-      message: `O arquivo tem ${Object.keys(d.recipes).length} receitas, ${Object.keys(d.weeks).length} semanas e ${Object.keys(d.pantry).length} produtos na despensa. Os dados atuais deste aparelho serão substituídos. Recomendamos exportar um backup antes.`,
+      message: `O arquivo tem ${Object.keys(d.recipes).length} receitas, ${Object.keys(d.weeks).length} semanas e ${Object.keys(d.pantry).length} produtos na despensa. Os dados atuais deste aparelho serão substituídos.${sharedWarning} Recomendamos exportar um backup antes.`,
       confirmLabel: 'Substituir dados',
       danger: true,
     });
@@ -71,6 +76,10 @@ export function SettingsPage() {
     await importData(d);
     toast('Dados importados');
   };
+
+  // Com a sincronização ligada, trocar todos os dados vale para a casa inteira.
+  const sync = useSyncStatus();
+  const sharedWarning = sync.connected ? ' Como este aparelho está sincronizado, a mudança vale para todos os aparelhos da casa.' : '';
 
   const fmtMB = (b) => `${(b / 1024 / 1024).toFixed(1)} MB`;
 
@@ -130,7 +139,7 @@ export function SettingsPage() {
         <div class="notice info">
           <HardDrive size={18} />
           <span>
-            Tudo fica salvo neste navegador (IndexedDB) e funciona sem internet. Não há sincronização automática entre aparelhos: para levar seus dados a outro aparelho, exporte aqui e importe lá.
+            Tudo fica salvo neste navegador (IndexedDB) e funciona sem internet. O backup em arquivo continua valendo mesmo com a sincronização ligada.
             {usage?.usage != null && ` Uso atual: ${fmtMB(usage.usage)}.`}
           </span>
         </div>
@@ -163,7 +172,7 @@ export function SettingsPage() {
             onClick={async () => {
               const ok = await confirmDialog({
                 title: 'Restaurar demonstração',
-                message: 'Substitui todos os dados atuais pelas receitas, despensa e cardápio de exemplo.',
+                message: `Substitui todos os dados atuais pelas receitas, despensa e cardápio de exemplo.${sharedWarning}`,
                 confirmLabel: 'Restaurar',
                 danger: true,
               });
@@ -181,7 +190,7 @@ export function SettingsPage() {
             onClick={async () => {
               const ok = await confirmDialog({
                 title: 'Começar do zero',
-                message: 'Apaga cardápios, despensa, marmitas e histórico. Receitas e catálogo de ingredientes são mantidos.',
+                message: `Apaga cardápios, despensa, marmitas e histórico. Receitas, catálogo de ingredientes e recados são mantidos.${sharedWarning}`,
                 confirmLabel: 'Apagar',
                 danger: true,
               });
@@ -195,6 +204,8 @@ export function SettingsPage() {
           </button>
         </div>
       </section>
+
+      <SyncSection invite={params.casa} />
 
       <section class="card card-pad form-section" style="margin-top:16px" aria-labelledby="app">
         <h2 id="app" class="section-title" style="margin:0">Aplicativo</h2>
@@ -223,10 +234,167 @@ export function SettingsPage() {
           </p>
         )}
         <p class="small muted" style="display:flex;gap:6px;align-items:center">
-          <Info size={14} /> PanelAI 1.0 · dados locais · sem envio de informações para servidores.
+          <Info size={14} /> PanelAI 1.1 · dados neste aparelho; só vão para a nuvem se você ligar a sincronização.
         </p>
       </section>
       <ShortcutsModal open={shortcuts} onClose={() => setShortcuts(false)} />
     </div>
+  );
+}
+
+const STATE_TEXT = {
+  idle: 'Sincronizado',
+  syncing: 'Sincronizando…',
+  offline: 'Sem conexão — as alterações serão enviadas quando a internet voltar',
+  error: 'Erro na sincronização',
+};
+
+/** Sincronização na nuvem: criar uma casa, entrar em uma casa por convite, estado e desconexão. */
+function SyncSection({ invite }) {
+  const sync = useSyncStatus();
+  const preset = defaultServer();
+  const hasPreset = !!(preset.url && preset.key);
+  const [url, setUrl] = useState(preset.url);
+  const [key, setKey] = useState(preset.key);
+  const [inviteText, setInviteText] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+
+  const run = async (fn, okMessage) => {
+    setBusy(true);
+    setError('');
+    try {
+      await fn();
+      toast(okMessage);
+    } catch (err) {
+      setError(String(err?.message ?? err));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const join = async (text) => {
+    const cfg = decodeInvite(text);
+    if (!cfg) return setError('Convite inválido. Copie o link completo no aparelho que já está conectado.');
+    const ok = await confirmDialog({
+      title: 'Entrar na casa',
+      message: 'Os dados deste aparelho (cardápios, receitas, despensa e recados) serão substituídos pelos da casa. Se quiser guardá-los, exporte um backup antes.',
+      confirmLabel: 'Entrar e substituir',
+      danger: true,
+    });
+    if (ok) await run(() => joinHouse(cfg), 'Aparelho conectado à casa');
+  };
+
+  // Link de convite aberto neste aparelho (#/ajustes?casa=…): pergunta e limpa o endereço.
+  useEffect(() => {
+    if (!invite) return;
+    navigate('/ajustes', { replace: true });
+    if (getSyncConfig()) setError('Este aparelho já está conectado a uma casa. Desconecte antes de usar outro convite.');
+    else join(invite);
+  }, [invite]);
+
+  const create = async () => {
+    const ok = await confirmDialog({
+      title: 'Criar casa na nuvem',
+      message: 'Os dados deste aparelho serão enviados para o seu projeto e passam a ser os dados da casa. Depois, conecte os outros aparelhos com o link de convite.',
+      confirmLabel: 'Criar e enviar',
+    });
+    if (ok) await run(() => createHouse({ url, key }), 'Casa criada. Agora convide os outros aparelhos.');
+  };
+
+  const leave = async () => {
+    const ok = await confirmDialog({
+      title: 'Desconectar este aparelho',
+      message: 'O aparelho para de sincronizar. Os dados continuam aqui e na nuvem. Para voltar, você precisará do link de convite — copie-o antes se este for o único aparelho conectado.',
+      confirmLabel: 'Desconectar',
+      danger: true,
+    });
+    if (ok) await run(disconnect, 'Aparelho desconectado');
+  };
+
+  return (
+    <section class="card card-pad form-section" style="margin-top:16px" aria-labelledby="nuvem">
+      <h2 id="nuvem" class="section-title" style="margin:0">Sincronização na nuvem</h2>
+
+      {sync.connected ? (
+        <>
+          <div class="notice info">
+            <Cloud size={18} />
+            <span class="sync-status">
+              <strong>{STATE_TEXT[sync.state] ?? 'Conectado'}</strong>
+              <span class="small">
+                {sync.lastSync ? `Última sincronização: ${formatDateTime(sync.lastSync)}.` : 'Ainda não sincronizou nesta sessão.'}
+                {sync.pending > 0 && ` ${sync.pending} alteração(ões) aguardando envio.`}
+              </span>
+            </span>
+          </div>
+          {sync.state === 'error' && sync.error && (
+            <p class="form-error" role="alert">{sync.error}</p>
+          )}
+          <div class="toolbar">
+            <button type="button" class="btn btn-primary" disabled={busy || sync.state === 'syncing'} onClick={() => syncNow()}>
+              <RefreshCw size={16} /> Sincronizar agora
+            </button>
+            <button
+              type="button"
+              class="btn btn-secondary"
+              onClick={async () => toast((await copyText(inviteLink())) ? 'Link de convite copiado' : 'Não foi possível copiar')}
+            >
+              <Copy size={16} /> Copiar link de convite
+            </button>
+            <button type="button" class="btn btn-danger-ghost" disabled={busy} onClick={leave}>
+              <Unplug size={16} /> Desconectar
+            </button>
+          </div>
+          <p class="small muted">
+            Abra o link de convite em outro celular ou computador para conectá-lo à mesma casa. Quem tem o link consegue ver e alterar os dados: envie só para quem mora com você.
+          </p>
+        </>
+      ) : (
+        <>
+          <p class="small muted" style="margin:0">
+            Mantém cardápio, compras, despensa, receitas e recados iguais em todos os aparelhos da casa, de qualquer lugar. As alterações feitas sem internet são enviadas quando a conexão volta.
+          </p>
+          <div class="field">
+            <label class="label" for="invite">Já tem uma casa? Cole o link de convite</label>
+            <div class="toolbar">
+              <input id="invite" class="input" style="flex:1;min-width:180px" type="text" value={inviteText} onInput={(e) => setInviteText(e.currentTarget.value)} autocomplete="off" />
+              <button type="button" class="btn btn-primary" disabled={busy || !inviteText.trim()} onClick={() => join(inviteText)}>
+                <Link2 size={16} /> Entrar
+              </button>
+            </div>
+          </div>
+          <details open={!hasPreset}>
+            <summary class="label" style="cursor:pointer">Primeiro aparelho: criar a casa</summary>
+            <div class="form-section" style="margin-top:12px">
+              {!hasPreset && (
+                <ol class="sync-steps small muted">
+                  <li>Crie um projeto gratuito em supabase.com.</li>
+                  <li>No SQL Editor do projeto, cole e execute o arquivo <code>supabase/panelai.sql</code> do repositório.</li>
+                  <li>Em Project Settings → API, copie o endereço do projeto e a chave pública (publishable / anon) para os campos abaixo.</li>
+                </ol>
+              )}
+              <div class="field">
+                <label class="label" for="sync-url">Endereço do projeto</label>
+                <input id="sync-url" class="input" type="url" placeholder="https://xxxxxxxx.supabase.co" value={url} onInput={(e) => setUrl(e.currentTarget.value)} autocomplete="off" />
+              </div>
+              <div class="field">
+                <label class="label" for="sync-key">Chave pública</label>
+                <input id="sync-key" class="input" type="text" value={key} onInput={(e) => setKey(e.currentTarget.value)} autocomplete="off" />
+                <span class="hint">Use a chave pública (publishable ou anon). Nunca a chave secreta (secret / service_role).</span>
+              </div>
+              <div class="toolbar">
+                <button type="button" class="btn btn-secondary" disabled={busy || !url.trim() || !key.trim()} onClick={create}>
+                  <Cloud size={16} /> Criar casa com os dados deste aparelho
+                </button>
+              </div>
+            </div>
+          </details>
+        </>
+      )}
+      {error && (
+        <p class="form-error" role="alert">{error}</p>
+      )}
+    </section>
   );
 }

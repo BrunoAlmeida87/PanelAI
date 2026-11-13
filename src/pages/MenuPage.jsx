@@ -51,7 +51,9 @@ import {
   weekdayName,
   weekdayShort,
   parseISODate,
+  weekStartOf,
 } from '../utils/dates.js';
+import { TodayNotes } from './NotesPage.jsx';
 import { useIsPhone, usePref } from '../utils/hooks.js';
 import { Modal, Menu, Progress, Segmented, toast, confirmDialog, EmptyState } from '../components/ui.jsx';
 import { MealPicker } from './menu/MealPicker.jsx';
@@ -146,6 +148,7 @@ export function MenuPage({ weekId }) {
 
   return (
     <div class="menu-page">
+      {weekId === weekStartOf(todayISO()) && <TodayNotes />}
       <div class="menu-head">
         <div class="grow">
           <h1>

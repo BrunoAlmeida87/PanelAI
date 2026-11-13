@@ -10,6 +10,7 @@ const ROUTES = [
   ['receita-nova', /^\/receitas\/nova$/],
   ['receita-editar', /^\/receitas\/([^/]+)\/editar$/],
   ['receita', /^\/receitas\/([^/]+)$/],
+  ['recados', /^\/recados$/],
   ['ajustes', /^\/ajustes$/],
   ['historico', /^\/historico$/],
 ];

@@ -9,6 +9,9 @@ import { createRequire } from 'node:module';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import { encodeInvite } from '../../src/services/sync.js';
+import { startSyncServer } from './sync-server.mjs';
+
 const require = createRequire(import.meta.url);
 const { chromium, devices } = require('playwright');
 
@@ -311,6 +314,10 @@ async function flows(browser, label, opts) {
       await page.getByRole('heading', { name: 'Lista da semana' }).waitFor();
       await page.keyboard.press('4');
       await page.getByRole('heading', { name: 'Receitas', level: 1 }).waitFor();
+      await page.keyboard.press('5');
+      await page.getByRole('heading', { name: 'Recados', level: 1 }).waitFor();
+      await page.keyboard.press('4');
+      await page.getByRole('heading', { name: 'Receitas', level: 1 }).waitFor();
       await page.keyboard.press('/');
       const focused = await page.evaluate(() => document.activeElement?.getAttribute('aria-label'));
       assert(focused === 'Buscar receitas', `foco em ${focused}`);
@@ -337,7 +344,7 @@ async function flows(browser, label, opts) {
 
 async function responsive(browser) {
   const widths = [360, 390, 430, 768, 1024, 1440];
-  const routes = ['cardapio', 'compras', 'despensa/estoque', 'despensa/contagem', 'despensa/mercado', 'receitas', 'receitas/strogonoff-frango', 'receitas/nova', 'ajustes', 'historico'];
+  const routes = ['cardapio', 'compras', 'despensa/estoque', 'despensa/contagem', 'despensa/mercado', 'receitas', 'receitas/strogonoff-frango', 'receitas/nova', 'recados', 'ajustes', 'historico'];
   for (const w of widths) {
     const touch = w < 900;
     const ctx = await browser.newContext({ viewport: { width: w, height: w < 600 ? 800 : 900 }, hasTouch: touch, isMobile: w < 600 });
@@ -367,6 +374,168 @@ async function responsive(browser) {
     record(`[${w}px] sem rolagem horizontal em ${routes.length} telas${touch ? ' e alvos de toque ≥ 40px' : ''}`, bad.length === 0 && small === 0, [...bad, small ? `${small} alvos pequenos` : ''].filter(Boolean).join(', '));
     await ctx.close();
   }
+}
+
+// Recados e sincronização entre dois aparelhos (computador A e celular B).
+// Por padrão usa o servidor de teste em memória; PANELAI_SYNC_TEST_URL/KEY
+// apontam para um servidor real com supabase/panelai.sql instalado.
+async function notesAndSync(browser) {
+  const fake = process.env.PANELAI_SYNC_TEST_URL ? null : await startSyncServer(4322);
+  const srv = fake ?? { url: process.env.PANELAI_SYNC_TEST_URL, apiKey: process.env.PANELAI_SYNC_TEST_KEY ?? 'chave-de-teste' };
+  const a = await newPage(browser, { viewport: { width: 1280, height: 900 } });
+  const b = await newPage(browser, { ...devices['Pixel 7'] });
+  const A = a.page;
+  const B = b.page;
+  currentPage = A;
+
+  const addNote = async (page, text) => {
+    await page.goto(`${BASE}#/recados`);
+    await page.getByRole('button', { name: 'Novo recado' }).click();
+    const dlg = page.getByRole('dialog');
+    await dlg.getByLabel('Recado', { exact: true }).fill(text);
+    await dlg.getByRole('button', { name: 'Salvar' }).click();
+    await dlg.waitFor({ state: 'detached' });
+    await page.locator('.note-card', { hasText: text }).waitFor();
+  };
+  const syncNow = async (page) => {
+    await page.goto(`${BASE}#/ajustes`);
+    await page.getByRole('button', { name: 'Sincronizar agora' }).click();
+    await page.waitForFunction(() => /Última sincronização/.test(document.querySelector('.sync-status')?.textContent ?? ''));
+    await page.waitForTimeout(300);
+  };
+  const hasNote = async (page, text) => {
+    await page.goto(`${BASE}#/recados`);
+    await page.getByRole('heading', { name: 'Recados', level: 1 }).waitFor();
+    return (await page.locator('.note-card', { hasText: text }).count()) > 0;
+  };
+
+  await step('[recados] criar, fixar, aparecer no cardápio e sobreviver ao recarregar', async () => {
+    await addNote(A, 'Recado E2E do computador');
+    await A.locator('.note-card', { hasText: 'Recado E2E' }).getByRole('button', { name: 'Fixar recado no topo' }).click();
+    assert((await A.locator('.note-card').first().textContent()).includes('Recado E2E'), 'fixado não foi para o topo');
+    await A.goto(`${BASE}#/cardapio`);
+    await A.locator('.today-notes', { hasText: 'Recado E2E do computador' }).waitFor();
+    await A.reload();
+    await A.locator('.today-notes', { hasText: 'Recado E2E do computador' }).waitFor();
+    await A.screenshot({ path: path.join(outDir, 'recados-cardapio.png') });
+  });
+
+  await step('[recados] programado para outro dia não aparece hoje; excluir e desfazer', async () => {
+    await A.goto(`${BASE}#/recados`);
+    await A.getByRole('button', { name: 'Novo recado' }).click();
+    const dlg = A.getByRole('dialog');
+    await dlg.getByLabel('Recado', { exact: true }).fill('Recado de amanhã');
+    const tomorrow = await A.evaluate(() => {
+      const d = new Date();
+      d.setDate(d.getDate() + 1);
+      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    });
+    await dlg.getByLabel('Aparece a partir de').fill(tomorrow);
+    await dlg.getByRole('button', { name: 'Salvar' }).click();
+    await A.getByRole('region', { name: 'Programados' }).locator('.note-card', { hasText: 'Recado de amanhã' }).waitFor();
+    await A.locator('.note-card', { hasText: 'Recado de amanhã' }).getByRole('button', { name: 'Excluir recado' }).click();
+    assert((await A.locator('.note-card', { hasText: 'Recado de amanhã' }).count()) === 0, 'não excluiu');
+    await A.getByRole('button', { name: 'Desfazer' }).click();
+    await A.locator('.note-card', { hasText: 'Recado de amanhã' }).waitFor();
+    await A.screenshot({ path: path.join(outDir, 'recados-desktop.png') });
+  });
+
+  let invite = '';
+  await step('[nuvem] A cria a casa e envia os dados', async () => {
+    await A.goto(`${BASE}#/ajustes`);
+    await A.locator('#sync-url').fill(srv.url);
+    await A.locator('#sync-key').fill(srv.apiKey);
+    await A.getByRole('button', { name: 'Criar casa com os dados deste aparelho' }).click();
+    await A.getByRole('button', { name: 'Criar e enviar' }).click();
+    await A.getByRole('button', { name: 'Copiar link de convite' }).waitFor({ timeout: 15000 });
+    await A.locator('.sync-status', { hasText: 'Última sincronização' }).waitFor({ timeout: 15000 }); // envio inicial concluído
+    const cfg = await A.evaluate(() => JSON.parse(localStorage.getItem('panelai.sync')));
+    assert(cfg.cursor > 0, 'cursor não avançou');
+    invite = encodeInvite(cfg);
+    await A.screenshot({ path: path.join(outDir, 'nuvem-conectado.png') });
+    return `cursor ${cfg.cursor}`;
+  });
+
+  await step('[nuvem] B entra pelo link de convite e recebe os dados de A', async () => {
+    currentPage = B;
+    await B.goto(`${BASE}#/ajustes?casa=${invite}`);
+    await B.getByRole('button', { name: 'Entrar e substituir' }).click();
+    await B.getByRole('button', { name: 'Copiar link de convite' }).waitFor({ timeout: 15000 });
+    assert(!(await B.evaluate(() => location.hash)).includes('casa='), 'convite ficou no endereço');
+    assert(await hasNote(B, 'Recado E2E do computador'), 'recado de A não chegou em B');
+    await B.goto(`${BASE}#/receitas`);
+    await B.getByText('Strogonoff de frango').first().waitFor();
+    await B.screenshot({ path: path.join(outDir, 'nuvem-celular.png') });
+  });
+
+  await step('[nuvem] alteração em B chega em A sozinha (sem tocar em nada)', async () => {
+    await addNote(B, 'Recado do celular');
+    await B.waitForTimeout(2500); // envio automático após a alteração
+    await A.goto(`${BASE}#/recados`);
+    await A.evaluate(() => document.dispatchEvent(new Event('visibilitychange'))); // voltar para o app
+    await A.locator('.note-card', { hasText: 'Recado do celular' }).waitFor({ timeout: 8000 });
+  });
+
+  await step('[nuvem] exclusão em A some em B', async () => {
+    currentPage = A;
+    await A.locator('.note-card', { hasText: 'Recado do celular' }).getByRole('button', { name: 'Excluir recado' }).click();
+    await syncNow(A);
+    await syncNow(B);
+    assert(!(await hasNote(B, 'Recado do celular')), 'recado excluído continua em B');
+  });
+
+  await step('[nuvem] alteração feita offline é enviada quando a conexão volta', async () => {
+    currentPage = B;
+    await b.ctx.setOffline(true);
+    await addNote(B, 'Recado sem internet');
+    await B.waitForTimeout(2500);
+    await b.ctx.setOffline(false);
+    await B.evaluate(() => window.dispatchEvent(new Event('online')));
+    await B.waitForTimeout(2000);
+    await syncNow(A);
+    assert(await hasNote(A, 'Recado sem internet'), 'recado offline não chegou em A');
+  });
+
+  await step('[nuvem] cardápio e configurações também sincronizam; conflito: vence a alteração mais recente', async () => {
+    await A.goto(`${BASE}#/ajustes`);
+    await A.getByRole('button', { name: 'Aumentar Pessoas na casa' }).click();
+    await A.waitForTimeout(100);
+    await B.goto(`${BASE}#/ajustes`);
+    await B.getByRole('button', { name: 'Aumentar Pessoas na casa' }).click();
+    await B.getByRole('button', { name: 'Aumentar Pessoas na casa' }).click();
+    await syncNow(B);
+    await syncNow(A);
+    await syncNow(B);
+    const people = (p) => p.getByRole('textbox', { name: 'Pessoas na casa' }).inputValue();
+    const [pa, pb] = [await people(A), await people(B)];
+    assert(pa === '4' && pb === '4', `A=${pa} B=${pb}`);
+  });
+
+  await step('[nuvem] desconectar mantém os dados e para de sincronizar', async () => {
+    await B.goto(`${BASE}#/ajustes`);
+    await B.getByRole('button', { name: 'Desconectar' }).click();
+    await B.getByRole('dialog').getByRole('button', { name: 'Desconectar' }).click();
+    await B.getByRole('button', { name: 'Criar casa com os dados deste aparelho' }).waitFor();
+    assert((await B.evaluate(() => localStorage.getItem('panelai.sync'))) === null, 'configuração não foi removida');
+    assert(await hasNote(B, 'Recado sem internet'), 'dados locais sumiram');
+  });
+
+  await step('[nuvem] chave errada mostra erro claro e não altera nada', async () => {
+    await B.goto(`${BASE}#/ajustes`);
+    await B.locator('#sync-url').fill(srv.url);
+    await B.locator('#sync-key').fill('chave-errada');
+    await B.getByRole('button', { name: 'Criar casa com os dados deste aparelho' }).click();
+    await B.getByRole('button', { name: 'Criar e enviar' }).click();
+    await B.getByRole('alert').filter({ hasText: /chave pública|Erro do servidor/ }).waitFor();
+    assert((await B.evaluate(() => localStorage.getItem('panelai.sync'))) === null, 'conectou com chave errada');
+  });
+
+  const ignore = (e) => /Failed to load resource|ERR_INTERNET_DISCONNECTED|401/.test(e);
+  const errs = [...A.errors, ...B.errors].filter((e) => !ignore(e));
+  record('[nuvem] sem erros no console', errs.length === 0, errs.slice(0, 3).join(' | '));
+  await a.ctx.close();
+  await b.ctx.close();
+  fake?.close();
 }
 
 async function offline(browser) {
@@ -403,10 +572,17 @@ await mkdir(outDir, { recursive: true });
 const server = await startServer();
 const browser = await chromium.launch();
 try {
-  await flows(browser, 'desktop', { viewport: { width: 1440, height: 900 } });
-  await flows(browser, 'mobile', { ...devices['Pixel 7'] });
-  await responsive(browser);
-  await offline(browser);
+  // PANELAI_E2E_ONLY=nuvem roda só recados e sincronização (mais rápido ao mexer nessa parte).
+  const only = process.env.PANELAI_E2E_ONLY;
+  if (!only) {
+    await flows(browser, 'desktop', { viewport: { width: 1440, height: 900 } });
+    await flows(browser, 'mobile', { ...devices['Pixel 7'] });
+  }
+  await notesAndSync(browser);
+  if (!only) {
+    await responsive(browser);
+    await offline(browser);
+  }
 } finally {
   await browser.close();
   server.kill();

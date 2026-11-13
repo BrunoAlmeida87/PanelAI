@@ -35,6 +35,11 @@ jobs:
 
       - name: Build de produção
         run: npm run build
+        env:
+          # Opcional: servidor de sincronização já preenchido no site publicado.
+          # Defina em Settings → Secrets and variables → Actions → Variables.
+          VITE_SYNC_URL: ${{ vars.PANELAI_SYNC_URL }}
+          VITE_SYNC_KEY: ${{ vars.PANELAI_SYNC_KEY }}
 
       - name: Enviar artefato do site
         if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'

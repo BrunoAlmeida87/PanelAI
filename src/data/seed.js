@@ -108,6 +108,30 @@ export function buildSeed(now = new Date()) {
     marmitas,
     movements: [],
     purchases: [],
+    notes: {
+      recado_demo_lixo: {
+        id: 'recado_demo_lixo',
+        text: 'Colocar o lixo reciclável para fora',
+        author: '',
+        pinned: false,
+        startDate: null,
+        endDate: null,
+        weekdays: [2, 4],
+        createdAt: stamp,
+        updatedAt: stamp,
+      },
+      recado_demo_boasvindas: {
+        id: 'recado_demo_boasvindas',
+        text: 'Bem-vindo ao PanelAI! Deixe aqui avisos para quem mora com você.',
+        author: 'PanelAI',
+        pinned: true,
+        startDate: null,
+        endDate: d(6),
+        weekdays: [],
+        createdAt: stamp,
+        updatedAt: stamp,
+      },
+    },
     settings: { ...DEFAULT_SETTINGS },
   };
 }

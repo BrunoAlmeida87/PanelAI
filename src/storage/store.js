@@ -21,6 +21,7 @@ let state = {
   marmitas: {},
   movements: [],
   purchases: [],
+  notes: {},
   settings: { ...DEFAULT_SETTINGS },
   monthlySession: { id: null, checked: {}, qty: {} },
   countDraft: {},
@@ -52,6 +53,25 @@ export function useStore() {
 
 let pending = Promise.resolve();
 let inFlight = 0;
+let persistHook = null;
+
+/**
+ * Registra uma função chamada antes de cada gravação. Ela recebe as operações
+ * e pode devolver operações extras, gravadas na mesma transação (a
+ * sincronização usa isso para anotar o que precisa ser enviado à nuvem).
+ */
+export function setPersistHook(fn) {
+  persistHook = fn;
+}
+
+/** Executa uma tarefa de banco na mesma fila das gravações (sem intercalar com elas). */
+export function runExclusive(fn) {
+  const p = pending.then(fn);
+  pending = p.catch(() => {});
+  return p;
+}
+
+export const hasPendingWrites = () => inFlight > 0;
 
 /** Enfileira gravações para manter a ordem e atualiza o indicador de salvamento. */
 export function persist(ops) {
@@ -59,7 +79,10 @@ export function persist(ops) {
   inFlight++;
   setState({ saveStatus: 'saving' });
   pending = pending
-    .then(() => writeBatch(ops))
+    .then(async () => {
+      const extra = persistHook ? await persistHook(ops) : [];
+      await writeBatch(extra.length ? [...ops, ...extra] : ops);
+    })
     .then(() => {
       inFlight--;
       if (inFlight === 0) setState({ saveStatus: 'saved' });
@@ -78,9 +101,9 @@ const byKey = (list, key) => Object.fromEntries(list.map((x) => [x[key], x]));
 
 export function seedOps(seed) {
   const ops = [];
-  for (const s of ['ingredients', 'recipes', 'pantry', 'weeks', 'marmitas']) {
+  for (const s of ['ingredients', 'recipes', 'pantry', 'weeks', 'marmitas', 'notes']) {
     ops.push({ store: s, type: 'clear' });
-    for (const v of Object.values(seed[s])) ops.push({ store: s, type: 'put', value: v });
+    for (const v of Object.values(seed[s] ?? {})) ops.push({ store: s, type: 'put', value: v });
   }
   for (const s of ['movements', 'purchases']) {
     ops.push({ store: s, type: 'clear' });
@@ -101,9 +124,43 @@ export function applyFullData(data) {
     marmitas: data.marmitas,
     movements: [...data.movements].sort((a, b) => (a.date < b.date ? 1 : -1)),
     purchases: [...data.purchases].sort((a, b) => (a.date < b.date ? 1 : -1)),
+    notes: data.notes ?? {},
     settings: { ...DEFAULT_SETTINGS, ...data.settings },
     monthlySession: { id: null, checked: {}, qty: {} },
     countDraft: {},
+  });
+}
+
+function stateFromDB(all) {
+  const meta = byKey(all.meta, 'key');
+  return {
+    ingredients: byKey(all.ingredients, 'id'),
+    recipes: byKey(all.recipes, 'id'),
+    pantry: byKey(all.pantry, 'ingredientId'),
+    weeks: byKey(all.weeks, 'id'),
+    marmitas: byKey(all.marmitas, 'id'),
+    movements: all.movements.sort((a, b) => (a.date < b.date ? 1 : -1)),
+    purchases: all.purchases.sort((a, b) => (a.date < b.date ? 1 : -1)),
+    notes: byKey(all.notes, 'id'),
+    settings: { ...DEFAULT_SETTINGS, ...(meta.settings?.value ?? {}) },
+    monthlySession: meta.monthlySession?.value ?? { id: null, checked: {}, qty: {} },
+    countDraft: meta.countDraft?.value ?? {},
+  };
+}
+
+/**
+ * Relê tudo do banco para a memória (usado depois que a sincronização grava
+ * dados vindos de outro aparelho). Só troca o estado quando não há gravação
+ * local na fila, para nunca sobrescrever uma alteração recém-feita na tela.
+ */
+export function reloadFromDB() {
+  return runExclusive(async () => {
+    const all = await loadAll();
+    if (hasPendingWrites()) {
+      reloadFromDB(); // entra de novo no fim da fila (sem aguardar: estamos dentro dela)
+      return;
+    }
+    setState(stateFromDB(all));
   });
 }
 
@@ -117,18 +174,7 @@ export async function bootstrap() {
       await writeBatch(seedOps(seed));
       applyFullData(seed);
     } else {
-      setState({
-        ingredients: byKey(all.ingredients, 'id'),
-        recipes: byKey(all.recipes, 'id'),
-        pantry: byKey(all.pantry, 'ingredientId'),
-        weeks: byKey(all.weeks, 'id'),
-        marmitas: byKey(all.marmitas, 'id'),
-        movements: all.movements.sort((a, b) => (a.date < b.date ? 1 : -1)),
-        purchases: all.purchases.sort((a, b) => (a.date < b.date ? 1 : -1)),
-        settings: { ...DEFAULT_SETTINGS, ...(meta.settings?.value ?? {}) },
-        monthlySession: meta.monthlySession?.value ?? { id: null, checked: {}, qty: {} },
-        countDraft: meta.countDraft?.value ?? {},
-      });
+      setState(stateFromDB(all));
     }
     setState({ ready: true, persistent });
     // Pede ao navegador para não apagar os dados em caso de pouco espaço.

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'preact/hooks';
-import { BookOpen, CalendarDays, Check, CloudOff, Loader2, Package, Settings, ShoppingCart, TriangleAlert } from 'lucide-preact';
+import { BookOpen, CalendarDays, Check, Cloud, CloudAlert, CloudOff, Loader2, Package, RefreshCw, Settings, ShoppingCart, StickyNote, TriangleAlert } from 'lucide-preact';
 import { useStore } from './storage/store.js';
+import { useSyncStatus } from './storage/sync.js';
 import { useRoute, navigate } from './utils/router.js';
 import { useWeekId, shiftWeek, goToCurrentWeek } from './storage/ui.js';
 import { useOnline } from './utils/hooks.js';
@@ -12,6 +13,7 @@ import { PantryPage } from './pages/PantryPage.jsx';
 import { RecipesPage } from './pages/RecipesPage.jsx';
 import { RecipeDetailPage } from './pages/RecipeDetailPage.jsx';
 import { RecipeFormPage } from './pages/RecipeFormPage.jsx';
+import { NotesPage } from './pages/NotesPage.jsx';
 import { SettingsPage } from './pages/SettingsPage.jsx';
 import { HistoryPage } from './pages/HistoryPage.jsx';
 import { useWeekShopping } from './pages/useWeekData.js';
@@ -21,6 +23,7 @@ const NAV = [
   { id: 'compras', path: '/compras', long: 'Lista da semana', short: 'Compras', icon: ShoppingCart },
   { id: 'despensa', path: '/despensa', long: 'Mercado do mês', short: 'Despensa', icon: Package },
   { id: 'receitas', path: '/receitas', long: 'Receitas', short: 'Receitas', icon: BookOpen },
+  { id: 'recados', path: '/recados', long: 'Recados', short: 'Recados', icon: StickyNote },
 ];
 
 function navSection(routeName) {
@@ -44,7 +47,7 @@ export function App() {
     const onKey = (e) => {
       if (e.ctrlKey || e.metaKey || e.altKey || isTyping(e.target) || document.querySelector('dialog[open]')) return;
       const n = Number(e.key);
-      if (n >= 1 && n <= 4) {
+      if (n >= 1 && n <= NAV.length) {
         navigate(NAV[n - 1].path);
         e.preventDefault();
       } else if (e.key === 'ArrowLeft' && ['cardapio', 'compras'].includes(section)) {
@@ -116,6 +119,7 @@ export function App() {
             </span>
           )}
           <SaveIndicator status={state.saveStatus} persistent={state.persistent} />
+          <SyncIndicator />
           {showWeek && <WeekSelector />}
           <div class="header-actions">
             <a
@@ -176,8 +180,10 @@ function Route({ route, weekId }) {
       return <RecipeFormPage id={null} />;
     case 'receita-editar':
       return <RecipeFormPage id={route.arg} />;
+    case 'recados':
+      return <NotesPage />;
     case 'ajustes':
-      return <SettingsPage />;
+      return <SettingsPage params={route.params} />;
     case 'historico':
       return <HistoryPage />;
     default:
@@ -206,8 +212,25 @@ function SaveIndicator({ status, persistent }) {
   );
 }
 
+/** Estado da sincronização na nuvem (só aparece quando o aparelho está conectado a uma casa). */
+function SyncIndicator() {
+  const sync = useSyncStatus();
+  if (!sync.connected) return null;
+  const map = {
+    syncing: { icon: RefreshCw, text: 'Sincronizando…' },
+    error: { icon: CloudAlert, text: 'Erro na sincronização' },
+    offline: { icon: CloudOff, text: 'Sem conexão com a nuvem — as alterações serão enviadas depois' },
+  };
+  const s = map[sync.state] ?? { icon: Cloud, text: 'Sincronizado com a nuvem' };
+  return (
+    <a class={`sync-pill ${sync.state}`} href="#/ajustes" role="status" title={s.text} aria-label={s.text}>
+      <s.icon size={15} />
+    </a>
+  );
+}
+
 const SHORTCUTS = [
-  ['1 – 4', 'Ir para Cardápio, Lista, Mercado e Receitas'],
+  ['1 – 5', 'Ir para Cardápio, Lista, Mercado, Receitas e Recados'],
   ['← / →', 'Semana anterior / próxima'],
   ['T', 'Voltar para a semana atual'],
   ['/', 'Buscar na tela atual'],
