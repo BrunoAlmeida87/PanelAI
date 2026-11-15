@@ -26,7 +26,9 @@ Sem a configuração, nada muda: o PanelAI continua salvando só no aparelho.
 
 ### 3. Ativar o login
 
-1. Menu **Criação → Authentication → Vamos começar**.
+1. Abra **Authentication** e clique em **Vamos começar**. O menu da esquerda muda conforme a versão do console:
+   fica em **Segurança** (versões novas) ou **Criação / Build** (versões antigas), às vezes dentro de **Todos os produtos**.
+   Também dá para digitar *Authentication* na busca do topo do console.
 2. Aba **Método de login**:
    - **Google** → Ativar → escolha o e-mail de suporte → Salvar.
    - **E-mail/senha** → Ativar (só a primeira opção) → Salvar.
@@ -37,7 +39,7 @@ Sem a configuração, nada muda: o PanelAI continua salvando só no aparelho.
 
 ### 4. Criar o banco de dados (Firestore)
 
-1. Menu **Criação → Firestore Database → Criar banco de dados**.
+1. Abra **Firestore Database** (menu **Bancos de dados e armazenamento**, ou **Criação / Build** em versões antigas; ou pela busca do topo) → **Criar banco de dados**.
 2. Edição **Standard**. Local: `southamerica-east1 (São Paulo)`. *O local não pode ser trocado depois.*
 3. Escolha **Iniciar no modo de produção** → Criar.
 
