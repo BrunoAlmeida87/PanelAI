@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'preact/hooks';
-import { BookOpen, CalendarDays, Check, CloudOff, Loader2, Package, Settings, ShoppingCart, TriangleAlert } from 'lucide-preact';
+import { BookOpen, CalendarDays, Check, CloudCheck, CloudOff, CloudUpload, Loader2, Package, Settings, ShoppingCart, TriangleAlert } from 'lucide-preact';
 import { useStore } from './storage/store.js';
 import { useRoute, navigate } from './utils/router.js';
 import { useWeekId, shiftWeek, goToCurrentWeek } from './storage/ui.js';
@@ -115,7 +115,7 @@ export function App() {
               <CloudOff size={14} /> <span class="hide-mobile">Offline</span>
             </span>
           )}
-          <SaveIndicator status={state.saveStatus} persistent={state.persistent} />
+          <SaveIndicator status={state.saveStatus} persistent={state.persistent} cloud={state.mode === 'cloud' ? state.cloud : null} online={online} />
           {showWeek && <WeekSelector />}
           <div class="header-actions">
             <a
@@ -185,7 +185,21 @@ function Route({ route, weekId }) {
   }
 }
 
-function SaveIndicator({ status, persistent }) {
+function SaveIndicator({ status, persistent, cloud, online }) {
+  if (cloud && status !== 'error') {
+    const s = cloud.error
+      ? { icon: TriangleAlert, text: 'Erro na nuvem', cls: 'error', title: cloud.error }
+      : cloud.pending > 0
+        ? online
+          ? { icon: CloudUpload, text: 'Sincronizando…', cls: 'saving', title: 'Enviando alterações para a nuvem' }
+          : { icon: CloudUpload, text: 'Salvo no aparelho', cls: 'saving', title: 'Sem internet: as alterações serão enviadas quando a conexão voltar' }
+        : { icon: CloudCheck, text: 'Sincronizado', cls: 'saved', title: 'Tudo salvo na nuvem da casa' };
+    return (
+      <span class={`save-indicator ${s.cls}`} role="status" aria-live="polite" title={s.title}>
+        <s.icon size={14} /> <span class="text">{s.text}</span>
+      </span>
+    );
+  }
   if (!persistent) {
     return (
       <span class="save-indicator error" title="O navegador bloqueou o armazenamento local. Os dados serão perdidos ao fechar.">

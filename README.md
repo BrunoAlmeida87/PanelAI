@@ -8,7 +8,7 @@ Organização alimentar e doméstica em um só lugar: **cardápio da semana, rec
 
 **Site publicado:** https://brunoalmeida87.github.io/PanelAI/
 
-Funciona no computador e no celular (layouts diferentes para cada um), pode ser instalado como aplicativo (PWA) e funciona offline depois do primeiro acesso. Os dados ficam salvos no próprio navegador.
+Funciona no computador e no celular (layouts diferentes para cada um), pode ser instalado como aplicativo (PWA) e funciona offline depois do primeiro acesso. Os dados ficam no próprio navegador ou, com o Firebase configurado, **numa casa compartilhada na nuvem**, sincronizada em tempo real entre as pessoas da casa ([passo a passo](docs/FIREBASE.md)).
 
 ---
 
@@ -44,7 +44,8 @@ Funciona no computador e no celular (layouts diferentes para cada um), pode ser 
 
 - Dados estruturados em **IndexedDB**; preferências simples de interface em `localStorage`.
 - **Exportar:** Configurações → *Exportar (JSON)*. **Importar:** Configurações → *Importar*. O arquivo é validado antes de qualquer alteração; arquivos inválidos são recusados sem mexer nos dados.
-- Não há sincronização entre aparelhos (o GitHub Pages é hospedagem estática). Para levar os dados a outro aparelho, exporte e importe. A camada `src/storage` concentra a persistência para permitir um serviço de sincronização no futuro.
+- **Sincronização na nuvem (opcional):** com o Firebase configurado em `src/cloud/firebase-config.js`, as pessoas da casa entram com Google ou e-mail e senha e compartilham os mesmos dados no Firestore, com atualização em tempo real e funcionamento offline (as alterações são enviadas quando a conexão volta). Regras de segurança em `firestore.rules`. Configuração completa em [docs/FIREBASE.md](docs/FIREBASE.md).
+- Sem Firebase configurado, não há sincronização entre aparelhos: exporte e importe para levar os dados.
 
 ## Instalar como aplicativo
 
@@ -95,11 +96,14 @@ PanelAI/
 │   ├── services/             # regras: demanda, lista, estoque, indicadores, sugestões, backup
 │   ├── models/               # constantes, unidades e conversões, validação de receitas
 │   ├── storage/              # IndexedDB, estado global, ações
+│   ├── cloud/                # Firebase: configuração, login, casa e sincronização
 │   ├── data/                 # catálogo de ingredientes, receitas e dados de demonstração
 │   ├── utils/                # datas, roteador, hooks
 │   └── styles/               # tokens, componentes, layout e telas
 ├── tests/unit/               # Vitest
 ├── tests/e2e/                # Playwright
+├── firestore.rules           # regras de segurança do Firestore
+├── firebase.json             # emuladores locais (testes)
 ├── scripts/generate-icons.mjs
 └── docs/referencias-visuais/ # capturas usadas como referência (não publicadas)
 ```
@@ -110,8 +114,9 @@ Panela minimalista verde-sálvia (`#789582`) sobre fundo verde muito claro (`#E7
 
 ## Limitações conhecidas
 
-- Sem sincronização automática entre aparelhos (use exportar/importar).
-- Os dados ficam no navegador: limpar os dados do site apaga o PanelAI. Faça backups.
+- Sem Firebase, não há sincronização automática entre aparelhos (use exportar/importar).
+- No modo local, os dados ficam no navegador: limpar os dados do site apaga o PanelAI. Faça backups.
+- Na nuvem, cada registro (receita, semana, item da despensa) é gravado inteiro: se duas pessoas alterarem a mesma semana no mesmo instante, vale a última gravação.
 - Sugestões usam regras locais (sem IA externa).
 - Conversões entre massa, volume e unidades dependem dos dados do ingrediente; sem eles, as quantidades aparecem separadas na lista.
 - Imagens de receitas são reduzidas e guardadas localmente; muitas imagens aumentam o tamanho do backup.
