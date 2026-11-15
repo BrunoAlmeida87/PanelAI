@@ -15,6 +15,7 @@ import { RecipeFormPage } from './pages/RecipeFormPage.jsx';
 import { SettingsPage } from './pages/SettingsPage.jsx';
 import { HistoryPage } from './pages/HistoryPage.jsx';
 import { TasksPage } from './pages/TasksPage.jsx';
+import { LoginGate } from './pages/LoginGate.jsx';
 import { DisplayPage, DisplayScreen } from './pages/DisplayPage.jsx';
 import { useWeekShopping } from './pages/useWeekData.js';
 
@@ -86,6 +87,17 @@ export function App() {
         <img src={`${import.meta.env.BASE_URL}logo.svg`} alt="" width="72" height="72" />
         <p>Carregando o PanelAI…</p>
       </div>
+    );
+  }
+
+  // Nuvem configurada e ninguém logado: só a tela de entrar.
+  if (state.mode === 'gate') {
+    return (
+      <>
+        <LoginGate />
+        <ToastRegion />
+        <ConfirmHost />
+      </>
     );
   }
 

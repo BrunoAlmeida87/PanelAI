@@ -26,6 +26,8 @@ export function SettingsPage() {
   const deviceName = useDeviceName();
   const shared = s.mode === 'cloud';
   const whose = shared ? 'da casa (para todas as pessoas)' : 'deste aparelho';
+  // Na nuvem, só o responsável pela casa pode substituir ou apagar tudo.
+  const isOwner = !shared || (s.cloud.household && s.cloud.user && s.cloud.household.ownerEmail === s.cloud.user.email);
 
   useEffect(() => {
     navigator.storage?.estimate?.().then((e) => setUsage(e)).catch(() => {});
@@ -161,9 +163,11 @@ export function SettingsPage() {
           <button type="button" class="btn btn-primary" onClick={doExport}>
             <Download size={16} /> Exportar (JSON)
           </button>
-          <button type="button" class="btn btn-secondary" onClick={() => fileRef.current?.click()}>
-            <Upload size={16} /> Importar
-          </button>
+          {isOwner && (
+            <button type="button" class="btn btn-secondary" onClick={() => fileRef.current?.click()}>
+              <Upload size={16} /> Importar
+            </button>
+          )}
           <input ref={fileRef} type="file" accept="application/json,.json" class="sr-only" onChange={doImport} aria-label="Arquivo de backup" />
         </div>
         {importErrors.length > 0 && (
@@ -178,6 +182,8 @@ export function SettingsPage() {
             </div>
           </div>
         )}
+        {isOwner ? (
+          <>
         <div class="divider" />
         <div class="toolbar">
           <button
@@ -217,6 +223,10 @@ export function SettingsPage() {
             <Eraser size={16} /> Começar do zero
           </button>
         </div>
+          </>
+        ) : (
+          <p class="small muted" style="margin:0">Importar, restaurar a demonstração e começar do zero ficam só com o responsável pela casa.</p>
+        )}
       </section>
 
       <section class="card card-pad form-section" style="margin-top:16px" aria-labelledby="app">

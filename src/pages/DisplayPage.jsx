@@ -433,7 +433,7 @@ function ScreenInspector({ layout, isActive, onChange }) {
           value={layout.modelId}
           onChange={(e) => {
             const m = DISPLAY_MODELS.find((x) => x.id === e.currentTarget.value);
-            onChange({ ...layout, modelId: m.id, screen: m.id === 'custom' ? layout.screen : { w: m.w, h: m.h } });
+            onChange({ ...layout, modelId: m.id, screen: m.id === 'custom' ? layout.screen : { w: m.w, h: m.h }, ...(m.colorMode ? { colorMode: m.colorMode } : {}) });
           }}
         >
           {DISPLAY_MODELS.map((m) => (

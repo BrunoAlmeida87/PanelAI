@@ -32,7 +32,7 @@ let state = {
   tasks: {},
   taskTemplates: {},
   displayLayouts: {},
-  mode: 'local', // 'local' | 'cloud'
+  mode: 'local', // 'local' | 'cloud' | 'gate' (nuvem configurada, sem login: só a tela de entrar)
   cloud: {
     configured: cloudConfigured,
     status: cloudConfigured ? 'checking' : 'off', // off | checking | idle | active
@@ -193,6 +193,8 @@ export function loadFromChanges(initial) {
 
 export async function bootstrap() {
   if (cloudConfigured) {
+    // Com a nuvem configurada, só quem entrou com um e-mail da casa usa o app.
+    // Sem login não há modo local: aparece apenas a tela de entrar.
     try {
       const { startCloudIfReady } = await import('../cloud/session.js');
       if (await startCloudIfReady()) return;
@@ -200,6 +202,9 @@ export async function bootstrap() {
       console.error('Falha ao conectar à nuvem', err);
       setState((s) => ({ cloud: { ...s.cloud, status: 'idle', error: `Não foi possível conectar à nuvem: ${err?.message ?? err}` } }));
     }
+    setWriter(() => Promise.reject(new Error('Entre com sua conta para salvar.')));
+    setState({ ready: true, mode: 'gate' });
+    return;
   }
   await bootstrapLocal();
 }

@@ -5,6 +5,7 @@ rules_version = '2';
 //
 // Quem pode o quê:
 //  - Só pessoas logadas com e-mail confirmado.
+//  - Ninguém cria casas novas (bloqueado depois da primeira configuração).
 //  - Uma "casa" (households/{casa}) lista os e-mails que podem acessá-la (memberEmails).
 //  - Só o responsável (ownerEmail) adiciona ou remove pessoas.
 //  - Todas as pessoas da casa leem e alteram cardápio, receitas, despensa etc.
@@ -39,13 +40,20 @@ service cloud.firestore {
         && d.ownerEmail in d.memberEmails;
     }
 
-    match /households/{casa} {
-      allow read: if signedIn() && myEmail() in resource.data.memberEmails;
-
-      allow create: if signedIn()
+    function canCreateHousehold() {
+      return signedIn()
         && request.resource.data.ownerEmail == myEmail()
         && request.resource.data.memberEmails == [myEmail()]
         && validHousehold(request.resource.data);
+    }
+
+    match /households/{casa} {
+      allow read: if signedIn() && myEmail() in resource.data.memberEmails;
+
+      // Criar casas novas está BLOQUEADO (a casa já existe; ninguém de fora cria
+      // nada no banco). Na primeira configuração de um projeto novo, troque
+      // "if false" por "if canCreateHousehold()" e publique; depois volte para "if false".
+      allow create: if false;
 
       allow update: if signedIn()
         && resource.data.ownerEmail == myEmail()

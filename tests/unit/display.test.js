@@ -52,7 +52,9 @@ describe('display: grade', () => {
   });
 
   it('novo layout: modelo, orientação e tamanho da tela', () => {
-    const l = newLayout({ modelId: '7in5', presetId: 'geladeira' }, { name: 'Bruno' });
+    const l = newLayout({ presetId: 'geladeira' }, { name: 'Bruno' });
+    expect(l.modelId).toBe('reterminal-e1001');
+    expect(l.colorMode).toBe('bw');
     expect(l.orientation).toBe('portrait');
     expect(screenSize(l)).toEqual({ w: 480, h: 800 });
     expect(l.createdBy).toBe('Bruno');

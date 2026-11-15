@@ -2,6 +2,7 @@
 // Carregado sob demanda, só quando o Firebase está configurado.
 
 import * as cloud from './cloud.js';
+import { buildSeed } from '../data/seed.js';
 import { applyRemoteChanges, getState, loadFromChanges, seedOps, setState, setWriter } from '../storage/store.js';
 
 const CACHE_KEY = 'panelai.cloud.household';
@@ -142,15 +143,20 @@ export function joinHousehold(household) {
 /** Cria a casa na nuvem com os dados que estão neste aparelho. */
 export async function createHouseholdFromThisDevice(name) {
   const s = getState();
+  // Na tela de login não há dados abertos: a casa nova começa com os exemplos.
+  const src = s.mode === 'gate' ? buildSeed() : s;
   const ops = seedOps({
-    ingredients: s.ingredients,
-    recipes: s.recipes,
-    pantry: s.pantry,
-    weeks: s.weeks,
-    marmitas: s.marmitas,
-    movements: s.movements,
-    purchases: s.purchases,
-    settings: s.settings,
+    ingredients: src.ingredients,
+    recipes: src.recipes,
+    pantry: src.pantry,
+    weeks: src.weeks,
+    marmitas: src.marmitas,
+    movements: src.movements,
+    purchases: src.purchases,
+    tasks: src.tasks,
+    taskTemplates: src.taskTemplates,
+    displayLayouts: src.displayLayouts,
+    settings: src.settings,
   });
   ops.push({ store: 'meta', type: 'put', value: { key: 'monthlySession', value: s.monthlySession } });
   ops.push({ store: 'meta', type: 'put', value: { key: 'countDraft', value: s.countDraft } });

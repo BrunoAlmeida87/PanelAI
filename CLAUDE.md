@@ -10,11 +10,13 @@ Site: https://brunoalmeida87.github.io/PanelAI/ (GitHub Pages, publica a partir 
 - O casal usa junto: Bruno (responsável pela casa na nuvem) e a esposa, cada um no seu celular.
 - Publicar = juntar na `main` (PR + merge) **só quando ele pedir**; o workflow publica sozinho.
 - Antes de publicar algo que precise de regras novas do Firestore, pedir para ele republicar `firestore.rules`.
+- **Só quem tem login altera dados**: com a nuvem configurada, o app abre numa tela de login (`mode: 'gate'`),
+  sem modo local. Criação de casas novas bloqueada nas regras. Importar/restaurar/começar do zero só para o responsável.
 
 ## Hardware do display
 
-- **Tela e-ink: Seeed Studio reTerminal (série E10xx, e-paper)** — ESP32-S3, 800 × 480.
-  Falta confirmar o modelo exato: **E1001** (7,5", preto e branco) ou **E1002** (7,3", colorido).
+- **Tela e-ink: Seeed Studio reTerminal E1001** — 7,5" e-paper **preto e branco**, 800 × 480, ESP32-S3.
+  Já é o modelo padrão do editor (`reterminal-e1001` em `src/display/model.js`).
 - Não tem navegador: precisa receber uma **imagem** (ou ser programado via ESPHome/SenseCraft).
   O PanelAI já gera a tela em `#/display/tela?exato=1` (800 × 480); falta o caminho que transforma
   isso em imagem para o aparelho, com acesso **só de leitura** (sem usar a conta pessoal):

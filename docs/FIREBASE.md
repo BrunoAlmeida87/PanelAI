@@ -52,6 +52,10 @@ Sem a configuração, nada muda: o PanelAI continua salvando só no aparelho.
 As regras garantem que só os e-mails cadastrados na casa (e confirmados) leem ou alteram os dados,
 e que só o responsável pela casa adiciona ou remove pessoas.
 
+**Criação de casas:** as regras vêm com a criação de casas **bloqueada** (`allow create: if false`),
+para ninguém de fora criar nada no banco. Na primeira configuração de um projeto novo, troque essa linha
+por `allow create: if canCreateHousehold();`, publique, crie a casa no app e depois volte para `if false`.
+
 > **Ao atualizar o PanelAI:** se uma versão nova pedir, publique de novo o `firestore.rules`
 > (mesmo caminho: Firestore Database → Regras → colar → Publicar). A partir da versão 1.2,
 > as regras aceitam coleções novas automaticamente, então isso deve ser raro.
@@ -78,6 +82,9 @@ e fazer o commit na branch `main`; a publicação no GitHub Pages acontece sozin
 ---
 
 ## Usando no dia a dia
+
+Com o Firebase configurado, **o PanelAI só abre depois do login** com um e-mail cadastrado na casa.
+Quem tiver só o link vê a tela de entrar e não consegue ver nem alterar nada.
 
 **Quem começa (ex.: Bruno), no aparelho que já tem os dados:**
 

@@ -7,7 +7,9 @@
 import { uid } from '../utils/id.js';
 
 export const DISPLAY_MODELS = [
-  { id: '7in5', label: '7,5" — 800 × 480 (Waveshare, TRMNL, reTerminal)', w: 800, h: 480 },
+  { id: 'reterminal-e1001', label: 'reTerminal E1001 — 7,5" preto e branco, 800 × 480', w: 800, h: 480, colorMode: 'bw' },
+  { id: 'reterminal-e1002', label: 'reTerminal E1002 — 7,3" colorido, 800 × 480', w: 800, h: 480, colorMode: 'color' },
+  { id: '7in5', label: '7,5" — 800 × 480 (Waveshare, TRMNL)', w: 800, h: 480 },
   { id: '7in5hd', label: '7,5" HD — 880 × 528', w: 880, h: 528 },
   { id: '6in', label: '6" — 800 × 600 (Inkplate 6, Kindle antigo)', w: 800, h: 600 },
   { id: '9in7', label: '9,7" — 1200 × 825 (Inkplate 10)', w: 1200, h: 825 },
@@ -350,7 +352,7 @@ export function presetCards(preset, grid) {
   return rescaleCards(cards, preset.base, grid);
 }
 
-export function newLayout({ name = 'Meu display', modelId = '7in5', orientation = 'landscape', presetId = 'cozinha' } = {}, actor) {
+export function newLayout({ name = 'Meu display', modelId = 'reterminal-e1001', orientation = 'landscape', presetId = 'cozinha' } = {}, actor) {
   const model = DISPLAY_MODELS.find((m) => m.id === modelId) ?? DISPLAY_MODELS[0];
   const preset = LAYOUT_PRESETS.find((p) => p.id === presetId) ?? LAYOUT_PRESETS[0];
   const orient = preset.orientation ?? orientation;
@@ -362,7 +364,7 @@ export function newLayout({ name = 'Meu display', modelId = '7in5', orientation 
     modelId: model.id,
     screen: { w: model.w, h: model.h },
     orientation: orient,
-    colorMode: 'bw',
+    colorMode: model.colorMode ?? 'bw',
     grid,
     refreshMinutes: 30,
     cards: presetCards(preset, grid),
