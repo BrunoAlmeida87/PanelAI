@@ -10,6 +10,7 @@ import { usePref } from '../utils/hooks.js';
 import { Chip, Segmented, Stepper, toast, confirmDialog } from '../components/ui.jsx';
 import { ShortcutsModal } from '../App.jsx';
 import { getInstallPrompt, onInstallPromptChange } from '../utils/install.js';
+import { CloudSection } from './settings/CloudSection.jsx';
 
 const MARKET_ORDER = [1, 2, 3, 4, 5, 6, 0];
 
@@ -21,6 +22,8 @@ export function SettingsPage() {
   const [usage, setUsage] = useState(null);
   const [installable, setInstallable] = useState(!!getInstallPrompt());
   const fileRef = useRef(null);
+  const shared = s.mode === 'cloud';
+  const whose = shared ? 'da casa (para todas as pessoas)' : 'deste aparelho';
 
   useEffect(() => {
     navigator.storage?.estimate?.().then((e) => setUsage(e)).catch(() => {});
@@ -63,7 +66,7 @@ export function SettingsPage() {
     const d = result.data;
     const ok = await confirmDialog({
       title: 'Importar dados',
-      message: `O arquivo tem ${Object.keys(d.recipes).length} receitas, ${Object.keys(d.weeks).length} semanas e ${Object.keys(d.pantry).length} produtos na despensa. Os dados atuais deste aparelho serão substituídos. Recomendamos exportar um backup antes.`,
+      message: `O arquivo tem ${Object.keys(d.recipes).length} receitas, ${Object.keys(d.weeks).length} semanas e ${Object.keys(d.pantry).length} produtos na despensa. Os dados atuais ${whose} serão substituídos. Recomendamos exportar um backup antes.`,
       confirmLabel: 'Substituir dados',
       danger: true,
     });
@@ -125,12 +128,16 @@ export function SettingsPage() {
         </div>
       </section>
 
+      <CloudSection />
+
       <section class="card card-pad form-section" style="margin-top:16px" aria-labelledby="dados">
         <h2 id="dados" class="section-title" style="margin:0">Dados e backup</h2>
         <div class="notice info">
           <HardDrive size={18} />
           <span>
-            Tudo fica salvo neste navegador (IndexedDB) e funciona sem internet. Não há sincronização automática entre aparelhos: para levar seus dados a outro aparelho, exporte aqui e importe lá.
+            {shared
+              ? 'Os dados estão na nuvem e são compartilhados com a casa. O backup em JSON continua útil como cópia de segurança.'
+              : 'Tudo fica salvo neste navegador (IndexedDB) e funciona sem internet. Para compartilhar entre aparelhos, use a sincronização na nuvem abaixo, ou exporte aqui e importe lá.'}
             {usage?.usage != null && ` Uso atual: ${fmtMB(usage.usage)}.`}
           </span>
         </div>
@@ -163,7 +170,7 @@ export function SettingsPage() {
             onClick={async () => {
               const ok = await confirmDialog({
                 title: 'Restaurar demonstração',
-                message: 'Substitui todos os dados atuais pelas receitas, despensa e cardápio de exemplo.',
+                message: `Substitui todos os dados ${whose} pelas receitas, despensa e cardápio de exemplo.`,
                 confirmLabel: 'Restaurar',
                 danger: true,
               });
@@ -181,7 +188,7 @@ export function SettingsPage() {
             onClick={async () => {
               const ok = await confirmDialog({
                 title: 'Começar do zero',
-                message: 'Apaga cardápios, despensa, marmitas e histórico. Receitas e catálogo de ingredientes são mantidos.',
+                message: `Apaga cardápios, despensa, marmitas e histórico ${whose}. Receitas e catálogo de ingredientes são mantidos.`,
                 confirmLabel: 'Apagar',
                 danger: true,
               });
@@ -223,7 +230,7 @@ export function SettingsPage() {
           </p>
         )}
         <p class="small muted" style="display:flex;gap:6px;align-items:center">
-          <Info size={14} /> PanelAI 1.0 · dados locais · sem envio de informações para servidores.
+          <Info size={14} /> PanelAI 1.1 · {shared ? 'dados sincronizados no Firebase da casa' : 'dados locais · sem envio de informações para servidores'}.
         </p>
       </section>
       <ShortcutsModal open={shortcuts} onClose={() => setShortcuts(false)} />

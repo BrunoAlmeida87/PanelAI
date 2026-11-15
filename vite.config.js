@@ -27,6 +27,8 @@ export default defineConfig({
   build: {
     target: 'es2020',
     sourcemap: false,
+    // O SDK do Firebase fica num pedaço separado, baixado só com a nuvem ativa.
+    chunkSizeWarningLimit: 800,
   },
   test: {
     environment: 'node',
