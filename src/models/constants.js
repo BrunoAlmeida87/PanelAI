@@ -106,4 +106,6 @@ export const DEFAULT_SETTINGS = {
   marketDays: [0, 3],
   // Se os lanches contam como pendência quando estão vazios.
   trackSnacks: false,
+  // Layout do display e-ink em uso.
+  displayLayoutId: null,
 };

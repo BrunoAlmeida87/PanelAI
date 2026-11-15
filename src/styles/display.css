@@ -1,0 +1,440 @@
+/* ---------- Tela e-ink (renderização) ---------- */
+.eink-frame {
+  position: relative;
+  overflow: hidden;
+  flex: none;
+}
+.eink {
+  position: absolute;
+  top: 0;
+  left: 0;
+  transform-origin: 0 0;
+  display: grid;
+  box-sizing: border-box;
+  background: #fff;
+  color: #000;
+  font-family: var(--font);
+  font-size: var(--base);
+  line-height: 1.25;
+  -webkit-font-smoothing: antialiased;
+}
+.eink *,
+.eink *::before,
+.eink *::after {
+  box-sizing: border-box;
+}
+.eink-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  background: #fff;
+  color: #000;
+  border-radius: 0.35em;
+  padding: 0.45em 0.6em;
+}
+.eink-card.border-line {
+  border: 2px solid #000;
+}
+.eink-card.border-thick {
+  border: 4px solid #000;
+}
+.eink-card.invert {
+  background: #000;
+  color: #fff;
+}
+.eink-card.invert .eink-box {
+  border-color: #fff;
+}
+.eink-card.invert .eink-box.on {
+  background: #fff;
+}
+.eink-title {
+  font-size: 0.72em;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding-bottom: 0.25em;
+  margin-bottom: 0.35em;
+  border-bottom: 2px solid currentColor;
+  color: var(--accent);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex: none;
+}
+.eink-card.invert .eink-title {
+  color: #fff;
+}
+.eink-gray .eink-title {
+  background: var(--soft);
+  margin: -0.45em -0.6em 0.35em;
+  padding: 0.3em 0.6em;
+  border-bottom: 0;
+  color: #000;
+}
+.eink-body {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+.eink-empty {
+  margin: 0;
+  font-size: 0.85em;
+  font-style: italic;
+}
+.eink-note {
+  margin: 0;
+  height: 100%;
+  display: grid;
+  align-content: center;
+  white-space: pre-wrap;
+  font-size: 1.15em;
+  font-weight: 650;
+}
+
+.eink-clock {
+  height: 100%;
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 0.2em 0.9em;
+  align-content: center;
+}
+.eink-clock .date {
+  font-size: 1.35em;
+  font-weight: 800;
+}
+.eink-clock .week,
+.eink-clock .time {
+  font-size: 0.75em;
+  font-weight: 500;
+}
+.eink-clock .time {
+  margin-left: auto;
+}
+
+.eink-meals {
+  margin: 0;
+  display: grid;
+  gap: 0.35em;
+}
+.eink-meals .meal dt {
+  font-size: 0.68em;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.eink-meals .meal dd {
+  margin: 0;
+  font-weight: 600;
+}
+
+.eink-week {
+  display: grid;
+  gap: 0.35em;
+  height: 100%;
+}
+.eink-week.rows {
+  grid-auto-rows: minmax(0, auto);
+}
+.eink-week .day {
+  min-width: 0;
+  overflow: hidden;
+}
+.eink-week.cols .day + .day {
+  border-left: 1px solid #000;
+  padding-left: 0.35em;
+}
+.eink-week.rows .day {
+  display: grid;
+  grid-template-columns: 4.2em 1fr;
+  gap: 0.4em;
+  border-top: 1px solid #000;
+  padding-top: 0.2em;
+}
+.eink-week .day-name {
+  font-size: 0.72em;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+.eink-week .day.today .day-name {
+  color: var(--accent);
+  text-decoration: underline;
+  text-underline-offset: 0.2em;
+}
+.eink-week .item {
+  font-size: 0.8em;
+  line-height: 1.2;
+  margin-top: 0.15em;
+}
+.eink-week .lbl {
+  font-weight: 700;
+}
+
+.eink-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  column-gap: 1em;
+}
+.eink-list li {
+  display: flex;
+  gap: 0.4em;
+  align-items: flex-start;
+  break-inside: avoid;
+  margin-bottom: 0.22em;
+}
+.eink-list.compact li {
+  font-size: 0.8em;
+}
+.eink-list li.done .txt {
+  text-decoration: line-through;
+}
+.eink-list li.more {
+  font-size: 0.75em;
+  font-style: italic;
+}
+.eink-list .who,
+.eink-list .from {
+  font-size: 0.8em;
+}
+.eink-list .note {
+  font-style: italic;
+}
+.eink-box {
+  flex: none;
+  width: 0.85em;
+  height: 0.85em;
+  margin-top: 0.18em;
+  border: 2px solid #000;
+  border-radius: 0.15em;
+}
+.eink-box.on {
+  background: #000;
+}
+.eink-box.warn {
+  border-color: var(--accent);
+  border-width: 3px;
+}
+
+.eink-summary {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.3em 0.8em;
+  height: 100%;
+  align-content: center;
+}
+.eink-summary b {
+  display: block;
+  font-size: 1.5em;
+  line-height: 1.05;
+}
+.eink-summary span {
+  font-size: 0.7em;
+}
+
+/* ---------- Editor ---------- */
+.display-editor {
+  display: grid;
+  gap: 16px;
+}
+@media (min-width: 1100px) {
+  .display-editor {
+    grid-template-columns: minmax(0, 1fr) 340px;
+    align-items: start;
+  }
+  .display-inspector {
+    position: sticky;
+    top: calc(var(--header-h) + 16px);
+    max-height: calc(100vh - var(--header-h) - 32px);
+    overflow: auto;
+  }
+}
+.display-stage {
+  background: repeating-conic-gradient(#efeee9 0% 25%, #f7f6f2 0% 50%) 0 0 / 16px 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  padding: 12px;
+  display: grid;
+  justify-items: center;
+  overflow: hidden;
+}
+.display-stage .eink-frame {
+  box-shadow: 0 0 0 8px #2b2d2a, 0 0 0 9px #111, var(--shadow-lg);
+  border-radius: 2px;
+  margin: 10px;
+}
+.eink-overlay {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  touch-action: none;
+}
+.eink-overlay.guides {
+  pointer-events: none;
+}
+.eink-cell {
+  outline: 1px dashed rgba(82, 118, 93, 0.35);
+  outline-offset: -1px;
+}
+.edit-box {
+  position: relative;
+  border: 2px dashed transparent;
+  border-radius: 0.35em;
+  cursor: grab;
+  touch-action: none;
+  outline: none;
+}
+.edit-box:hover {
+  border-color: rgba(82, 118, 93, 0.6);
+}
+.edit-box.selected {
+  border: 3px solid var(--green);
+  background: rgba(120, 149, 130, 0.12);
+  cursor: move;
+}
+.edit-box.overlap {
+  border-color: var(--danger);
+  background: rgba(181, 82, 74, 0.1);
+}
+.edit-box .handle {
+  position: absolute;
+  width: 28px;
+  height: 28px;
+  background: var(--green-dark);
+  border: 3px solid #fff;
+  border-radius: 50%;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.35);
+  touch-action: none;
+}
+.edit-box .handle.se {
+  right: -14px;
+  bottom: -14px;
+  cursor: nwse-resize;
+}
+.edit-box .handle.e {
+  right: -14px;
+  top: calc(50% - 14px);
+  cursor: ew-resize;
+}
+.edit-box .handle.s {
+  bottom: -14px;
+  left: calc(50% - 14px);
+  cursor: ns-resize;
+}
+.edit-box .tag {
+  position: absolute;
+  left: 4px;
+  top: 4px;
+  font: 600 12px/1.2 var(--font);
+  background: var(--green-dark);
+  color: #fff;
+  padding: 2px 6px;
+  border-radius: 6px;
+  white-space: nowrap;
+  pointer-events: none;
+}
+.display-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 12px;
+}
+.display-toolbar select.input {
+  width: auto;
+  min-width: 0;
+  max-width: 100%;
+}
+.card-type-list {
+  display: grid;
+  gap: 8px;
+}
+@media (min-width: 600px) {
+  .card-type-list {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+.card-type-list button {
+  text-align: left;
+  display: grid;
+  gap: 2px;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  background: var(--surface);
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+}
+.card-type-list button:hover {
+  border-color: var(--green);
+  background: var(--green-xlight);
+}
+.card-type-list button span {
+  color: var(--text-2);
+  font-size: var(--fs-sm);
+}
+.preset-grid {
+  display: grid;
+  gap: 12px;
+}
+@media (min-width: 700px) {
+  .preset-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+.preset-grid button {
+  display: grid;
+  gap: 8px;
+  justify-items: center;
+  text-align: center;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  background: var(--muted-surface);
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+}
+.preset-grid button:hover {
+  border-color: var(--green);
+}
+.preset-grid .eink-frame {
+  box-shadow: 0 0 0 3px #2b2d2a;
+}
+.preset-grid .p-desc {
+  font-size: var(--fs-sm);
+  color: var(--text-2);
+}
+.inspector-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+/* ---------- Tela cheia (para o aparelho) ---------- */
+.display-fullscreen {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  background: #fff;
+}
+.display-fullscreen.exact {
+  display: block;
+}
+.display-fullscreen .fs-hint {
+  position: fixed;
+  right: 12px;
+  bottom: 12px;
+  font: 500 12px var(--font);
+  color: #777;
+}
+@media print {
+  .display-fullscreen .fs-hint {
+    display: none;
+  }
+}

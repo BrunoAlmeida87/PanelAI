@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'preact/hooks';
-import { BookOpen, CalendarDays, Check, CloudCheck, CloudOff, CloudUpload, Loader2, Package, Settings, ShoppingCart, TriangleAlert } from 'lucide-preact';
+import { BookOpen, CalendarDays, Check, ListChecks, MonitorSmartphone, CloudCheck, CloudOff, CloudUpload, Loader2, Package, Settings, ShoppingCart, TriangleAlert } from 'lucide-preact';
 import { useStore } from './storage/store.js';
 import { useRoute, navigate } from './utils/router.js';
 import { useWeekId, shiftWeek, goToCurrentWeek } from './storage/ui.js';
@@ -14,6 +14,8 @@ import { RecipeDetailPage } from './pages/RecipeDetailPage.jsx';
 import { RecipeFormPage } from './pages/RecipeFormPage.jsx';
 import { SettingsPage } from './pages/SettingsPage.jsx';
 import { HistoryPage } from './pages/HistoryPage.jsx';
+import { TasksPage } from './pages/TasksPage.jsx';
+import { DisplayPage, DisplayScreen } from './pages/DisplayPage.jsx';
 import { useWeekShopping } from './pages/useWeekData.js';
 
 const NAV = [
@@ -21,6 +23,7 @@ const NAV = [
   { id: 'compras', path: '/compras', long: 'Lista da semana', short: 'Compras', icon: ShoppingCart },
   { id: 'despensa', path: '/despensa', long: 'Mercado do mês', short: 'Despensa', icon: Package },
   { id: 'receitas', path: '/receitas', long: 'Receitas', short: 'Receitas', icon: BookOpen },
+  { id: 'tarefas', path: '/tarefas', long: 'Tarefas', short: 'Tarefas', icon: ListChecks },
 ];
 
 function navSection(routeName) {
@@ -44,12 +47,12 @@ export function App() {
     const onKey = (e) => {
       if (e.ctrlKey || e.metaKey || e.altKey || isTyping(e.target) || document.querySelector('dialog[open]')) return;
       const n = Number(e.key);
-      if (n >= 1 && n <= 4) {
+      if (n >= 1 && n <= NAV.length) {
         navigate(NAV[n - 1].path);
         e.preventDefault();
-      } else if (e.key === 'ArrowLeft' && ['cardapio', 'compras'].includes(section)) {
+      } else if (e.key === 'ArrowLeft' && ['cardapio', 'compras', 'tarefas'].includes(section)) {
         shiftWeek(-1);
-      } else if (e.key === 'ArrowRight' && ['cardapio', 'compras'].includes(section)) {
+      } else if (e.key === 'ArrowRight' && ['cardapio', 'compras', 'tarefas'].includes(section)) {
         shiftWeek(1);
       } else if (e.key === 't' || e.key === 'h') {
         goToCurrentWeek();
@@ -75,7 +78,7 @@ export function App() {
   }, [route.name, route.arg]);
 
   const counts = { compras: list?.summary.remaining || null };
-  const showWeek = ['cardapio', 'compras'].includes(route.name);
+  const showWeek = ['cardapio', 'compras', 'tarefas'].includes(route.name);
 
   if (!state.ready) {
     return (
@@ -85,6 +88,9 @@ export function App() {
       </div>
     );
   }
+
+  // Tela do display: só o conteúdo, sem menus (para o aparelho e-ink).
+  if (route.name === 'display-tela') return <DisplayScreen params={route.params} />;
 
   return (
     <>
@@ -118,6 +124,15 @@ export function App() {
           <SaveIndicator status={state.saveStatus} persistent={state.persistent} cloud={state.mode === 'cloud' ? state.cloud : null} online={online} />
           {showWeek && <WeekSelector />}
           <div class="header-actions">
+            <a
+              class="icon-btn"
+              href="#/display"
+              aria-label="Display e-ink"
+              title="Display e-ink"
+              aria-current={section === 'display' ? 'page' : undefined}
+            >
+              <MonitorSmartphone size={20} />
+            </a>
             <a
               class="icon-btn"
               href="#/ajustes"
@@ -180,6 +195,10 @@ function Route({ route, weekId }) {
       return <SettingsPage />;
     case 'historico':
       return <HistoryPage />;
+    case 'tarefas':
+      return <TasksPage />;
+    case 'display':
+      return <DisplayPage />;
     default:
       return <MenuPage weekId={weekId} />;
   }
@@ -221,7 +240,7 @@ function SaveIndicator({ status, persistent, cloud, online }) {
 }
 
 const SHORTCUTS = [
-  ['1 – 4', 'Ir para Cardápio, Lista, Mercado e Receitas'],
+  ['1 – 5', 'Ir para Cardápio, Lista, Mercado, Receitas e Tarefas'],
   ['← / →', 'Semana anterior / próxima'],
   ['T', 'Voltar para a semana atual'],
   ['/', 'Buscar na tela atual'],

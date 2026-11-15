@@ -29,6 +29,9 @@ let state = {
   settings: { ...DEFAULT_SETTINGS },
   monthlySession: { id: null, checked: {}, qty: {} },
   countDraft: {},
+  tasks: {},
+  taskTemplates: {},
+  displayLayouts: {},
   mode: 'local', // 'local' | 'cloud'
   cloud: {
     configured: cloudConfigured,
@@ -98,9 +101,9 @@ const byKey = (list, key) => Object.fromEntries(list.map((x) => [x[key], x]));
 
 export function seedOps(seed) {
   const ops = [];
-  for (const s of ['ingredients', 'recipes', 'pantry', 'weeks', 'marmitas']) {
+  for (const s of ['ingredients', 'recipes', 'pantry', 'weeks', 'marmitas', 'tasks', 'taskTemplates', 'displayLayouts']) {
     ops.push({ store: s, type: 'clear' });
-    for (const v of Object.values(seed[s])) ops.push({ store: s, type: 'put', value: v });
+    for (const v of Object.values(seed[s] ?? {})) ops.push({ store: s, type: 'put', value: v });
   }
   for (const s of ['movements', 'purchases']) {
     ops.push({ store: s, type: 'clear' });
@@ -124,6 +127,9 @@ export function applyFullData(data) {
     settings: { ...DEFAULT_SETTINGS, ...data.settings },
     monthlySession: { id: null, checked: {}, qty: {} },
     countDraft: {},
+    tasks: data.tasks ?? {},
+    taskTemplates: data.taskTemplates ?? {},
+    displayLayouts: data.displayLayouts ?? {},
   });
 }
 
@@ -177,6 +183,9 @@ export function loadFromChanges(initial) {
     settings: { ...DEFAULT_SETTINGS },
     monthlySession: EMPTY_SESSION,
     countDraft: {},
+    tasks: {},
+    taskTemplates: {},
+    displayLayouts: {},
   };
   for (const [store, changes] of Object.entries(initial)) s = { ...s, ...reduceChanges(s, store, changes) };
   setState(s);
@@ -216,6 +225,9 @@ async function bootstrapLocal() {
         settings: { ...DEFAULT_SETTINGS, ...(meta.settings?.value ?? {}) },
         monthlySession: meta.monthlySession?.value ?? { id: null, checked: {}, qty: {} },
         countDraft: meta.countDraft?.value ?? {},
+        tasks: byKey(all.tasks, 'id'),
+        taskTemplates: byKey(all.taskTemplates, 'id'),
+        displayLayouts: byKey(all.displayLayouts, 'id'),
       });
     }
     setState({ ready: true, persistent });

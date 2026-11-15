@@ -19,6 +19,8 @@ Funciona no computador e no celular (layouts diferentes para cada um), pode ser 
 | **Cardápio** | Semana de segunda a domingo com lanche da manhã, almoço, lanche da tarde e jantar. Cada refeição pode ser receita (uma ou várias), marmita, refeição fora de casa ou texto livre, com porções e observações. Duplicar, transferir, substituir, marcar como preparada, repetir em outros dias. Indicadores de planejamento, equilíbrio alimentar e tarefas de preparo antecipado. Duplicar a semana anterior, salvar semanas favoritas, reaproveitar semanas, copiar para o WhatsApp e imprimir. |
 | **Lista da semana** | Gerada do cardápio: ingredientes somados, convertidos e comparados com o estoque. Agrupada por dia de mercado e categoria. Marcação com um toque, itens avulsos, ajuste manual de quantidade, "já tenho em casa", rastreio de quais receitas geraram cada item, registro da compra no estoque, WhatsApp e impressão. |
 | **Mercado do mês** | **Estoque** (quantidade, mínimo, desejado, última atualização), **Contagem** (inventário da despensa com rascunho salvo) e **No mercado** (compras recorrentes com reposição calculada e finalização única). |
+| **Tarefas** | Tarefas da casa por dia da semana: marcar como feita, registrar pendência com recado, adiar para outra data (a nova data mostra de onde veio e a antiga mostra para onde foi), recados e histórico completo de quem fez cada alteração. Toda tarefa fica salva para usar de novo; tarefas fixas se repetem sozinhas (semanal, quinzenal ou mensal). Filtros por situação e pessoa, cópia da semana anterior e envio pelo WhatsApp. |
+| **Display e-ink** | Editor visual do que aparece na tela e-ink: modelo e posição da tela, cores, grade, cards arrastáveis e redimensionáveis (data, cardápio do dia/semana, tarefas, pendências, lista de compras, despensa, marmitas, preparos, resumo, recado), tamanho do texto, borda e destaque por card, layouts sugeridos e vários layouts salvos. A tela pronta fica em `#/display/tela` (base para conectar o aparelho). |
 | **Receitas** | Pratos e lanches com ingredientes estruturados, porções, tempo, dificuldade, proteína, composição, modo de preparo, marmita, congelamento, preparo antecipado e imagem opcional. Busca, filtros, favoritas, duplicar, excluir e **"Com o que tenho"** (sugestões pelo estoque). |
 | **Configurações e histórico** | Pessoas na casa, dias de mercado, exportar/importar JSON, restaurar demonstração, compras concluídas, movimentações de estoque e semanas anteriores. |
 
@@ -97,6 +99,7 @@ PanelAI/
 │   ├── models/               # constantes, unidades e conversões, validação de receitas
 │   ├── storage/              # IndexedDB, estado global, ações
 │   ├── cloud/                # Firebase: configuração, login, casa e sincronização
+│   ├── display/              # display e-ink: modelos, cards, layouts sugeridos e renderização
 │   ├── data/                 # catálogo de ingredientes, receitas e dados de demonstração
 │   ├── utils/                # datas, roteador, hooks
 │   └── styles/               # tokens, componentes, layout e telas

@@ -8,6 +8,7 @@ import { emptyWeek } from '../services/demand.js';
 import { addEntry, newEntry } from '../services/planning.js';
 import { newPantryItem } from '../services/pantry.js';
 import { addDays, todayISO, weekStartOf } from '../utils/dates.js';
+import { newTask, newTemplate } from '../models/tasks.js';
 
 const PANTRY = [
   // ingredientId, qty, unit, min, desired, monthly
@@ -100,6 +101,22 @@ export function buildSeed(now = new Date()) {
   add(5, 'almoco', r('macarrao-bolonhesa'));
   add(6, 'almoco', { kind: 'out', text: 'Almoço de família' });
 
+  // Tarefas da casa (exemplos): fixas se repetem sozinhas; avulsas só nesta semana.
+  const actor = { name: 'PanelAI' };
+  const fixed = [
+    newTemplate({ title: 'Tirar o lixo', category: 'limpeza', repeat: { kind: 'weekly', weekdays: [1, 3, 5] }, startDate: weekId }, actor, now),
+    newTemplate({ title: 'Regar as plantas', category: 'casa', repeat: { kind: 'weekly', weekdays: [6] }, startDate: weekId }, actor, now),
+    newTemplate({ title: 'Pagar conta de luz', category: 'contas', repeat: { kind: 'monthly', dayOfMonth: 10 }, startDate: weekId }, actor, now),
+    newTemplate({ title: 'Trocar roupa de cama', category: 'roupas' }, actor, now),
+  ];
+  const taskTemplates = Object.fromEntries(fixed.map((t) => [t.id, t]));
+  const oneOff = [
+    newTask({ title: 'Levar roupas na lavanderia', date: d(1), category: 'roupas', templateId: null }, actor, now),
+    newTask({ title: 'Trocar roupa de cama', date: d(5), category: 'roupas', templateId: fixed[3].id }, actor, now),
+    newTask({ title: 'Organizar a despensa', date: d(2), category: 'cozinha', notes: 'Conferir validades.' }, actor, now),
+  ];
+  const tasks = Object.fromEntries(oneOff.map((t) => [t.id, t]));
+
   return {
     ingredients,
     recipes,
@@ -108,6 +125,9 @@ export function buildSeed(now = new Date()) {
     marmitas,
     movements: [],
     purchases: [],
+    tasks,
+    taskTemplates,
+    displayLayouts: {},
     settings: { ...DEFAULT_SETTINGS },
   };
 }
