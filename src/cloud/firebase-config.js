@@ -9,12 +9,12 @@
 // Passo a passo completo em docs/FIREBASE.md.
 
 const FIREBASE_CONFIG = {
-  apiKey: '',
-  authDomain: '',
-  projectId: '',
-  storageBucket: '',
-  messagingSenderId: '',
-  appId: '',
+  apiKey: 'AIzaSyCC_IfEOQDX20tBiJ4FgIb90_O-dHvL8kE',
+  authDomain: 'house-management-2c5a9.firebaseapp.com',
+  projectId: 'house-management-2c5a9',
+  storageBucket: 'house-management-2c5a9.firebasestorage.app',
+  messagingSenderId: '510022017478',
+  appId: '1:510022017478:web:02d13bf6afbf884577d2c7',
 };
 
 function fromEnv() {
