@@ -52,6 +52,10 @@ Sem a configuração, nada muda: o PanelAI continua salvando só no aparelho.
 As regras garantem que só os e-mails cadastrados na casa (e confirmados) leem ou alteram os dados,
 e que só o responsável pela casa adiciona ou remove pessoas.
 
+> **Ao atualizar o PanelAI:** se uma versão nova pedir, publique de novo o `firestore.rules`
+> (mesmo caminho: Firestore Database → Regras → colar → Publicar). A partir da versão 1.2,
+> as regras aceitam coleções novas automaticamente, então isso deve ser raro.
+
 ### 6. Colocar a configuração no PanelAI
 
 Edite [`src/cloud/firebase-config.js`](../src/cloud/firebase-config.js) e preencha os campos com os valores do passo 2:

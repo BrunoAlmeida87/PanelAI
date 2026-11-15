@@ -1,7 +1,8 @@
 // Configurações, dados (exportar/importar) e informações do aplicativo.
 
 import { useEffect, useRef, useState } from 'preact/hooks';
-import { Download, Upload, History, Keyboard, RotateCcw, Eraser, Smartphone, HardDrive, Info } from 'lucide-preact';
+import { Download, Upload, History, Keyboard, RotateCcw, Eraser, Smartphone, HardDrive, Info, MonitorSmartphone } from 'lucide-preact';
+import { currentActor, setDeviceName, useDeviceName } from '../storage/actor.js';
 import { useStore } from '../storage/store.js';
 import { updateSettings, exportData, importData, resetDemo, startFresh } from '../storage/actions.js';
 import { validateBackup } from '../services/backup.js';
@@ -22,6 +23,7 @@ export function SettingsPage() {
   const [usage, setUsage] = useState(null);
   const [installable, setInstallable] = useState(!!getInstallPrompt());
   const fileRef = useRef(null);
+  const deviceName = useDeviceName();
   const shared = s.mode === 'cloud';
   const whose = shared ? 'da casa (para todas as pessoas)' : 'deste aparelho';
 
@@ -91,6 +93,20 @@ export function SettingsPage() {
 
       <section class="card card-pad form-section" aria-labelledby="pref">
         <h2 id="pref" class="section-title" style="margin:0">Preferências</h2>
+        <label class="field">
+          <span class="label">Seu nome neste aparelho</span>
+          <input
+            class="input"
+            value={deviceName}
+            maxLength={40}
+            placeholder={currentActor().name}
+            onChange={(e) => {
+              setDeviceName(e.currentTarget.value);
+              toast('Nome salvo');
+            }}
+          />
+          <span class="hint">Aparece no histórico das tarefas ("feita por…"). Sem preencher, usamos o nome da conta da nuvem.</span>
+        </label>
         <div class="field">
           <span class="label">Pessoas na casa</span>
           <Stepper value={s.settings.people} min={1} max={20} unit="pessoas" label="Pessoas na casa" onChange={(v) => updateSettings({ people: v })} />
@@ -188,7 +204,7 @@ export function SettingsPage() {
             onClick={async () => {
               const ok = await confirmDialog({
                 title: 'Começar do zero',
-                message: `Apaga cardápios, despensa, marmitas e histórico ${whose}. Receitas e catálogo de ingredientes são mantidos.`,
+                message: `Apaga cardápios, despensa, marmitas, tarefas e histórico ${whose}. Receitas, catálogo de ingredientes, tarefas salvas e layouts do display são mantidos.`,
                 confirmLabel: 'Apagar',
                 danger: true,
               });
@@ -220,6 +236,9 @@ export function SettingsPage() {
               <Smartphone size={16} /> Instalar PanelAI
             </button>
           )}
+          <a class="btn btn-secondary" href="#/display">
+            <MonitorSmartphone size={16} /> Display e-ink
+          </a>
           <button type="button" class="btn btn-secondary hide-mobile" onClick={() => setShortcuts(true)}>
             <Keyboard size={16} /> Atalhos de teclado
           </button>
@@ -230,7 +249,7 @@ export function SettingsPage() {
           </p>
         )}
         <p class="small muted" style="display:flex;gap:6px;align-items:center">
-          <Info size={14} /> PanelAI 1.1 · {shared ? 'dados sincronizados no Firebase da casa' : 'dados locais · sem envio de informações para servidores'}.
+          <Info size={14} /> PanelAI 1.2 · {shared ? 'dados sincronizados no Firebase da casa' : 'dados locais · sem envio de informações para servidores'}.
         </p>
       </section>
       <ShortcutsModal open={shortcuts} onClose={() => setShortcuts(false)} />

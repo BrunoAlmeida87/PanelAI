@@ -3,7 +3,7 @@
 // usamos memória e avisamos o usuário de que os dados não serão mantidos.
 
 const DB_NAME = 'panelai';
-const DB_VERSION = 1;
+const DB_VERSION = 2; // v2: tarefas, modelos de tarefa e layouts do display
 
 export const STORES = {
   ingredients: 'id',
@@ -14,6 +14,9 @@ export const STORES = {
   movements: 'id',
   purchases: 'id',
   meta: 'key',
+  tasks: 'id',
+  taskTemplates: 'id',
+  displayLayouts: 'id',
 };
 
 let dbPromise = null;

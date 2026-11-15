@@ -505,7 +505,7 @@ export async function resetDemo() {
   applyFullData(seed);
 }
 
-/** Apaga cardápios, estoque e histórico, mantendo receitas e catálogo. */
+/** Apaga cardápios, estoque, tarefas e histórico, mantendo receitas, catálogo, tarefas salvas e layouts. */
 export async function startFresh() {
   const s = getState();
   const data = {
@@ -516,6 +516,9 @@ export async function startFresh() {
     marmitas: {},
     movements: [],
     purchases: [],
+    tasks: {},
+    taskTemplates: s.taskTemplates,
+    displayLayouts: s.displayLayouts,
     settings: s.settings,
   };
   await persist(seedOps(data));

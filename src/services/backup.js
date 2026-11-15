@@ -8,6 +8,8 @@ import { isValidISODate, weekStartOf } from '../utils/dates.js';
 export const BACKUP_APP = 'PanelAI';
 export const BACKUP_VERSION = 1;
 export const COLLECTIONS = ['ingredients', 'recipes', 'pantry', 'weeks', 'marmitas', 'movements', 'purchases'];
+// Coleções novas: opcionais, para aceitar backups de versões anteriores.
+export const OPTIONAL_COLLECTIONS = ['tasks', 'taskTemplates', 'displayLayouts'];
 
 export function buildBackup(data, now = new Date()) {
   return {
@@ -22,6 +24,9 @@ export function buildBackup(data, now = new Date()) {
       marmitas: Object.values(data.marmitas ?? {}),
       movements: data.movements ?? [],
       purchases: data.purchases ?? [],
+      tasks: Object.values(data.tasks ?? {}),
+      taskTemplates: Object.values(data.taskTemplates ?? {}),
+      displayLayouts: Object.values(data.displayLayouts ?? {}),
       settings: data.settings ?? {},
     },
   };
@@ -59,6 +64,10 @@ export function validateBackup(raw) {
     if (list.length > 20000) errors.push(`Coleção "${name}" grande demais.`);
   };
   COLLECTIONS.forEach((c) => limit(d[c], c));
+  for (const c of OPTIONAL_COLLECTIONS) {
+    if (d[c] !== undefined && !Array.isArray(d[c])) errors.push(`Coleção "${c}" inválida.`);
+    else if (d[c]) limit(d[c], c);
+  }
 
   const ingredients = {};
   d.ingredients.forEach((ing, idx) => {
@@ -137,6 +146,31 @@ export function validateBackup(raw) {
   const purchases = d.purchases.filter((p) => isObj(p) && isStr(p.id));
   const settings = isObj(d.settings) ? d.settings : {};
 
+  const tasks = {};
+  (d.tasks ?? []).forEach((t, idx) => {
+    if (!isObj(t) || !isStr(t.id) || !isStr(t.title) || !isValidISODate(t.date)) {
+      errors.push(`Tarefa #${idx + 1}: id, nome e data são obrigatórios.`);
+      return;
+    }
+    tasks[t.id] = { status: 'todo', comments: [], history: [], movedFrom: [], ...t };
+  });
+  const taskTemplates = {};
+  (d.taskTemplates ?? []).forEach((t, idx) => {
+    if (!isObj(t) || !isStr(t.id) || !isStr(t.title)) {
+      errors.push(`Tarefa salva #${idx + 1}: id e nome são obrigatórios.`);
+      return;
+    }
+    taskTemplates[t.id] = t;
+  });
+  const displayLayouts = {};
+  (d.displayLayouts ?? []).forEach((l, idx) => {
+    if (!isObj(l) || !isStr(l.id) || !Array.isArray(l.cards) || !isObj(l.grid)) {
+      errors.push(`Layout do display #${idx + 1}: dados inválidos.`);
+      return;
+    }
+    displayLayouts[l.id] = l;
+  });
+
   if (errors.length) return { ok: false, errors: errors.slice(0, 20) };
-  return { ok: true, errors: [], data: { ingredients, recipes, pantry, weeks, marmitas, movements, purchases, settings } };
+  return { ok: true, errors: [], data: { ingredients, recipes, pantry, weeks, marmitas, movements, purchases, settings, tasks, taskTemplates, displayLayouts } };
 }

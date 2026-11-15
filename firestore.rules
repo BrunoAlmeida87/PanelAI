@@ -28,6 +28,10 @@ service cloud.firestore {
         && myEmail() in get(/databases/$(database)/documents/households/$(casa)).data.memberEmails;
     }
 
+    function validCollection(nome) {
+      return nome.matches('^[A-Za-z]{1,40}$');
+    }
+
     function validHousehold(d) {
       return d.keys().hasOnly(['name', 'ownerEmail', 'memberEmails', 'createdAt'])
         && d.name is string && d.name.size() <= 60
@@ -51,15 +55,13 @@ service cloud.firestore {
       allow delete: if false;
 
       // Dados do app: um documento por registro, com o JSON em "v".
+      // Qualquer coleção com nome simples (cardápio, receitas, despensa,
+      // tarefas, layouts do display e as que vierem em versões futuras).
       match /{colecao}/{id} {
-        allow read: if isMember(casa)
-          && colecao in ['ingredients', 'recipes', 'pantry', 'weeks', 'marmitas', 'movements', 'purchases', 'meta'];
-
-        allow delete: if isMember(casa)
-          && colecao in ['ingredients', 'recipes', 'pantry', 'weeks', 'marmitas', 'movements', 'purchases', 'meta'];
+        allow read, delete: if isMember(casa) && validCollection(colecao);
 
         allow create, update: if isMember(casa)
-          && colecao in ['ingredients', 'recipes', 'pantry', 'weeks', 'marmitas', 'movements', 'purchases', 'meta']
+          && validCollection(colecao)
           && request.resource.data.keys().hasOnly(['v', 't', 'by'])
           && request.resource.data.v is string
           && request.resource.data.v.size() < 1000000

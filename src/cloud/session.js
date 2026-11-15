@@ -75,7 +75,12 @@ export async function startCloudIfReady() {
   return true;
 }
 
-function describeError(err) {
+let householdOk = false;
+
+function describeError(err, where) {
+  if (err?.code === 'permission-denied' && householdOk && where !== 'household') {
+    return 'As regras do Firestore estão desatualizadas para esta versão do PanelAI. Publique de novo o arquivo firestore.rules (Firestore → Regras → Publicar).';
+  }
   if (err?.code === 'permission-denied') {
     return 'Seu e-mail não tem acesso aos dados desta casa (talvez tenha sido removido). Saia da conta para voltar aos dados deste aparelho.';
   }
@@ -86,11 +91,14 @@ function describeError(err) {
 async function startSync(householdId) {
   const initial = await cloud.startSync(householdId, {
     onChanges: applyRemoteChanges,
-    onHousehold: (household) => patchCloud({ household }),
+    onHousehold: (household) => {
+      householdOk = !!household;
+      patchCloud({ household });
+    },
     onPending: (pending) => patchCloud({ pending }),
     onError: (err, where) => {
       console.error('Nuvem', where, err);
-      patchCloud({ error: describeError(err) });
+      patchCloud({ error: describeError(err, where) });
       if (where === 'write') setState({ saveStatus: 'error' });
     },
   });

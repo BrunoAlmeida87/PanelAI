@@ -12,6 +12,9 @@ const ROUTES = [
   ['receita', /^\/receitas\/([^/]+)$/],
   ['ajustes', /^\/ajustes$/],
   ['historico', /^\/historico$/],
+  ['tarefas', /^\/tarefas$/],
+  ['display', /^\/display$/],
+  ['display-tela', /^\/display\/tela$/],
 ];
 
 export function parseHash(hash = location.hash) {
