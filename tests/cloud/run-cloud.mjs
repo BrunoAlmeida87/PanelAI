@@ -8,6 +8,7 @@
 // Simula dois aparelhos (Alice e Bob) no mesmo processo, cada um com a sua
 // instância do módulo src/cloud/cloud.js.
 
+import { readFile } from 'node:fs/promises';
 
 const HOST = '127.0.0.1';
 const PROJECT = 'demo-panelai';
@@ -79,6 +80,22 @@ async function adminList(path) {
   });
   const j = await r.json();
   return j.documents ?? [];
+}
+
+/**
+ * Regras da "primeira configuração": iguais às publicadas, com a criação de
+ * casas liberada (como o docs/FIREBASE.md manda fazer num projeto novo).
+ */
+async function loadFirstSetupRules() {
+  const published = await readFile(new URL('../../firestore.rules', import.meta.url), 'utf8');
+  const firstSetup = published.replace('allow create: if false;', 'allow create: if canCreateHousehold(casa);');
+  assert(firstSetup !== published, 'firestore.rules deveria ter "allow create: if false;"');
+  const r = await fetch(`${FS}/emulator/v1/projects/${PROJECT}:securityRules`, {
+    method: 'PUT',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ rules: { files: [{ content: firstSetup }] } }),
+  });
+  assert(r.ok, `não foi possível carregar as regras (${r.status})`);
 }
 
 // ---------- aparelhos ----------
@@ -155,6 +172,11 @@ seed.recipes['bolo-teste'] = { ...Object.values(seed.recipes)[0], id: 'bolo-test
 const counts = Object.fromEntries(['ingredients', 'recipes', 'pantry', 'weeks', 'tasks', 'displayLayouts'].map((s) => [s, Object.keys(seed[s]).length]));
 
 let hid = null;
+
+await step('regras publicadas: ninguém cria casa nova', async () => {
+  await expectDenied(alice.cloud.createHousehold('Casa teste', []), 'criar casa');
+  await loadFirstSetupRules();
+});
 
 await step('criar a casa envia todos os dados (inclusive tarefas e layouts)', async () => {
   hid = await alice.cloud.createHousehold('Casa teste', seedOps(seed));
@@ -238,7 +260,7 @@ await step('regras: quem não é da casa não lê nem grava', async () => {
   await expectDenied(setDoc(doc(db, 'households', hid, 'recipes', 'x'), { v: '{}', t: serverTimestamp(), by: 'carol@exemplo.com' }), 'gravar receita');
 });
 
-await step('regras: cada conta cria só a própria casa', async () => {
+await step('regras (primeira configuração): cada conta cria só a própria casa', async () => {
   const { getFirestore, doc, setDoc, serverTimestamp } = await import('firebase/firestore');
   const { getApp } = await import('firebase/app');
   const db = getFirestore(getApp('carol'));

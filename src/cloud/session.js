@@ -2,10 +2,9 @@
 // Carregado sob demanda, só quando o Firebase está configurado.
 
 import * as cloud from './cloud.js';
-import { applyRemoteChanges, getState, loadFromChanges, seedOps, setState, setWriter } from '../storage/store.js';
-import { CLOUD_HINT_KEY, CLOUD_HOUSEHOLD_KEY } from '../storage/cloudHint.js';
+import { applyRemoteChanges, getState, loadFromChanges, readLocalData, seedOps, setState, setWriter } from '../storage/store.js';
 
-const CACHE_KEY = CLOUD_HOUSEHOLD_KEY;
+const CACHE_KEY = 'panelai.cloud.household';
 const SYNCED_KEY = 'panelai.cloud.synced'; // casa já baixada por completo neste aparelho
 const MAINT_KEY = 'panelai.cloud.maintenance';
 const MAINT_EVERY_MS = 6 * 3600_000;
@@ -60,14 +59,10 @@ let watching = false;
 function ensureUserWatch() {
   if (watching) return;
   watching = true;
-  cloud.watchUser((user) => {
-    // Lembra que há conta neste aparelho: na próxima abertura o Firebase é carregado logo.
-    lsSet(CLOUD_HINT_KEY, user ? '1' : null);
-    patchCloud({ user });
-  });
+  cloud.watchUser((user) => patchCloud({ user }));
 }
 
-/** Tela de Configurações aberta sem a nuvem ativa: carrega o login (sob demanda). */
+/** Tela de entrar ou de Configurações sem a nuvem ativa: garante o estado do login. */
 export async function initCloudUi() {
   ensureUserWatch();
   if (getState().cloud.status !== 'checking') return;
@@ -175,7 +170,6 @@ const reloadApp = () => window.location.reload();
 
 /** Depois do login: procura a casa do usuário. */
 async function afterSignIn(user) {
-  if (user) lsSet(CLOUD_HINT_KEY, '1');
   patchCloud({ user, error: null });
   if (!user?.verified) return { user, household: null };
   const household = await cloud.findMyHousehold();
@@ -201,9 +195,14 @@ export function joinHousehold(household) {
   reloadApp();
 }
 
-/** Cria a casa na nuvem com os dados que estão neste aparelho. */
+/**
+ * Cria a casa na nuvem com os dados que estão neste aparelho. Na tela de entrar
+ * não há dados abertos: usa os dados que este navegador guardou antes (versões
+ * sem login obrigatório) ou, se não houver, os exemplos.
+ */
 export async function createHouseholdFromThisDevice(name) {
-  const s = getState();
+  let s = getState();
+  if (s.mode === 'gate') s = (await readLocalData()) ?? (await import('../data/seed.js')).buildSeed();
   const ops = seedOps({
     ingredients: s.ingredients,
     recipes: s.recipes,
@@ -217,10 +216,10 @@ export async function createHouseholdFromThisDevice(name) {
     displayLayouts: s.displayLayouts,
     settings: s.settings,
   });
-  ops.push({ store: 'meta', type: 'put', value: { key: 'monthlySession', value: s.monthlySession } });
-  ops.push({ store: 'meta', type: 'put', value: { key: 'countDraft', value: s.countDraft } });
+  ops.push({ store: 'meta', type: 'put', value: { key: 'monthlySession', value: s.monthlySession ?? { id: null, checked: {}, qty: {} } } });
+  ops.push({ store: 'meta', type: 'put', value: { key: 'countDraft', value: s.countDraft ?? {} } });
   const id = await cloud.createHousehold(name, ops);
-  writeCache(s.cloud.user.email, id);
+  writeCache(getState().cloud.user.email, id);
   reloadApp();
 }
 
@@ -256,7 +255,6 @@ export async function renameHousehold(name) {
 export async function signOutCloud() {
   clearCache();
   lsSet(SYNCED_KEY, null);
-  lsSet(CLOUD_HINT_KEY, null);
   await cloud.signOutAndClear();
   reloadApp();
 }

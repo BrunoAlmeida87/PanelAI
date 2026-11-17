@@ -8,7 +8,7 @@ Organização alimentar e doméstica em um só lugar: **cardápio da semana, rec
 
 **Site publicado:** https://brunoalmeida87.github.io/PanelAI/
 
-Funciona no computador e no celular (layouts diferentes para cada um), pode ser instalado como aplicativo (PWA) e funciona offline depois do primeiro acesso. Os dados ficam no próprio navegador ou, com o Firebase configurado, **numa casa compartilhada na nuvem**, sincronizada em tempo real entre as pessoas da casa ([passo a passo](docs/FIREBASE.md)).
+Funciona no computador e no celular (layouts diferentes para cada um), pode ser instalado como aplicativo (PWA) e funciona offline depois do primeiro acesso. Com o Firebase configurado, os dados ficam **numa casa compartilhada na nuvem**, sincronizada em tempo real, e **só quem entra com um e-mail cadastrado na casa usa o app** ([passo a passo](docs/FIREBASE.md)). Sem o Firebase, os dados ficam no próprio navegador, sem login.
 
 ---
 
@@ -50,7 +50,7 @@ Funciona no computador e no celular (layouts diferentes para cada um), pode ser 
   - Duas pessoas marcando a lista (ou contando a despensa, ou no mercado do mês) ao mesmo tempo não apagam as marcações uma da outra: cada item vale pela alteração mais recente.
   - Registros antigos (histórico, compras, tarefas concluídas, semanas passadas) são agrupados por mês na nuvem, para a abertura do app não ficar mais cara com o tempo.
   - Num aparelho novo sem internet, o app espera os dados da casa em vez de abrir vazio.
-  - Quem nunca entrou na nuvem não baixa o Firebase: ele só é carregado em Configurações → Nuvem.
+  - **Login obrigatório:** sem login aparece só a tela de entrar (também em `#/display/tela`). Cada alteração fica registrada com o e-mail de quem a fez. Importar, restaurar demonstração e começar do zero ficam só com o responsável pela casa, e as regras do Firestore bloqueiam a criação de casas novas.
 - Sem Firebase configurado, não há sincronização entre aparelhos: exporte e importe para levar os dados.
 
 ## Instalar como aplicativo
@@ -71,7 +71,7 @@ npm run build      # gera dist/
 npm run preview    # serve o build em http://localhost:4173/PanelAI/
 ```
 
-Testes da sincronização na nuvem e das regras do Firestore, nos emuladores do Firebase (precisa de Java 11+; nada toca o projeto real):
+Testes da sincronização na nuvem, das regras do Firestore e do login no navegador, nos emuladores do Firebase (precisa de Java 11+ e Playwright; nada toca o projeto real):
 
 ```bash
 npm run test:cloud
@@ -80,10 +80,10 @@ npm run test:cloud
 Testes de ponta a ponta e responsividade (Playwright com Chromium instalado no ambiente):
 
 ```bash
-npm run build && npm run test:e2e
+npm run build:e2e && npm run test:e2e
 ```
 
-(No CI, o build dos testes de tela é feito sem a nuvem — `VITE_FIREBASE_CONFIG='{"apiKey":""}'` — para não tocar o projeto real do Firebase.)
+O `build:e2e` gera o app sem a nuvem (arquivo `.env.e2e`), para os testes de tela não precisarem de login nem tocarem o projeto real do Firebase. O login é testado em `npm run test:cloud`.
 
 Cobrem os fluxos em desktop (1440 px) e celular (Pixel 7): criar receita, selecionar refeição, alterar porções, navegar entre semanas, gerar lista, rastrear ingrediente, marcar comprados, registrar compra, atualizar estoque, contagem, compra mensal, exportar, importar, persistência após recarregar, barra inferior sem sobrepor conteúdo, modal com teclado virtual, orientação paisagem, gesto de deslizar, atalhos e foco; ausência de rolagem horizontal em 360, 390, 430, 768, 1024 e 1440 px; e funcionamento offline. Capturas ficam em `tests/e2e/output/`.
 
@@ -145,8 +145,8 @@ Panela minimalista verde-sálvia (`#789582`) sobre fundo verde muito claro (`#E7
 
 ## Limitações conhecidas
 
-- Sem Firebase, não há sincronização automática entre aparelhos (use exportar/importar).
-- No modo local, os dados ficam no navegador: limpar os dados do site apaga o PanelAI. Faça backups.
+- Sem Firebase, não há login nem sincronização automática entre aparelhos (use exportar/importar).
+- Sem Firebase, os dados ficam no navegador: limpar os dados do site apaga o PanelAI. Faça backups.
 - Na nuvem, marcações da lista, contagem e mercado do mês se somam item a item; já o cardápio da semana, as receitas e os itens da despensa são gravados inteiros: se duas pessoas alterarem o mesmo registro no mesmo instante, vale a última gravação.
 - Sugestões usam regras locais (sem IA externa).
 - Conversões entre massa, volume e unidades dependem dos dados do ingrediente; sem eles, as quantidades aparecem separadas na lista.

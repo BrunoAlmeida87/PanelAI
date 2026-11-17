@@ -26,6 +26,8 @@ export function SettingsPage() {
   const deviceName = useDeviceName();
   const shared = s.mode === 'cloud';
   const whose = shared ? 'da casa (para todas as pessoas)' : 'deste aparelho';
+  // Na nuvem, só o responsável pela casa pode substituir ou apagar tudo.
+  const isOwner = !shared || (s.cloud.household && s.cloud.user && s.cloud.household.ownerEmail === s.cloud.user.email);
 
   useEffect(() => {
     navigator.storage?.estimate?.().then((e) => setUsage(e)).catch(() => {});
@@ -161,9 +163,11 @@ export function SettingsPage() {
           <button type="button" class="btn btn-primary" onClick={doExport}>
             <Download size={16} /> Exportar (JSON)
           </button>
-          <button type="button" class="btn btn-secondary" onClick={() => fileRef.current?.click()}>
-            <Upload size={16} /> Importar
-          </button>
+          {isOwner && (
+            <button type="button" class="btn btn-secondary" onClick={() => fileRef.current?.click()}>
+              <Upload size={16} /> Importar
+            </button>
+          )}
           <input ref={fileRef} type="file" accept="application/json,.json" class="sr-only" onChange={doImport} aria-label="Arquivo de backup" />
         </div>
         {importErrors.length > 0 && (
@@ -178,45 +182,53 @@ export function SettingsPage() {
             </div>
           </div>
         )}
-        <div class="divider" />
-        <div class="toolbar">
-          <button
-            type="button"
-            class="btn btn-ghost"
-            onClick={async () => {
-              const ok = await confirmDialog({
-                title: 'Restaurar demonstração',
-                message: `Substitui todos os dados ${whose} pelas receitas, despensa e cardápio de exemplo.`,
-                confirmLabel: 'Restaurar',
-                danger: true,
-              });
-              if (ok) {
-                await resetDemo();
-                toast('Dados de demonstração restaurados');
-              }
-            }}
-          >
-            <RotateCcw size={16} /> Restaurar demonstração
-          </button>
-          <button
-            type="button"
-            class="btn btn-danger-ghost"
-            onClick={async () => {
-              const ok = await confirmDialog({
-                title: 'Começar do zero',
-                message: `Apaga cardápios, despensa, marmitas, tarefas e histórico ${whose}. Receitas, catálogo de ingredientes, tarefas salvas e layouts do display são mantidos.`,
-                confirmLabel: 'Apagar',
-                danger: true,
-              });
-              if (ok) {
-                await startFresh();
-                toast('Pronto para começar');
-              }
-            }}
-          >
-            <Eraser size={16} /> Começar do zero
-          </button>
-        </div>
+        {isOwner ? (
+          <>
+            <div class="divider" />
+            <div class="toolbar">
+              <button
+                type="button"
+                class="btn btn-ghost"
+                onClick={async () => {
+                  const ok = await confirmDialog({
+                    title: 'Restaurar demonstração',
+                    message: `Substitui todos os dados ${whose} pelas receitas, despensa e cardápio de exemplo.`,
+                    confirmLabel: 'Restaurar',
+                    danger: true,
+                  });
+                  if (ok) {
+                    await resetDemo();
+                    toast('Dados de demonstração restaurados');
+                  }
+                }}
+              >
+                <RotateCcw size={16} /> Restaurar demonstração
+              </button>
+              <button
+                type="button"
+                class="btn btn-danger-ghost"
+                onClick={async () => {
+                  const ok = await confirmDialog({
+                    title: 'Começar do zero',
+                    message: `Apaga cardápios, despensa, marmitas, tarefas e histórico ${whose}. Receitas, catálogo de ingredientes, tarefas salvas e layouts do display são mantidos.`,
+                    confirmLabel: 'Apagar',
+                    danger: true,
+                  });
+                  if (ok) {
+                    await startFresh();
+                    toast('Pronto para começar');
+                  }
+                }}
+              >
+                <Eraser size={16} /> Começar do zero
+              </button>
+            </div>
+          </>
+        ) : (
+          <p class="small muted" style="margin:0">
+            Importar, restaurar a demonstração e começar do zero ficam só com o responsável pela casa.
+          </p>
+        )}
       </section>
 
       <section class="card card-pad form-section" style="margin-top:16px" aria-labelledby="app">

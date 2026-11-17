@@ -25,6 +25,7 @@ const HistoryPage = lazyPage(() => import('./pages/HistoryPage.jsx'), 'HistoryPa
 const TasksPage = lazyPage(() => import('./pages/TasksPage.jsx'), 'TasksPage');
 const DisplayPage = lazyPage(() => import('./pages/DisplayPage.jsx'), 'DisplayPage');
 const DisplayScreen = lazyPage(() => import('./pages/DisplayPage.jsx'), 'DisplayScreen');
+const LoginGate = lazyPage(() => import('./pages/LoginGate.jsx'), 'LoginGate');
 
 const NAV = [
   { id: 'cardapio', path: '/cardapio', long: 'Cardápio', short: 'Cardápio', icon: CalendarDays },
@@ -94,6 +95,19 @@ export function App() {
   const showWeek = ['cardapio', 'compras', 'tarefas'].includes(route.name);
 
   if (!state.ready) return <BootScreen waiting={state.cloud.waiting} online={online} />;
+
+  // Nuvem configurada e ninguém logado: só a tela de entrar (também no display).
+  if (state.mode === 'gate') {
+    return (
+      <>
+        <Suspense fallback={<PageLoading />}>
+          <LoginGate />
+        </Suspense>
+        <ToastRegion />
+        <ConfirmHost />
+      </>
+    );
+  }
 
   // Tela do display: só o conteúdo, sem menus (para o aparelho e-ink).
   if (route.name === 'display-tela') {

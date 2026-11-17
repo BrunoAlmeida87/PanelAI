@@ -383,3 +383,30 @@
     display: none !important;
   }
 }
+
+/* ---------- Tela de login ---------- */
+.login-gate {
+  min-height: 100vh;
+  min-height: 100dvh;
+  display: grid;
+  place-items: center;
+  padding: calc(24px + var(--safe-top)) var(--gutter) calc(24px + var(--safe-bottom));
+  background: var(--bg);
+}
+.login-gate-inner {
+  width: 100%;
+  max-width: 460px;
+  display: grid;
+  gap: 20px;
+  justify-items: center;
+}
+.login-gate .gate-card {
+  width: 100%;
+}
+.login-logo {
+  height: auto;
+}
+.login-foot {
+  text-align: center;
+  margin: 0;
+}

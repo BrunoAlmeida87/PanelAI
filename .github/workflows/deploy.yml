@@ -66,9 +66,7 @@ jobs:
 
       # Sem o Firebase: os testes de tela não usam o projeto real (a nuvem é testada no job "cloud").
       - name: Build de produção (sem nuvem)
-        run: npm run build
-        env:
-          VITE_FIREBASE_CONFIG: '{"apiKey":""}'
+        run: npm run build:e2e
 
       - name: Testes de ponta a ponta
         run: npm run test:e2e
@@ -100,7 +98,12 @@ jobs:
       - name: Instalar dependências
         run: npm ci
 
-      - name: Testes da nuvem (emuladores)
+      - name: Instalar Playwright e Chromium
+        run: |
+          npm install --no-save playwright@1.63.0
+          npx playwright install --with-deps chromium
+
+      - name: Testes da nuvem e do login (emuladores)
         run: npm run test:cloud
 
   deploy:

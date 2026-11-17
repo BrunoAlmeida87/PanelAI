@@ -7,3 +7,4 @@ tests/e2e/output/
 firebase-debug.log
 firestore-debug.log
 ui-debug.log
+tests/cloud/dist/

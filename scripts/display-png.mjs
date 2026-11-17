@@ -75,8 +75,8 @@ async function login() {
   await mkdir(PROFILE, { recursive: true });
   const ctx = await chromium.launchPersistentContext(PROFILE, { headless: false, viewport: null });
   const page = ctx.pages()[0] ?? (await ctx.newPage());
-  await page.goto(`${SITE}#/ajustes`);
-  console.log('Entre na conta da casa em Configurações → Sincronização na nuvem e toque em "Usar os dados da casa".');
+  await page.goto(`${SITE}#/cardapio`);
+  console.log('Entre com um e-mail cadastrado na casa (tela de entrar) e toque em "Entrar na casa".');
   console.log('Depois feche a janela do navegador. O login fica guardado em', PROFILE);
   await new Promise((resolve) => ctx.on('close', resolve));
 }

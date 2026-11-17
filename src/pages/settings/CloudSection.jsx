@@ -29,7 +29,7 @@ const AUTH_ERRORS = {
 
 const errorText = (err) => AUTH_ERRORS[err?.code] ?? err?.message ?? String(err);
 
-export function CloudSection() {
+export function CloudSection({ gate = false }) {
   const s = useStore();
   const c = s.cloud;
   const [busy, setBusy] = useState(false);
@@ -64,19 +64,25 @@ export function CloudSection() {
     }
   }, []);
 
-  // Usuário já logado (modo local): procura a casa ao abrir a tela.
+  // Usuário já logado, sem casa aberta: procura a casa ao abrir a tela.
   useEffect(() => {
-    if (s.mode === 'local' && c.user?.verified && found === undefined) {
+    if (s.mode !== 'cloud' && c.user?.verified && found === undefined) {
       run((a) => a.findMyHousehold()).then((h) => setFound(h ?? null));
     }
   }, [s.mode, c.user?.email, c.user?.verified]);
 
   return (
-    <section class="card card-pad form-section" style="margin-top:16px" aria-labelledby="nuvem">
+    <section class={`card card-pad form-section ${gate ? 'gate-card' : ''}`} style={gate ? undefined : 'margin-top:16px'} aria-labelledby="nuvem">
       <h2 id="nuvem" class="section-title" style="margin:0;display:flex;gap:8px;align-items:center">
-        <Cloud size={18} /> Sincronização na nuvem
+        {gate ? (
+          'Entrar no PanelAI'
+        ) : (
+          <>
+            <Cloud size={18} /> Sincronização na nuvem
+          </>
+        )}
       </h2>
-      <Body s={s} c={c} busy={busy} run={run} found={found} setFound={setFound} afterLogin={afterLogin} />
+      <Body s={s} c={c} busy={busy} run={run} found={found} setFound={setFound} afterLogin={afterLogin} gate={gate} />
       {(error || c.error) && (
         <div class="notice" role="alert" style="background:var(--danger-light);color:var(--danger)">
           {error || c.error}
@@ -86,7 +92,7 @@ export function CloudSection() {
   );
 }
 
-function Body({ s, c, busy, run, found, setFound, afterLogin }) {
+function Body({ s, c, busy, run, found, setFound, afterLogin, gate }) {
   if (!c.configured) {
     return (
       <div class="notice info">
@@ -100,7 +106,7 @@ function Body({ s, c, busy, run, found, setFound, afterLogin }) {
   }
   if (c.status === 'checking') return <p class="small muted">Verificando a conta…</p>;
   if (s.mode === 'cloud') return <ActiveHousehold s={s} c={c} busy={busy} run={run} />;
-  if (!c.user) return <SignIn busy={busy} run={run} afterLogin={afterLogin} />;
+  if (!c.user) return <SignIn busy={busy} run={run} afterLogin={afterLogin} gate={gate} />;
   if (!c.user.verified) {
     return (
       <>
@@ -127,10 +133,10 @@ function Body({ s, c, busy, run, found, setFound, afterLogin }) {
       </>
     );
   }
-  return <NoHouseholdYet c={c} busy={busy} run={run} found={found} setFound={setFound} />;
+  return <NoHouseholdYet c={c} busy={busy} run={run} found={found} setFound={setFound} gate={gate} />;
 }
 
-function SignIn({ busy, run, afterLogin }) {
+function SignIn({ busy, run, afterLogin, gate }) {
   const [withEmail, setWithEmail] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -143,8 +149,9 @@ function SignIn({ busy, run, afterLogin }) {
   return (
     <>
       <p class="small muted" style="margin:0">
-        Entre com a sua conta para compartilhar cardápio, lista de compras e despensa com as pessoas da casa. Cada pessoa entra com o próprio e-mail e todos veem as
-        mesmas informações, atualizadas na hora.
+        {gate
+          ? 'Só as pessoas da casa podem ver e alterar os dados. Entre com o e-mail que foi cadastrado na casa.'
+          : 'Entre com a sua conta para compartilhar cardápio, lista de compras e despensa com as pessoas da casa. Cada pessoa entra com o próprio e-mail e todos veem as mesmas informações, atualizadas na hora.'}
       </p>
       <div class="toolbar">
         <button type="button" class="btn btn-primary" disabled={busy} onClick={() => run((a) => a.signInGoogle()).then(afterLogin)}>
@@ -195,7 +202,7 @@ function SignIn({ busy, run, afterLogin }) {
   );
 }
 
-function NoHouseholdYet({ c, busy, run, found, setFound }) {
+function NoHouseholdYet({ c, busy, run, found, setFound, gate }) {
   const [name, setName] = useState('Nossa casa');
 
   if (found === undefined) return <p class="small muted">Procurando sua casa na nuvem…</p>;
@@ -207,11 +214,11 @@ function NoHouseholdYet({ c, busy, run, found, setFound }) {
           Você faz parte da casa <strong>{found.name}</strong>.
         </p>
         <p class="small muted" style="margin:0">
-          Ao usar a casa, este aparelho passa a mostrar os dados da nuvem. Os dados que estão só neste aparelho ficam guardados à parte e voltam se você sair da conta.
+          Ao entrar, este aparelho passa a mostrar os dados da casa, atualizados na hora.
         </p>
         <div class="toolbar">
           <button type="button" class="btn btn-primary" disabled={busy} onClick={() => run((a) => a.joinHousehold(found))}>
-            <Cloud size={16} /> Usar os dados da casa
+            <Cloud size={16} /> Entrar na casa
           </button>
           <SignOutButton busy={busy} run={run} />
         </div>
@@ -228,6 +235,41 @@ function NoHouseholdYet({ c, busy, run, found, setFound }) {
     });
     if (ok) run((a) => a.createHouseholdFromThisDevice(name));
   };
+
+  const retry = () => run((a) => a.findMyHousehold()).then((h) => setFound(h ?? null));
+
+  if (gate) {
+    return (
+      <>
+        <div class="notice" style="background:var(--amber-light);color:var(--amber)">
+          <Users size={18} />
+          <span>
+            O e-mail <strong>{c.user.email}</strong> ainda não tem acesso. Peça para o responsável pela casa adicioná-lo em <strong>Configurações → Pessoas da casa</strong>{' '}
+            e depois toque em "Procurar de novo".
+          </span>
+        </div>
+        <div class="toolbar">
+          <button type="button" class="btn btn-primary" disabled={busy} onClick={retry}>
+            <RefreshCw size={16} /> Procurar de novo
+          </button>
+          <SignOutButton busy={busy} run={run} label="Entrar com outra conta" />
+        </div>
+        <details class="small">
+          <summary class="muted" style="cursor:pointer;min-height:32px">Primeira configuração: criar uma casa nova</summary>
+          <p class="muted">
+            Só funciona se a criação de casas estiver liberada nas regras do Firebase (veja docs/FIREBASE.md). A casa começa com os dados que este navegador já
+            tinha guardado ou, se não houver, com as receitas de exemplo.
+          </p>
+          <div class="toolbar">
+            <input class="input" style="flex:1;min-width:160px" value={name} maxLength={60} aria-label="Nome da casa" onInput={(e) => setName(e.currentTarget.value)} />
+            <button type="button" class="btn btn-secondary" disabled={busy || !name.trim()} onClick={() => run((a) => a.createHouseholdFromThisDevice(name))}>
+              <Cloud size={16} /> Criar casa
+            </button>
+          </div>
+        </details>
+      </>
+    );
+  }
 
   return (
     <>
@@ -250,7 +292,7 @@ function NoHouseholdYet({ c, busy, run, found, setFound }) {
         <button type="button" class="btn btn-primary" disabled={busy || !name.trim()} onClick={create}>
           <Cloud size={16} /> Criar casa com os dados deste aparelho
         </button>
-        <button type="button" class="btn btn-secondary" disabled={busy} onClick={() => run((a) => a.findMyHousehold()).then((h) => setFound(h ?? null))}>
+        <button type="button" class="btn btn-secondary" disabled={busy} onClick={retry}>
           <RefreshCw size={16} /> Procurar de novo
         </button>
         <SignOutButton busy={busy} run={run} />
@@ -349,7 +391,7 @@ function LeaveButton({ busy, run, name }) {
   const onClick = async () => {
     const ok = await confirmDialog({
       title: 'Sair da casa',
-      message: `Você deixa de ver e alterar os dados da casa ${name}. Este aparelho volta aos dados guardados só nele. Para voltar, o responsável precisa adicionar seu e-mail de novo.`,
+      message: `Você deixa de ver e alterar os dados da casa ${name} e este aparelho volta para a tela de entrar. Para voltar, o responsável precisa adicionar seu e-mail de novo.`,
       confirmLabel: 'Sair da casa',
       danger: true,
     });
@@ -371,7 +413,7 @@ function SignOutButton({ busy, run, label = 'Sair' }) {
         message:
           s.cloud.pending > 0
             ? 'Há alterações que ainda não foram enviadas para a nuvem e serão perdidas. Conecte-se à internet antes de sair, se puder.'
-            : 'Este aparelho deixa de mostrar os dados da casa e volta aos dados guardados só nele. Os dados da nuvem continuam salvos para as outras pessoas.',
+            : 'Este aparelho deixa de mostrar os dados da casa e volta para a tela de entrar. Os dados continuam salvos na nuvem para as outras pessoas.',
         confirmLabel: 'Sair',
         danger: s.cloud.pending > 0,
       });

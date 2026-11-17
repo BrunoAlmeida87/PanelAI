@@ -7,11 +7,12 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
+    "build:e2e": "vite build --mode e2e",
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:e2e": "node tests/e2e/run-e2e.mjs",
-    "test:cloud": "npx --yes firebase-tools@15.36.0 emulators:exec --only auth,firestore --project demo-panelai \"node tests/cloud/run-cloud.mjs\"",
+    "test:cloud": "npx --yes firebase-tools@15.36.0 emulators:exec --only auth,firestore --project demo-panelai \"node tests/cloud/run-cloud.mjs && node tests/cloud/run-login.mjs\"",
     "lint": "eslint .",
     "icons": "node scripts/generate-icons.mjs",
     "display:png": "node scripts/display-png.mjs"

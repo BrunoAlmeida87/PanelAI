@@ -10,7 +10,6 @@ import { useEffect, useReducer, useRef } from 'preact/hooks';
 import { initDB, loadAll, writeBatch } from './db.js';
 import { DEFAULT_SETTINGS } from '../models/constants.js';
 import { cloudConfigured } from '../cloud/firebase-config.js';
-import { hasCloudHint } from './cloudHint.js';
 
 const listeners = new Set();
 
@@ -32,7 +31,7 @@ let state = {
   tasks: {},
   taskTemplates: {},
   displayLayouts: {},
-  mode: 'local', // 'local' | 'cloud'
+  mode: 'local', // 'local' | 'cloud' | 'gate' (nuvem configurada, sem login: só a tela de entrar)
   cloud: {
     configured: cloudConfigured,
     status: cloudConfigured ? 'checking' : 'off', // off | checking | idle | active
@@ -220,8 +219,9 @@ export function loadFromChanges(initial) {
 }
 
 export async function bootstrap() {
-  // O Firebase só é baixado na abertura se este aparelho já usa a nuvem.
-  if (cloudConfigured && hasCloudHint()) {
+  if (cloudConfigured) {
+    // Com a nuvem configurada, só quem entrou com um e-mail da casa usa o app.
+    // Sem login não há modo local: aparece apenas a tela de entrar.
     try {
       const { startCloudIfReady } = await import('../cloud/session.js');
       if (await startCloudIfReady()) return;
@@ -229,8 +229,43 @@ export async function bootstrap() {
       console.error('Falha ao conectar à nuvem', err);
       setState((s) => ({ cloud: { ...s.cloud, status: 'idle', error: `Não foi possível conectar à nuvem: ${err?.message ?? err}` } }));
     }
+    setWriter(() => Promise.reject(new Error('Entre com sua conta para salvar.')));
+    setState({ ready: true, mode: 'gate' });
+    return;
   }
   await bootstrapLocal();
+}
+
+/**
+ * Dados guardados só neste navegador (modo local), sem abrir o app com eles.
+ * Usado ao criar a casa na nuvem a partir da tela de entrar: um aparelho que
+ * já tinha dados locais leva esses dados para a casa. Devolve null se não há.
+ */
+export async function readLocalData() {
+  try {
+    await initDB();
+    const all = await loadAll();
+    const meta = byKey(all.meta, 'key');
+    if (!meta.seeded?.value) return null;
+    return {
+      ingredients: byKey(all.ingredients, 'id'),
+      recipes: byKey(all.recipes, 'id'),
+      pantry: byKey(all.pantry, 'ingredientId'),
+      weeks: byKey(all.weeks, 'id'),
+      marmitas: byKey(all.marmitas, 'id'),
+      movements: all.movements,
+      purchases: all.purchases,
+      tasks: byKey(all.tasks, 'id'),
+      taskTemplates: byKey(all.taskTemplates, 'id'),
+      displayLayouts: byKey(all.displayLayouts, 'id'),
+      settings: { ...DEFAULT_SETTINGS, ...(meta.settings?.value ?? {}) },
+      monthlySession: meta.monthlySession?.value ?? EMPTY_SESSION,
+      countDraft: meta.countDraft?.value ?? {},
+    };
+  } catch (err) {
+    console.warn('Não foi possível ler os dados deste aparelho', err);
+    return null;
+  }
 }
 
 async function bootstrapLocal() {
