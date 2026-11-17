@@ -50,11 +50,16 @@ Sem a configuração, nada muda: o PanelAI continua salvando só no aparelho.
 3. **Publicar**.
 
 As regras garantem que só os e-mails cadastrados na casa (e confirmados) leem ou alteram os dados,
-e que só o responsável pela casa adiciona ou remove pessoas.
+que só o responsável pela casa adiciona ou remove pessoas (os demais podem sair por conta própria)
+e que cada conta cria no máximo uma casa.
 
 > **Ao atualizar o PanelAI:** se uma versão nova pedir, publique de novo o `firestore.rules`
 > (mesmo caminho: Firestore Database → Regras → colar → Publicar). A partir da versão 1.2,
 > as regras aceitam coleções novas automaticamente, então isso deve ser raro.
+>
+> **Versão 1.3:** publique as regras de novo para ativar "Sair da casa" e o limite de uma casa
+> por conta. Sem isso tudo continua funcionando; só o botão "Sair da casa" mostra
+> "Sem permissão no Firestore".
 
 ### 6. Colocar a configuração no PanelAI
 
@@ -74,6 +79,26 @@ const FIREBASE_CONFIG = {
 Esses valores **não são senhas**: só identificam o projeto, e podem ficar no GitHub.
 A proteção vem das regras e do login. Pelo GitHub dá para editar direto no navegador (ícone de lápis)
 e fazer o commit na branch `main`; a publicação no GitHub Pages acontece sozinha em 1–2 minutos.
+
+### 7. Proteger o projeto (recomendado, ~10 minutos)
+
+A configuração do passo 6 é pública (fica no site). As regras já impedem que alguém de fora veja
+ou altere os dados da casa, mas qualquer pessoa com uma conta Google poderia criar uma casa própria
+no seu projeto e gastar a cota gratuita. Três ajustes fecham essa porta:
+
+1. **Restringir a chave da API ao site.** No [Google Cloud Console](https://console.cloud.google.com/apis/credentials)
+   (mesmo projeto) → **Credenciais** → abra a chave chamada *Browser key (auto created by Firebase)* →
+   **Restrições de aplicativo: Referenciadores HTTP** → adicione
+   `https://brunoalmeida87.github.io/*` e `http://localhost:5173/*` (para testes) → **Salvar**.
+2. **Domínios autorizados** (Authentication → Configurações): deixe só `localhost`,
+   `brunoalmeida87.github.io` e o domínio `*.firebaseapp.com` do projeto. Apague os que não usa.
+3. **App Check** (opcional, a proteção mais forte):
+   1. Em <https://www.google.com/recaptcha/admin> crie uma chave **reCAPTCHA v3** para o domínio `brunoalmeida87.github.io`.
+   2. No Firebase: **App Check → Apps → PanelAI (Web) → reCAPTCHA v3** → cole a **chave secreta** → Salvar.
+   3. No PanelAI, preencha a **chave do site** em `src/cloud/firebase-config.js`
+      (`appCheckSiteKey`) ou na variável `VITE_APPCHECK_SITE_KEY`, publique e use o app por um ou dois dias.
+   4. Em **App Check → APIs**, confira que as solicitações aparecem como verificadas e clique em
+      **Aplicar** no Cloud Firestore e no Authentication.
 
 ---
 
@@ -97,21 +122,40 @@ Pronto: o que um altera aparece no aparelho do outro em segundos. O topo da tela
 ### Bom saber
 
 - **Sair da conta** em um aparelho apaga a cópia da nuvem nele e volta aos dados que estavam só no aparelho. Os dados da casa continuam na nuvem.
+- **Sair da casa** (para quem não é o responsável) tira o seu e-mail da casa.
 - **Importar, Restaurar demonstração e Começar do zero** afetam os dados **de todos** quando a nuvem está ativa. Exporte um backup antes.
-- Se duas pessoas alterarem **a mesma semana** exatamente ao mesmo tempo, vale a última gravação. Na prática, com o app aberto, cada um já vê a mudança do outro antes de editar.
+- **Duas pessoas marcando a lista ao mesmo tempo** (ou a contagem da despensa, o mercado do mês e as tarefas de preparo): as marcações se somam, item a item. Para o mesmo item, vale a última alteração.
+- Se duas pessoas alterarem **o cardápio da mesma semana** exatamente ao mesmo tempo, vale a última gravação. Na prática, com o app aberto, cada um já vê a mudança do outro antes de editar.
+- **Primeira abertura num aparelho novo sem internet:** o PanelAI espera os dados da casa chegarem em vez de abrir vazio.
 - Um mesmo e-mail participa de uma casa. Até 10 pessoas por casa.
+
+### Quanto da cota gratuita a casa usa
+
+O plano gratuito permite 50 mil leituras e 20 mil gravações por dia. Cada vez que o app abre depois de
+mais de 30 minutos sem conexão, o Firestore cobra a leitura dos documentos da casa. Para isso não
+crescer com o tempo, o PanelAI agrupa automaticamente os registros antigos em **pacotes mensais**:
+histórico de estoque e compras com mais de 30 dias, tarefas concluídas com mais de 45 dias, marmitas
+consumidas com mais de 60 dias e semanas com mais de 4 meses. O app continua mostrando tudo.
+
+Na prática, cada abertura lê algumas centenas de documentos. Duas pessoas usando o dia todo ficam
+bem abaixo de 20% da cota. Para conferir: Firestore Database → aba **Uso**.
 
 ## Como os dados ficam no Firestore
 
 ```
-households/{casa}                       name, ownerEmail, memberEmails[], createdAt
-households/{casa}/recipes/{id}          v (JSON da receita), t (data), by (e-mail de quem alterou)
-households/{casa}/weeks/{segunda-feira} ...
-households/{casa}/pantry|ingredients|marmitas|movements|purchases|meta/...
+households/{id da conta do responsável}   name, ownerEmail, memberEmails[], createdAt
+households/{casa}/recipes/{id}            v (JSON da receita), t (data), by (e-mail de quem alterou)
+households/{casa}/weeks/{segunda-feira}   ...
+households/{casa}/pantry|ingredients|marmitas|movements|purchases|tasks|taskTemplates|displayLayouts|meta/...
+households/{casa}/marks/{coleção~id~aparelho}   marcações de cada aparelho (lista, contagem, mercado do mês)
+households/{casa}/{coleção}Archive/{AAAA-MM}    registros antigos agrupados por mês
+households/{casa}/recipeImages/{receita}        imagem da receita
 ```
 
-Cada registro guarda o mesmo JSON que o app usa (campo `v`). Isso facilita no futuro ler os dados
-de outros lugares, como o display e-ink.
+Cada registro guarda o mesmo JSON que o app usa (campo `v`), com três diferenças: as marcações
+recentes ficam em `marks` até serem incorporadas (depois de 2 dias sem mudanças), os registros
+antigos ficam nos pacotes mensais e a imagem da receita fica em `recipeImages`. Os detalhes estão em
+[`src/cloud/layout.js`](../src/cloud/layout.js).
 
 ## Problemas comuns
 
@@ -125,7 +169,13 @@ de outros lugares, como o display e-ink.
 
 ## Testar no computador (desenvolvedores)
 
-Com o [Firebase CLI](https://firebase.google.com/docs/cli) é possível usar emuladores locais, sem projeto real:
+Testes automáticos da sincronização e das regras, nos emuladores (precisa de Java 11+):
+
+```bash
+npm run test:cloud
+```
+
+Com o [Firebase CLI](https://firebase.google.com/docs/cli) também é possível usar o app com emuladores locais, sem projeto real:
 
 ```bash
 firebase emulators:start --only auth,firestore --project demo-panelai

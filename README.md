@@ -20,7 +20,7 @@ Funciona no computador e no celular (layouts diferentes para cada um), pode ser 
 | **Lista da semana** | Gerada do cardápio: ingredientes somados, convertidos e comparados com o estoque. Agrupada por dia de mercado e categoria. Marcação com um toque, itens avulsos, ajuste manual de quantidade, "já tenho em casa", rastreio de quais receitas geraram cada item, registro da compra no estoque, WhatsApp e impressão. |
 | **Mercado do mês** | **Estoque** (quantidade, mínimo, desejado, última atualização), **Contagem** (inventário da despensa com rascunho salvo) e **No mercado** (compras recorrentes com reposição calculada e finalização única). |
 | **Tarefas** | Tarefas da casa por dia da semana: marcar como feita, registrar pendência com recado, adiar para outra data (a nova data mostra de onde veio e a antiga mostra para onde foi), recados e histórico completo de quem fez cada alteração. Toda tarefa fica salva para usar de novo; tarefas fixas se repetem sozinhas (semanal, quinzenal ou mensal). Filtros por situação e pessoa, cópia da semana anterior e envio pelo WhatsApp. |
-| **Display e-ink** | Editor visual do que aparece na tela e-ink: modelo e posição da tela, cores, grade, cards arrastáveis e redimensionáveis (data, cardápio do dia/semana, tarefas, pendências, lista de compras, despensa, marmitas, preparos, resumo, recado), tamanho do texto, borda e destaque por card, layouts sugeridos e vários layouts salvos. A tela pronta fica em `#/display/tela` (base para conectar o aparelho). |
+| **Display e-ink** | Editor visual do que aparece na tela e-ink: modelo e posição da tela, cores, grade, cards arrastáveis e redimensionáveis (data, cardápio do dia/semana, tarefas, pendências, lista de compras, despensa, marmitas, preparos, resumo, recado), tamanho do texto, borda e destaque por card, layouts sugeridos e vários layouts salvos. A tela pronta fica em `#/display/tela`; para aparelhos que só mostram imagens (Kindle, Inkplate, TRMNL…), `npm run display:png` gera e serve a tela como PNG na rede de casa ([como usar](#display-e-ink-como-imagem)). |
 | **Receitas** | Pratos e lanches com ingredientes estruturados, porções, tempo, dificuldade, proteína, composição, modo de preparo, marmita, congelamento, preparo antecipado e imagem opcional. Busca, filtros, favoritas, duplicar, excluir e **"Com o que tenho"** (sugestões pelo estoque). |
 | **Configurações e histórico** | Pessoas na casa, dias de mercado, exportar/importar JSON, restaurar demonstração, compras concluídas, movimentações de estoque e semanas anteriores. |
 
@@ -47,6 +47,10 @@ Funciona no computador e no celular (layouts diferentes para cada um), pode ser 
 - Dados estruturados em **IndexedDB**; preferências simples de interface em `localStorage`.
 - **Exportar:** Configurações → *Exportar (JSON)*. **Importar:** Configurações → *Importar*. O arquivo é validado antes de qualquer alteração; arquivos inválidos são recusados sem mexer nos dados.
 - **Sincronização na nuvem (opcional):** com o Firebase configurado em `src/cloud/firebase-config.js`, as pessoas da casa entram com Google ou e-mail e senha e compartilham os mesmos dados no Firestore, com atualização em tempo real e funcionamento offline (as alterações são enviadas quando a conexão volta). Regras de segurança em `firestore.rules`. Configuração completa em [docs/FIREBASE.md](docs/FIREBASE.md).
+  - Duas pessoas marcando a lista (ou contando a despensa, ou no mercado do mês) ao mesmo tempo não apagam as marcações uma da outra: cada item vale pela alteração mais recente.
+  - Registros antigos (histórico, compras, tarefas concluídas, semanas passadas) são agrupados por mês na nuvem, para a abertura do app não ficar mais cara com o tempo.
+  - Num aparelho novo sem internet, o app espera os dados da casa em vez de abrir vazio.
+  - Quem nunca entrou na nuvem não baixa o Firebase: ele só é carregado em Configurações → Nuvem.
 - Sem Firebase configurado, não há sincronização entre aparelhos: exporte e importe para levar os dados.
 
 ## Instalar como aplicativo
@@ -62,8 +66,15 @@ Requisitos: Node.js 20+.
 npm install
 npm run dev        # servidor local em http://localhost:5173/PanelAI/
 npm test           # testes das regras de negócio (Vitest)
+npm run lint       # verificação do código (ESLint)
 npm run build      # gera dist/
 npm run preview    # serve o build em http://localhost:4173/PanelAI/
+```
+
+Testes da sincronização na nuvem e das regras do Firestore, nos emuladores do Firebase (precisa de Java 11+; nada toca o projeto real):
+
+```bash
+npm run test:cloud
 ```
 
 Testes de ponta a ponta e responsividade (Playwright com Chromium instalado no ambiente):
@@ -72,13 +83,29 @@ Testes de ponta a ponta e responsividade (Playwright com Chromium instalado no a
 npm run build && npm run test:e2e
 ```
 
+(No CI, o build dos testes de tela é feito sem a nuvem — `VITE_FIREBASE_CONFIG='{"apiKey":""}'` — para não tocar o projeto real do Firebase.)
+
 Cobrem os fluxos em desktop (1440 px) e celular (Pixel 7): criar receita, selecionar refeição, alterar porções, navegar entre semanas, gerar lista, rastrear ingrediente, marcar comprados, registrar compra, atualizar estoque, contagem, compra mensal, exportar, importar, persistência após recarregar, barra inferior sem sobrepor conteúdo, modal com teclado virtual, orientação paisagem, gesto de deslizar, atalhos e foco; ausência de rolagem horizontal em 360, 390, 430, 768, 1024 e 1440 px; e funcionamento offline. Capturas ficam em `tests/e2e/output/`.
 
 Ícones PNG são gerados a partir dos SVGs com `npm run icons`.
 
+### Display e-ink como imagem
+
+Para telas que não rodam o PanelAI, um computador da casa que fica ligado (ex.: Raspberry Pi) gera a imagem da tela e a serve na rede local. Precisa de Node.js 20+ e Playwright (`npm i -g playwright && npx playwright install chromium`).
+
+```bash
+npm run display:png -- --entrar                     # uma vez: abre o navegador para entrar na conta da casa
+npm run display:png -- --saida tela.png             # gera uma imagem
+npm run display:png -- --servir 8080 --a-cada 15    # gera a cada 15 min em http://<ip>:8080/tela.png
+```
+
+Opções: `--layout ID`, `--cinza`, `--pb` (preto e branco puro), `--girar 90|180|270`, `--site URL`. Em `http://<ip>:8080/` há uma página só com a imagem, que se atualiza sozinha (para o navegador de e-readers). A página fica aberta entre uma imagem e outra, então cada atualização só lê o que mudou na nuvem.
+
 ## Publicação (GitHub Pages)
 
-O workflow `.github/workflows/deploy.yml` roda em todo push: instala, testa e gera o build. Em pushes na branch `main` ele publica no GitHub Pages.
+O workflow `.github/workflows/deploy.yml` roda em todo push: verifica o código (ESLint), roda os testes de unidade, os de ponta a ponta (Playwright) e os da nuvem (emuladores) e gera o build. Em pushes na branch `main` ele publica no GitHub Pages, só se tudo passar.
+
+Quando sai uma versão nova, o app mostra **"Nova versão do PanelAI disponível — Atualizar"** (ou atualiza sozinho na próxima abertura). A tela do display se atualiza sem precisar tocar.
 
 Configuração única no GitHub: **Settings → Pages → Build and deployment → Source: GitHub Actions**.
 
@@ -98,16 +125,17 @@ PanelAI/
 │   ├── services/             # regras: demanda, lista, estoque, indicadores, sugestões, backup
 │   ├── models/               # constantes, unidades e conversões, validação de receitas
 │   ├── storage/              # IndexedDB, estado global, ações
-│   ├── cloud/                # Firebase: configuração, login, casa e sincronização
+│   ├── cloud/                # Firebase: configuração, login, casa, sincronização e formato na nuvem (layout.js)
 │   ├── display/              # display e-ink: modelos, cards, layouts sugeridos e renderização
 │   ├── data/                 # catálogo de ingredientes, receitas e dados de demonstração
 │   ├── utils/                # datas, roteador, hooks
 │   └── styles/               # tokens, componentes, layout e telas
 ├── tests/unit/               # Vitest
 ├── tests/e2e/                # Playwright
+├── tests/cloud/              # sincronização e regras nos emuladores do Firebase
 ├── firestore.rules           # regras de segurança do Firestore
 ├── firebase.json             # emuladores locais (testes)
-├── scripts/generate-icons.mjs
+├── scripts/                  # generate-icons.mjs, display-png.mjs (display e-ink como imagem)
 └── docs/referencias-visuais/ # capturas usadas como referência (não publicadas)
 ```
 
@@ -119,7 +147,7 @@ Panela minimalista verde-sálvia (`#789582`) sobre fundo verde muito claro (`#E7
 
 - Sem Firebase, não há sincronização automática entre aparelhos (use exportar/importar).
 - No modo local, os dados ficam no navegador: limpar os dados do site apaga o PanelAI. Faça backups.
-- Na nuvem, cada registro (receita, semana, item da despensa) é gravado inteiro: se duas pessoas alterarem a mesma semana no mesmo instante, vale a última gravação.
+- Na nuvem, marcações da lista, contagem e mercado do mês se somam item a item; já o cardápio da semana, as receitas e os itens da despensa são gravados inteiros: se duas pessoas alterarem o mesmo registro no mesmo instante, vale a última gravação.
 - Sugestões usam regras locais (sem IA externa).
 - Conversões entre massa, volume e unidades dependem dos dados do ingrediente; sem eles, as quantidades aparecem separadas na lista.
 - Imagens de receitas são reduzidas e guardadas localmente; muitas imagens aumentam o tamanho do backup.

@@ -49,7 +49,7 @@ async function expectDenied(p, msg) {
     await p;
   } catch (err) {
     if (err?.code === 'permission-denied') return;
-    throw new Error(`${msg}: erro inesperado ${err?.code ?? err}`);
+    throw new Error(`${msg}: erro inesperado ${err?.code ?? err}`, { cause: err });
   }
   throw new Error(`${msg}: deveria ser recusado`);
 }
@@ -245,6 +245,32 @@ await step('regras: cada conta cria só a própria casa', async () => {
   const data = { name: 'Outra', ownerEmail: 'carol@exemplo.com', memberEmails: ['carol@exemplo.com'], createdAt: serverTimestamp() };
   await expectDenied(setDoc(doc(db, 'households', 'qualquer-id'), data), 'criar com id de outro');
   await setDoc(doc(db, 'households', carolUid), data);
+});
+
+await step('casa criada pela versão anterior abre igual (formato antigo)', async () => {
+  // Carol (dona da casa criada acima) grava registros como a versão anterior gravava:
+  // o registro inteiro em "v", com a imagem e as marcações da lista dentro.
+  const { getFirestore, doc, setDoc, serverTimestamp } = await import('firebase/firestore');
+  const { getApp } = await import('firebase/app');
+  const db = getFirestore(getApp('carol'));
+  const old = (coll, id, value) =>
+    setDoc(doc(db, 'households', carolUid, coll, encodeURIComponent(id)), { v: JSON.stringify(value), t: serverTimestamp(), by: 'carol@exemplo.com' });
+  const recipe = { ...Object.values(seed.recipes)[0], id: 'antiga', name: 'Receita antiga', image: 'data:image/jpeg;base64,T0xE' };
+  const week = { id: WEEK, meals: {}, shopping: { checked: { 'sal|g': true }, overrides: {}, missing: {}, extras: [{ id: 'avulso_1', name: 'Pão', checked: true }] }, tasksDone: {} };
+  await old('recipes', 'antiga', recipe);
+  await old('weeks', WEEK, week);
+  await old('meta', 'settings', { key: 'settings', value: { people: 2 } });
+  await carol.start(carolUid);
+  assert(carol.state.recipes.antiga.image === recipe.image, 'imagem da receita antiga');
+  assert(carol.state.weeks[WEEK].shopping.checked['sal|g'] === true, 'marcação antiga');
+  assert(carol.state.weeks[WEEK].shopping.extras[0].name === 'Pão', 'avulso antigo');
+  // Marcar um item na versão nova mantém o que já estava marcado.
+  const w = carol.state.weeks[WEEK];
+  await carol.write([{ store: 'weeks', type: 'put', value: { ...w, shopping: { ...w.shopping, checked: { ...w.shopping.checked, 'oleo|ml': true } } } }]);
+  await waitFor(async () => (await adminList(`households/${carolUid}/marks`)).length === 1, 'marcação gravada');
+  const doc2 = (await adminList(`households/${carolUid}/weeks`))[0];
+  assert(JSON.parse(doc2.fields.v.stringValue).shopping.checked['sal|g'] === true, 'semana antiga preservada');
+  carol.cloud.stopSync();
 });
 
 await step('regras: gravações precisam identificar a pessoa certa', async () => {

@@ -19,9 +19,8 @@ export function lazyPage(load, name) {
         return { default: m[name] };
       })
       .catch((err) => {
-        let last = 0;
         try {
-          last = Number(sessionStorage.getItem(KEY)) || 0;
+          const last = Number(sessionStorage.getItem(KEY)) || 0;
           if (Date.now() - last > 60_000) {
             sessionStorage.setItem(KEY, String(Date.now()));
             window.location.reload();
