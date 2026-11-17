@@ -106,8 +106,12 @@ export async function writeBatch(ops) {
 export const put = (store, value) => writeBatch([{ store, type: 'put', value }]);
 export const remove = (store, key) => writeBatch([{ store, type: 'delete', key }]);
 
+/** Lê todas as coleções numa única transação (as leituras correm em paralelo). */
 export async function loadAll() {
-  const out = {};
-  for (const s of Object.keys(STORES)) out[s] = await getAll(s);
-  return out;
+  const names = Object.keys(STORES);
+  if (memory) return Object.fromEntries(names.map((s) => [s, [...memory[s].values()]]));
+  const db = await dbPromise;
+  const tx = db.transaction(names, 'readonly');
+  const lists = await Promise.all(names.map((s) => reqToPromise(tx.objectStore(s).getAll())));
+  return Object.fromEntries(names.map((s, i) => [s, lists[i]]));
 }

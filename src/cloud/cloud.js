@@ -5,9 +5,10 @@
 //
 // Modelo no Firestore:
 //   households/{casa}                    { name, ownerEmail, memberEmails[], createdAt }
-//   households/{casa}/{coleção}/{id}     { v: JSON do registro, t: data do servidor, by: e-mail }
-// As coleções são as mesmas do IndexedDB (src/storage/db.js). Cada registro
-// é guardado como texto JSON para manter exatamente o mesmo formato do app.
+//   households/{casa}/{coleção}/{id}     { v: JSON, t: data do servidor, by: e-mail }
+// As coleções são as mesmas do IndexedDB (src/storage/db.js), mais as de
+// marcações, arquivo mensal e imagens. Como os registros do app viram
+// documentos (e vice-versa) está em src/cloud/layout.js.
 
 import { initializeApp } from 'firebase/app';
 import {
@@ -24,7 +25,6 @@ import {
   signOut,
 } from 'firebase/auth';
 import {
-  addDoc,
   arrayRemove,
   arrayUnion,
   clearIndexedDbPersistence,
@@ -33,42 +33,78 @@ import {
   doc,
   getDocs,
   initializeFirestore,
+  memoryLocalCache,
   onSnapshot,
   persistentLocalCache,
   persistentMultipleTabManager,
   query,
+  runTransaction,
   serverTimestamp,
+  setDoc,
   terminate,
   updateDoc,
   where,
   writeBatch,
 } from 'firebase/firestore';
-import { emulatorHost, firebaseConfig } from './firebase-config.js';
-import { STORES } from '../storage/db.js';
+import { initializeAppCheck, ReCaptchaV3Provider } from 'firebase/app-check';
+import { appCheckSiteKey, emulatorHost, firebaseConfig } from './firebase-config.js';
+import { ALL_COLLECTIONS, MARKS, Mirror, archiveColl, bundleRaw, foldRaw, isArchivable, archiveMonth, nextBundleId, parseRaw, MAX_DOC_CHARS } from './layout.js';
+import { todayISO } from '../utils/dates.js';
+import { uid } from '../utils/id.js';
 
 const HOUSEHOLDS = 'households';
 const BATCH_SIZE = 400; // limite do Firestore: 500 gravações por lote
-const MAX_DOC_CHARS = 900_000; // limite do Firestore: ~1 MB por documento
 export const MAX_MEMBERS = 10;
 
 let app = null;
 let auth = null;
 let db = null;
 
+// Opções usadas pelos testes (vários "aparelhos" no mesmo processo, sem IndexedDB).
+const options = { appName: undefined, emulatorHost, deviceId: null };
+export function configureCloud(opts) {
+  Object.assign(options, opts);
+}
+
 function init() {
   if (app) return;
-  app = initializeApp(firebaseConfig);
+  app = initializeApp(firebaseConfig, options.appName);
+  // App Check (opcional): só aceita pedidos vindos do site publicado.
+  if (appCheckSiteKey && !options.emulatorHost && typeof window !== 'undefined') {
+    try {
+      initializeAppCheck(app, { provider: new ReCaptchaV3Provider(appCheckSiteKey), isTokenAutoRefreshEnabled: true });
+    } catch (err) {
+      console.warn('App Check não iniciado', err);
+    }
+  }
   auth = getAuth(app);
   // Cache persistente: o app abre e grava sem internet; o Firestore envia
   // as alterações quando a conexão volta.
   db = initializeFirestore(app, {
-    localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() }),
+    localCache:
+      typeof indexedDB === 'undefined' ? memoryLocalCache() : persistentLocalCache({ tabManager: persistentMultipleTabManager() }),
     ignoreUndefinedProperties: true,
   });
-  if (emulatorHost) {
-    connectAuthEmulator(auth, `http://${emulatorHost}:9099`, { disableWarnings: true });
-    connectFirestoreEmulator(db, emulatorHost, 8080);
+  if (options.emulatorHost) {
+    connectAuthEmulator(auth, `http://${options.emulatorHost}:9099`, { disableWarnings: true });
+    connectFirestoreEmulator(db, options.emulatorHost, 8080);
   }
+}
+
+/** Identificador deste aparelho (as marcações de cada aparelho ficam num documento próprio). */
+function deviceId() {
+  if (options.deviceId) return options.deviceId;
+  try {
+    let id = localStorage.getItem('panelai.deviceId');
+    if (!id) {
+      id = uid('ap').slice(3, 15);
+      localStorage.setItem('panelai.deviceId', id);
+    }
+    options.deviceId = id;
+  } catch {
+    options.deviceId = uid('ap').slice(3, 15);
+  }
+  return options.deviceId;
 }
 
 // ---------- Login ----------
@@ -167,11 +203,15 @@ export async function findMyHousehold() {
   return snap.empty ? null : householdFromSnap(snap.docs[0]);
 }
 
-/** Cria a casa e envia os dados (operações no formato de src/storage/db.js). */
+/**
+ * Cria a casa e envia os dados (operações no formato de src/storage/db.js).
+ * O id da casa é o id da conta: cada conta cria no máximo uma casa.
+ */
 export async function createHousehold(name, ops) {
   init();
   const email = normalizeEmail(auth.currentUser?.email);
-  const ref = await addDoc(collection(db, HOUSEHOLDS), {
+  const ref = doc(db, HOUSEHOLDS, auth.currentUser.uid);
+  await setDoc(ref, {
     name: String(name || 'Minha casa').slice(0, 60),
     ownerEmail: email,
     memberEmails: [email],
@@ -191,6 +231,12 @@ export async function removeMember(householdId, email) {
   await updateDoc(doc(db, HOUSEHOLDS, householdId), { memberEmails: arrayRemove(normalizeEmail(email)) });
 }
 
+/** Pessoa (que não é a responsável) sai da casa. */
+export async function leaveHousehold(householdId) {
+  init();
+  await updateDoc(doc(db, HOUSEHOLDS, householdId), { memberEmails: arrayRemove(normalizeEmail(auth.currentUser?.email)) });
+}
+
 export async function renameHousehold(householdId, name) {
   init();
   await updateDoc(doc(db, HOUSEHOLDS, householdId), { name: String(name).slice(0, 60) });
@@ -200,13 +246,12 @@ export async function renameHousehold(householdId, name) {
 
 const encId = (key) => encodeURIComponent(String(key));
 const decId = (id) => decodeURIComponent(id);
+const ref = (target, coll, id) => doc(db, HOUSEHOLDS, target.householdId, coll, encId(id));
 
 function newTarget(householdId) {
   return {
     householdId,
-    // Ids existentes e último JSON conhecido de cada registro (para "limpar"
-    // coleções e para ignorar ecos que não mudam nada).
-    known: Object.fromEntries(Object.keys(STORES).map((s) => [s, new Map()])),
+    mirror: new Mirror(),
     pending: 0,
     unsubs: [],
     onPending: () => {},
@@ -218,10 +263,15 @@ let active = null;
 
 /**
  * Começa a ouvir os dados da casa em tempo real.
- * Resolve com { [coleção]: alterações[] } da primeira leitura (do cache local,
- * quando houver). Depois, alterações vindas de outros aparelhos chegam em onChanges.
+ * Resolve com { [coleção]: alterações[] } da primeira leitura. Depois,
+ * alterações vindas de outros aparelhos chegam em onChanges.
+ *
+ * requireServer: este aparelho ainda não tem uma cópia completa da casa, então
+ * só abre com os dados vindos do servidor (sem internet, chama onWaiting e
+ * continua esperando). Assim o app nunca abre "vazio" e grava por cima.
+ * onServerSynced: todas as coleções foram confirmadas pelo servidor.
  */
-export function startSync(householdId, { onChanges, onHousehold, onPending, onError }) {
+export function startSync(householdId, { onChanges, onHousehold, onPending, onError, onWaiting = () => {}, onServerSynced = () => {}, requireServer = false }) {
   init();
   stopSync();
   const target = newTarget(householdId);
@@ -230,17 +280,29 @@ export function startSync(householdId, { onChanges, onHousehold, onPending, onEr
   active = target;
 
   return new Promise((resolve) => {
-    const initial = {};
-    let waiting = Object.keys(STORES).length;
+    const seen = new Map(ALL_COLLECTIONS.map((c) => [c, { any: false, server: false }]));
     let resolved = false;
+    let serverDone = false;
+    const all = (k) => [...seen.values()].every((s) => s[k]);
     const finish = () => {
       if (resolved) return;
       resolved = true;
       clearTimeout(timer);
-      resolve(initial);
+      resolve(target.mirror.flush());
     };
-    // Sem resposta (ex.: sem internet e sem cache), abre com o que houver.
-    const timer = setTimeout(finish, 12000);
+    const check = () => {
+      if (!resolved && (all('server') || (!requireServer && all('any') && target.mirror.docCount() > 0))) finish();
+      if (!serverDone && all('server')) {
+        serverDone = true;
+        onServerSynced();
+      }
+    };
+    // Sem resposta do servidor: com cópia local, abre com ela; sem cópia, avisa e espera.
+    const timer = setTimeout(() => {
+      if (resolved) return;
+      if (requireServer) onWaiting();
+      else finish();
+    }, 12000);
 
     target.unsubs.push(
       onSnapshot(
@@ -250,43 +312,25 @@ export function startSync(householdId, { onChanges, onHousehold, onPending, onEr
       ),
     );
 
-    for (const store of Object.keys(STORES)) {
-      let first = true;
-      const known = target.known[store];
+    for (const coll of ALL_COLLECTIONS) {
       const unsub = onSnapshot(
-        collection(db, HOUSEHOLDS, householdId, store),
+        collection(db, HOUSEHOLDS, householdId, coll),
+        { includeMetadataChanges: true },
         (snap) => {
-          const changes = [];
+          if (active !== target) return;
           for (const ch of snap.docChanges()) {
-            const key = decId(ch.doc.id);
-            if (ch.type === 'removed') {
-              if (known.has(key)) changes.push({ type: 'delete', key });
-              known.delete(key);
-              continue;
-            }
-            const raw = ch.doc.data().v;
-            // Eco de uma gravação deste aparelho, ou registro sem mudança real.
-            if (!first && (ch.doc.metadata.hasPendingWrites || known.get(key) === raw)) {
-              known.set(key, raw);
-              continue;
-            }
-            known.set(key, raw);
-            try {
-              changes.push({ type: 'put', key, value: JSON.parse(raw) });
-            } catch {
-              console.warn('Registro inválido na nuvem', store, key);
-            }
+            target.mirror.applyDoc(coll, decId(ch.doc.id), ch.type === 'removed' ? null : ch.doc.data().v);
           }
-          if (first && !resolved) {
-            first = false;
-            initial[store] = changes;
-            if (--waiting === 0) finish();
-            return;
+          const st = seen.get(coll);
+          st.any = true;
+          if (!snap.metadata.fromCache) st.server = true;
+          if (resolved) {
+            const changes = target.mirror.flush();
+            for (const [store, list] of Object.entries(changes)) onChanges(store, list);
           }
-          first = false;
-          if (changes.length) onChanges(store, changes);
+          check();
         },
-        (err) => onError(err, store),
+        (err) => onError(err, coll),
       );
       target.unsubs.push(unsub);
     }
@@ -306,46 +350,18 @@ export function writeOps(ops) {
 }
 
 function commitOps(target, ops, { wait }) {
-  // Reduz as operações ao estado final de cada registro.
-  const final = new Map();
-  const id = (store, key) => `${store}\u0000${key}`;
-  for (const op of ops) {
-    if (op.type === 'clear') {
-      for (const key of target.known[op.store].keys()) final.set(id(op.store, key), { store: op.store, key, value: null });
-      for (const [k, w] of final) if (w.store === op.store) final.set(k, { ...w, value: null });
-    } else if (op.type === 'put') {
-      const key = op.value[STORES[op.store]];
-      final.set(id(op.store, key), { store: op.store, key, value: op.value });
-    } else if (op.type === 'delete') {
-      final.set(id(op.store, op.key), { store: op.store, key: op.key, value: null });
-    }
-  }
+  const { writes, errors } = target.mirror.plan(ops, { device: deviceId(), now: Date.now() });
+  for (const msg of errors) target.onError(new Error(msg), 'write');
 
   const by = normalizeEmail(auth.currentUser?.email);
-  const writes = [];
-  for (const w of final.values()) {
-    const ref = doc(db, HOUSEHOLDS, target.householdId, w.store, encId(w.key));
-    const known = target.known[w.store];
-    if (w.value == null) {
-      if (!known.has(w.key) && target !== active) continue; // casa nova: nada a apagar
-      known.delete(w.key);
-      writes.push((b) => b.delete(ref));
-      continue;
-    }
-    const v = JSON.stringify(w.value);
-    if (v.length > MAX_DOC_CHARS) {
-      target.onError(new Error(`Registro grande demais para a nuvem (${w.store}: ${w.key}). Use imagens menores.`), 'write');
-      continue;
-    }
-    if (known.get(w.key) === v) continue; // nada mudou
-    known.set(w.key, v);
-    writes.push((b) => b.set(ref, { v, t: serverTimestamp(), by }));
-  }
-
   const commits = [];
   for (let i = 0; i < writes.length; i += BATCH_SIZE) {
     const batch = writeBatch(db);
-    for (const fn of writes.slice(i, i + BATCH_SIZE)) fn(batch);
+    for (const w of writes.slice(i, i + BATCH_SIZE)) {
+      const r = ref(target, w.coll, w.id);
+      if (w.raw == null) batch.delete(r);
+      else batch.set(r, { v: w.raw, t: serverTimestamp(), by });
+    }
     commits.push(batch.commit());
   }
   if (!commits.length) return Promise.resolve();
@@ -369,4 +385,82 @@ function commitOps(target, ops, { wait }) {
   if (wait) return Promise.all(tracked);
   tracked.forEach((p) => p.catch(() => {}));
   return Promise.resolve();
+}
+
+// ---------- Manutenção (economiza leituras) ----------
+
+/**
+ * Incorpora marcações antigas aos registros e agrupa registros antigos em
+ * pacotes mensais. Cada passo é uma transação: se outro aparelho mexer nos
+ * mesmos documentos ao mesmo tempo, o Firestore repete ou desiste sem perder
+ * nada. Roda só com internet e depois da sincronização completa.
+ * Devolve { folded, archived } (quantidades).
+ */
+export async function runMaintenance({ maxSteps = 12, today = todayISO(), now = Date.now() } = {}) {
+  const target = active;
+  if (!target) return { folded: 0, archived: 0 };
+  const by = normalizeEmail(auth.currentUser?.email);
+  let steps = 0;
+  let folded = 0;
+  let archived = 0;
+
+  for (const { store, key, markIds } of target.mirror.foldCandidates(now)) {
+    if (steps++ >= maxSteps || active !== target) break;
+    const done = await runTransaction(db, async (tx) => {
+      const baseRef = ref(target, store, key);
+      const markRefs = markIds.map((id) => ref(target, MARKS, id));
+      const [base, ...marks] = await Promise.all([tx.get(baseRef), ...markRefs.map((r) => tx.get(r))]);
+      const live = marks.filter((m) => m.exists());
+      // Alguém marcou algo há pouco: deixa para depois.
+      const fresh = live.some((m) => {
+        const f = parseRaw(m.data().v)?.f ?? {};
+        return Object.values(f).some((entries) => Object.values(entries ?? {}).some((e) => Number(e?.a) >= now - 2 * 86_400_000));
+      });
+      if (fresh) return false;
+      // Semana que está no arquivo mensal: as marcações continuam valendo como estão.
+      if (!base.exists() && target.mirror.archived.get(store)?.has(key)) return false;
+      if (base.exists()) {
+        const raw = foldRaw(store, key, base.data().v, live.map((m) => m.data().v));
+        if (raw) tx.set(baseRef, { v: raw, t: serverTimestamp(), by });
+      }
+      for (const m of live) tx.delete(m.ref);
+      return true;
+    });
+    if (done) folded++;
+  }
+
+  for (const { store, month, keys } of target.mirror.archiveCandidates(today)) {
+    for (let i = 0; i < keys.length; i += 150) {
+      if (steps++ >= maxSteps || active !== target) return { folded, archived };
+      const chunk = keys.slice(i, i + 150);
+      const ids = target.mirror.bundleIds(store, month);
+      const lastId = ids[ids.length - 1] ?? month;
+      const spareId = nextBundleId(month, ids.length ? ids : [month]);
+      const n = await runTransaction(db, async (tx) => {
+        const coll = archiveColl(store);
+        const lastSnap = await tx.get(ref(target, coll, lastId));
+        const spareSnap = await tx.get(ref(target, coll, spareId));
+        const liveSnaps = await Promise.all(chunk.map((k) => tx.get(ref(target, store, k))));
+        const moving = [];
+        for (const snap of liveSnaps) {
+          if (!snap.exists()) continue;
+          const rec = parseRaw(snap.data().v);
+          if (rec && isArchivable(store, rec, today) && archiveMonth(store, rec) === month) moving.push({ snap, rec });
+        }
+        if (!moving.length) return 0;
+        let bundleId = lastId;
+        let raw = bundleRaw(store, lastSnap.exists() ? parseRaw(lastSnap.data().v) : null, moving.map((m) => m.rec));
+        if (raw.length > MAX_DOC_CHARS) {
+          bundleId = spareId;
+          raw = bundleRaw(store, spareSnap.exists() ? parseRaw(spareSnap.data().v) : null, moving.map((m) => m.rec));
+          if (raw.length > MAX_DOC_CHARS) return 0;
+        }
+        tx.set(ref(target, coll, bundleId), { v: raw, t: serverTimestamp(), by });
+        for (const m of moving) tx.delete(m.snap.ref);
+        return moving.length;
+      });
+      archived += n;
+    }
+  }
+  return { folded, archived };
 }

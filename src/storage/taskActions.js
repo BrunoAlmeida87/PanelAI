@@ -18,7 +18,7 @@ import {
   resolvePending,
   setDone,
 } from '../models/tasks.js';
-import { todayISO, weekDates } from '../utils/dates.js';
+import { addDays, todayISO, weekDates, weekStartOf } from '../utils/dates.js';
 
 function saveTasks(list, extraOps = []) {
   if (!list.length && !extraOps.length) return;
@@ -157,9 +157,20 @@ export function restoreTask(task) {
   saveTasks([task]);
 }
 
+/**
+ * Tarefas fixas só são criadas quando os dados estão completos: no modo local,
+ * sempre; na nuvem, só depois de a casa ter sido lida do servidor (senão uma
+ * cópia desatualizada poderia recriar como "a fazer" uma tarefa já feita em
+ * outro aparelho).
+ */
+export function canGenerateRecurring(s = getState()) {
+  return s.ready && (s.mode !== 'cloud' || !!s.cloud?.serverSynced);
+}
+
 /** Cria as tarefas fixas que faltam nas datas (a partir de hoje). */
 export function ensureRecurring(dates) {
   const s = getState();
+  if (!canGenerateRecurring(s)) return 0;
   const list = missingRecurring({
     templates: Object.values(s.taskTemplates),
     dates,
@@ -173,6 +184,12 @@ export function ensureRecurring(dates) {
 
 export function ensureRecurringForWeek(weekId) {
   return ensureRecurring(weekDates(weekId));
+}
+
+/** Semana atual e a próxima: usado ao abrir o app e de hora em hora (display sempre ligado). */
+export function ensureRecurringAround(today = todayISO()) {
+  const monday = weekStartOf(today);
+  return ensureRecurring([...weekDates(monday), ...weekDates(addDays(monday, 7))]);
 }
 
 export function copyTasksFromWeek(fromWeekId, toWeekId) {

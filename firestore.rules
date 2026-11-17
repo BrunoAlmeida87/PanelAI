@@ -6,7 +6,9 @@ rules_version = '2';
 // Quem pode o quê:
 //  - Só pessoas logadas com e-mail confirmado.
 //  - Uma "casa" (households/{casa}) lista os e-mails que podem acessá-la (memberEmails).
-//  - Só o responsável (ownerEmail) adiciona ou remove pessoas.
+//  - Só o responsável (ownerEmail) adiciona ou remove pessoas; quem não é
+//    responsável pode sair da casa por conta própria.
+//  - Cada conta cria no máximo uma casa (o id da casa é o id da conta).
 //  - Todas as pessoas da casa leem e alteram cardápio, receitas, despensa etc.
 //  - Ninguém de fora da lista vê nada.
 
@@ -43,20 +45,32 @@ service cloud.firestore {
       allow read: if signedIn() && myEmail() in resource.data.memberEmails;
 
       allow create: if signedIn()
+        && casa == request.auth.uid
         && request.resource.data.ownerEmail == myEmail()
         && request.resource.data.memberEmails == [myEmail()]
         && validHousehold(request.resource.data);
 
+      // Responsável: renomeia, adiciona e remove pessoas.
       allow update: if signedIn()
         && resource.data.ownerEmail == myEmail()
         && request.resource.data.ownerEmail == resource.data.ownerEmail
+        && request.resource.data.get('createdAt', null) == resource.data.get('createdAt', null)
         && validHousehold(request.resource.data);
+
+      // Outra pessoa da casa: só pode tirar o próprio e-mail da lista (sair).
+      allow update: if signedIn()
+        && resource.data.ownerEmail != myEmail()
+        && myEmail() in resource.data.memberEmails
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['memberEmails'])
+        && request.resource.data.memberEmails.toSet()
+             == resource.data.memberEmails.toSet().difference([myEmail()].toSet());
 
       allow delete: if false;
 
       // Dados do app: um documento por registro, com o JSON em "v".
       // Qualquer coleção com nome simples (cardápio, receitas, despensa,
-      // tarefas, layouts do display e as que vierem em versões futuras).
+      // tarefas, layouts do display, marcações, arquivo mensal, imagens e as
+      // que vierem em versões futuras).
       match /{colecao}/{id} {
         allow read, delete: if isMember(casa) && validCollection(colecao);
 

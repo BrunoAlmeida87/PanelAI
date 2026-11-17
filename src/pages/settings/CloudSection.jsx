@@ -55,6 +55,15 @@ export function CloudSection() {
     if (r) setFound(r.household ?? null);
   };
 
+  // Sem a nuvem ativa, o Firebase só é carregado agora (ao abrir esta tela).
+  useEffect(() => {
+    if (c.configured && s.mode !== 'cloud') {
+      api()
+        .then((a) => a.initCloudUi())
+        .catch((err) => setError(errorText(err)));
+    }
+  }, []);
+
   // Usuário já logado (modo local): procura a casa ao abrir a tela.
   useEffect(() => {
     if (s.mode === 'local' && c.user?.verified && found === undefined) {
@@ -329,9 +338,27 @@ function ActiveHousehold({ s, c, busy, run }) {
         </form>
       )}
       <div class="toolbar">
+        {h && !isOwner && <LeaveButton busy={busy} run={run} name={h.name} />}
         <SignOutButton busy={busy} run={run} label="Sair da conta neste aparelho" />
       </div>
     </>
+  );
+}
+
+function LeaveButton({ busy, run, name }) {
+  const onClick = async () => {
+    const ok = await confirmDialog({
+      title: 'Sair da casa',
+      message: `Você deixa de ver e alterar os dados da casa ${name}. Este aparelho volta aos dados guardados só nele. Para voltar, o responsável precisa adicionar seu e-mail de novo.`,
+      confirmLabel: 'Sair da casa',
+      danger: true,
+    });
+    if (ok) run((a) => a.leaveHousehold());
+  };
+  return (
+    <button type="button" class="btn btn-danger-ghost" disabled={busy} onClick={onClick}>
+      <LogOut size={16} /> Sair da casa
+    </button>
   );
 }
 

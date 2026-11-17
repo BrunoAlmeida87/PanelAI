@@ -22,6 +22,7 @@ import {
   deletePantryItem,
   saveIngredient,
   saveCountDraft,
+  patchCountDraft,
   confirmCount,
   setMonthlyChecked,
   setMonthlyQty,
@@ -257,6 +258,27 @@ function CountView() {
   const [draft, setDraft] = useState(() => ({ ...s.countDraft }));
   const [q, setQ] = useState('');
   const saveTimer = useRef(null);
+  const unsaved = useRef({}); // digitado aqui e ainda não gravado
+
+  // O rascunho pode mudar em outro aparelho: mantém o que foi digitado aqui.
+  useEffect(() => {
+    setDraft(() => {
+      const next = { ...s.countDraft };
+      for (const [id, v] of Object.entries(unsaved.current)) {
+        if (v === '') delete next[id];
+        else next[id] = v;
+      }
+      return next;
+    });
+  }, [s.countDraft]);
+
+  const flushDraft = () => {
+    clearTimeout(saveTimer.current);
+    const patch = unsaved.current;
+    unsaved.current = {};
+    if (Object.keys(patch).length) patchCountDraft(patch);
+  };
+  useEffect(() => flushDraft, []);
 
   const groups = useMemo(() => {
     const nq = normalizeText(q);
@@ -278,8 +300,9 @@ function CountView() {
     if (text === '') delete next[id];
     else next[id] = text;
     setDraft(next);
+    unsaved.current = { ...unsaved.current, [id]: text };
     clearTimeout(saveTimer.current);
-    saveTimer.current = setTimeout(() => saveCountDraft(next), 500);
+    saveTimer.current = setTimeout(flushDraft, 500);
   };
 
   const parsed = Object.fromEntries(
@@ -301,6 +324,7 @@ function CountView() {
     });
     if (!ok) return;
     clearTimeout(saveTimer.current);
+    unsaved.current = {};
     const r = confirmCount(parsed);
     setDraft({});
     toast(`Contagem registrada · ${r.changed} ajustes`);
@@ -309,6 +333,8 @@ function CountView() {
   const discard = async () => {
     const ok = await confirmDialog({ title: 'Descartar contagem', message: 'Apagar os valores digitados?', confirmLabel: 'Descartar', danger: true });
     if (!ok) return;
+    clearTimeout(saveTimer.current);
+    unsaved.current = {};
     setDraft({});
     saveCountDraft({});
   };

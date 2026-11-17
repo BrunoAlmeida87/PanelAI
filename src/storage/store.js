@@ -8,9 +8,9 @@
 
 import { useSyncExternalStore } from 'preact/compat';
 import { initDB, loadAll, writeBatch } from './db.js';
-import { buildSeed } from '../data/seed.js';
 import { DEFAULT_SETTINGS } from '../models/constants.js';
 import { cloudConfigured } from '../cloud/firebase-config.js';
+import { hasCloudHint } from './cloudHint.js';
 
 const listeners = new Set();
 
@@ -40,6 +40,8 @@ let state = {
     household: null,
     pending: 0,
     error: null,
+    waiting: false, // sem internet e sem cópia da casa neste aparelho: aguardando o servidor
+    serverSynced: false, // dados da casa confirmados pelo servidor nesta abertura
   },
 };
 
@@ -192,7 +194,8 @@ export function loadFromChanges(initial) {
 }
 
 export async function bootstrap() {
-  if (cloudConfigured) {
+  // O Firebase só é baixado na abertura se este aparelho já usa a nuvem.
+  if (cloudConfigured && hasCloudHint()) {
     try {
       const { startCloudIfReady } = await import('../cloud/session.js');
       if (await startCloudIfReady()) return;
@@ -210,6 +213,8 @@ async function bootstrapLocal() {
     const all = await loadAll();
     const meta = byKey(all.meta, 'key');
     if (!meta.seeded?.value) {
+      // Dados de demonstração: só baixados no primeiro acesso.
+      const { buildSeed } = await import('../data/seed.js');
       const seed = buildSeed();
       await writeBatch(seedOps(seed));
       applyFullData(seed);
