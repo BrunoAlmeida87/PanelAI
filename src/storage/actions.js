@@ -15,7 +15,6 @@ import {
 } from '../services/planning.js';
 import { applyStockDelta, newPantryItem, setStock } from '../services/pantry.js';
 import { buildBackup } from '../services/backup.js';
-import { buildSeed } from '../data/seed.js';
 import { DEFAULT_SETTINGS } from '../models/constants.js';
 import { convert } from '../models/units.js';
 import { addDays } from '../utils/dates.js';
@@ -402,6 +401,20 @@ export function saveCountDraft(draft) {
   persist([{ store: 'meta', type: 'put', value: { key: 'countDraft', value: draft } }]);
 }
 
+/**
+ * Grava só os itens digitados (null = apagado), sobre o rascunho atual.
+ * Duas pessoas contando partes diferentes da despensa não apagam o que a
+ * outra digitou.
+ */
+export function patchCountDraft(patch) {
+  const draft = { ...getState().countDraft };
+  for (const [id, v] of Object.entries(patch)) {
+    if (v == null || v === '') delete draft[id];
+    else draft[id] = v;
+  }
+  saveCountDraft(draft);
+}
+
 // ---------- Lista da semana ----------
 
 function updateShopping(weekId, fn) {
@@ -500,6 +513,7 @@ export async function importData(data) {
 }
 
 export async function resetDemo() {
+  const { buildSeed } = await import('../data/seed.js');
   const seed = buildSeed();
   await persist(seedOps(seed));
   applyFullData(seed);

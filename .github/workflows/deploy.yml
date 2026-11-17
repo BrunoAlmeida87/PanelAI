@@ -1,7 +1,7 @@
 name: Testes e publicação
 
-# Em qualquer push ou PR: instala, testa e gera o build.
-# Na branch main (ou manualmente): publica no GitHub Pages.
+# Em qualquer push ou PR: verifica o código, roda os testes e gera o build.
+# Na branch main (ou manualmente): publica no GitHub Pages, só se tudo passar.
 on:
   push:
   pull_request:
@@ -30,6 +30,9 @@ jobs:
       - name: Instalar dependências
         run: npm ci
 
+      - name: Verificar o código (ESLint)
+        run: npm run lint
+
       - name: Testes das regras de negócio
         run: npm test
 
@@ -42,9 +45,70 @@ jobs:
         with:
           path: dist
 
+  e2e:
+    # Fluxos completos no navegador (computador e celular), responsividade e offline.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Instalar dependências
+        run: npm ci
+
+      - name: Instalar Playwright e Chromium
+        run: |
+          npm install --no-save playwright@1.63.0
+          npx playwright install --with-deps chromium
+
+      # Sem o Firebase: os testes de tela não usam o projeto real (a nuvem é testada no job "cloud").
+      - name: Build de produção (sem nuvem)
+        run: npm run build:e2e
+
+      - name: Testes de ponta a ponta
+        run: npm run test:e2e
+
+      - name: Capturas de tela
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: capturas-e2e
+          path: tests/e2e/output
+          if-no-files-found: ignore
+
+  cloud:
+    # Sincronização entre aparelhos e regras do Firestore, nos emuladores do Firebase.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - name: Instalar dependências
+        run: npm ci
+
+      - name: Instalar Playwright e Chromium
+        run: |
+          npm install --no-save playwright@1.63.0
+          npx playwright install --with-deps chromium
+
+      - name: Testes da nuvem e do login (emuladores)
+        run: npm run test:cloud
+
   deploy:
     if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
-    needs: build
+    needs: [build, e2e, cloud]
     runs-on: ubuntu-latest
     environment:
       name: github-pages

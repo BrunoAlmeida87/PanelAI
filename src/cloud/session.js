@@ -2,9 +2,28 @@
 // Carregado sob demanda, só quando o Firebase está configurado.
 
 import * as cloud from './cloud.js';
-import { applyRemoteChanges, getState, loadFromChanges, seedOps, setState, setWriter } from '../storage/store.js';
+import { applyRemoteChanges, getState, loadFromChanges, readLocalData, seedOps, setState, setWriter } from '../storage/store.js';
 
 const CACHE_KEY = 'panelai.cloud.household';
+const SYNCED_KEY = 'panelai.cloud.synced'; // casa já baixada por completo neste aparelho
+const MAINT_KEY = 'panelai.cloud.maintenance';
+const MAINT_EVERY_MS = 6 * 3600_000;
+
+const lsGet = (k) => {
+  try {
+    return localStorage.getItem(k);
+  } catch {
+    return null;
+  }
+};
+const lsSet = (k, v) => {
+  try {
+    if (v == null) localStorage.removeItem(k);
+    else localStorage.setItem(k, v);
+  } catch {
+    /* ignora */
+  }
+};
 
 function readCache(email) {
   try {
@@ -41,6 +60,18 @@ function ensureUserWatch() {
   if (watching) return;
   watching = true;
   cloud.watchUser((user) => patchCloud({ user }));
+}
+
+/** Tela de entrar ou de Configurações sem a nuvem ativa: garante o estado do login. */
+export async function initCloudUi() {
+  ensureUserWatch();
+  if (getState().cloud.status !== 'checking') return;
+  try {
+    const user = await cloud.currentUser();
+    patchCloud({ user, status: 'idle' });
+  } catch (err) {
+    patchCloud({ status: 'idle', error: `Não foi possível falar com a nuvem: ${err?.message ?? err}` });
+  }
 }
 
 /**
@@ -88,8 +119,33 @@ function describeError(err, where) {
   return `Erro na nuvem: ${err?.message ?? err}`;
 }
 
+let maintenanceTimer = null;
+function scheduleMaintenance(householdId) {
+  clearTimeout(maintenanceTimer);
+  const last = Number(lsGet(`${MAINT_KEY}.${householdId}`)) || 0;
+  if (Date.now() - last < MAINT_EVERY_MS) return;
+  maintenanceTimer = setTimeout(async () => {
+    if (typeof navigator !== 'undefined' && navigator.onLine === false) return;
+    try {
+      const r = await cloud.runMaintenance();
+      lsSet(`${MAINT_KEY}.${householdId}`, String(Date.now()));
+      if (r.folded || r.archived) console.info('Nuvem: manutenção', r);
+    } catch (err) {
+      console.warn('Nuvem: manutenção adiada', err);
+    }
+  }, 8000);
+}
+
 async function startSync(householdId) {
+  const requireServer = lsGet(SYNCED_KEY) !== householdId;
   const initial = await cloud.startSync(householdId, {
+    requireServer,
+    onWaiting: () => patchCloud({ waiting: true }),
+    onServerSynced: () => {
+      lsSet(SYNCED_KEY, householdId);
+      patchCloud({ serverSynced: true, waiting: false });
+      scheduleMaintenance(householdId);
+    },
     onChanges: applyRemoteChanges,
     onHousehold: (household) => {
       householdOk = !!household;
@@ -105,7 +161,7 @@ async function startSync(householdId) {
   loadFromChanges(initial);
   setWriter((ops) => cloud.writeOps(ops));
   setState({ mode: 'cloud', ready: true, persistent: true, loadError: null });
-  patchCloud({ status: 'active', error: null });
+  patchCloud({ status: 'active', error: null, waiting: false });
 }
 
 // ---------- Ações da tela de Configurações ----------
@@ -139,9 +195,16 @@ export function joinHousehold(household) {
   reloadApp();
 }
 
-/** Cria a casa na nuvem com os dados que estão neste aparelho. */
+/**
+ * Cria a casa na nuvem com os dados que estão neste aparelho. Na tela de entrar
+ * não há dados abertos: usa os dados que este navegador guardou antes (versões
+ * sem login obrigatório) ou, se não houver, os exemplos.
+ */
 export async function createHouseholdFromThisDevice(name) {
-  const s = getState();
+  let s = getState();
+  // Dados do modo de teste nunca vão para a nuvem.
+  if (s.mode === 'demo') throw new Error('No modo de teste não é possível criar uma casa. Saia do teste e entre na sua conta.');
+  if (s.mode === 'gate') s = (await readLocalData()) ?? (await import('../data/seed.js')).buildSeed();
   const ops = seedOps({
     ingredients: s.ingredients,
     recipes: s.recipes,
@@ -150,12 +213,15 @@ export async function createHouseholdFromThisDevice(name) {
     marmitas: s.marmitas,
     movements: s.movements,
     purchases: s.purchases,
+    tasks: s.tasks,
+    taskTemplates: s.taskTemplates,
+    displayLayouts: s.displayLayouts,
     settings: s.settings,
   });
-  ops.push({ store: 'meta', type: 'put', value: { key: 'monthlySession', value: s.monthlySession } });
-  ops.push({ store: 'meta', type: 'put', value: { key: 'countDraft', value: s.countDraft } });
+  ops.push({ store: 'meta', type: 'put', value: { key: 'monthlySession', value: s.monthlySession ?? { id: null, checked: {}, qty: {} } } });
+  ops.push({ store: 'meta', type: 'put', value: { key: 'countDraft', value: s.countDraft ?? {} } });
   const id = await cloud.createHousehold(name, ops);
-  writeCache(s.cloud.user.email, id);
+  writeCache(getState().cloud.user.email, id);
   reloadApp();
 }
 
@@ -173,6 +239,16 @@ export async function removeMember(email) {
   await cloud.removeMember(h.id, email);
 }
 
+/** Sai da casa (quem não é responsável): este aparelho volta aos próprios dados. */
+export async function leaveHousehold() {
+  const h = getState().cloud.household;
+  await cloud.leaveHousehold(h.id);
+  clearCache();
+  lsSet(SYNCED_KEY, null);
+  cloud.stopSync();
+  reloadApp();
+}
+
 export async function renameHousehold(name) {
   await cloud.renameHousehold(getState().cloud.household.id, name);
 }
@@ -180,6 +256,7 @@ export async function renameHousehold(name) {
 /** Sai da conta: apaga a cópia da nuvem neste aparelho e volta aos dados locais. */
 export async function signOutCloud() {
   clearCache();
+  lsSet(SYNCED_KEY, null);
   await cloud.signOutAndClear();
   reloadApp();
 }

@@ -19,7 +19,8 @@ const FIREBASE_CONFIG = {
 
 function fromEnv() {
   try {
-    const raw = import.meta.env?.VITE_FIREBASE_CONFIG;
+    // import.meta.env no app (Vite); process.env nos testes com o emulador (Node).
+    const raw = import.meta.env?.VITE_FIREBASE_CONFIG || globalThis.process?.env?.VITE_FIREBASE_CONFIG;
     return raw ? JSON.parse(raw) : null;
   } catch {
     console.warn('VITE_FIREBASE_CONFIG inválido; usando src/cloud/firebase-config.js');
@@ -29,6 +30,13 @@ function fromEnv() {
 
 /** Configuração em uso (variável de ambiente VITE_FIREBASE_CONFIG tem prioridade). */
 export const firebaseConfig = fromEnv() ?? FIREBASE_CONFIG;
+
+/**
+ * App Check (opcional, recomendado): chave do site reCAPTCHA v3. Com ela, só o
+ * site publicado consegue usar o Firebase do projeto. Passo a passo em
+ * docs/FIREBASE.md. Também pode vir da variável VITE_APPCHECK_SITE_KEY.
+ */
+export const appCheckSiteKey = import.meta.env?.VITE_APPCHECK_SITE_KEY || '';
 
 /** Endereço do emulador local (só para desenvolvimento/testes), ex.: "127.0.0.1". */
 export const emulatorHost = import.meta.env?.VITE_FIREBASE_EMULATOR || '';

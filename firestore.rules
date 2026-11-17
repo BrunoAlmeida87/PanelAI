@@ -5,8 +5,12 @@ rules_version = '2';
 //
 // Quem pode o quê:
 //  - Só pessoas logadas com e-mail confirmado.
+//  - Ninguém cria casas novas (bloqueado depois da primeira configuração).
 //  - Uma "casa" (households/{casa}) lista os e-mails que podem acessá-la (memberEmails).
-//  - Só o responsável (ownerEmail) adiciona ou remove pessoas.
+//  - Só o responsável (ownerEmail) adiciona ou remove pessoas; quem não é
+//    responsável pode sair da casa por conta própria.
+//  - Na primeira configuração (criação liberada), cada conta cria no máximo uma
+//    casa (o id da casa é o id da conta).
 //  - Todas as pessoas da casa leem e alteram cardápio, receitas, despensa etc.
 //  - Ninguém de fora da lista vê nada.
 
@@ -39,24 +43,43 @@ service cloud.firestore {
         && d.ownerEmail in d.memberEmails;
     }
 
-    match /households/{casa} {
-      allow read: if signedIn() && myEmail() in resource.data.memberEmails;
-
-      allow create: if signedIn()
+    function canCreateHousehold(casa) {
+      return signedIn()
+        && casa == request.auth.uid
         && request.resource.data.ownerEmail == myEmail()
         && request.resource.data.memberEmails == [myEmail()]
         && validHousehold(request.resource.data);
+    }
 
+    match /households/{casa} {
+      allow read: if signedIn() && myEmail() in resource.data.memberEmails;
+
+      // Criar casas novas está BLOQUEADO (a casa já existe; ninguém de fora cria
+      // nada no banco). Na primeira configuração de um projeto novo, troque
+      // "if false" por "if canCreateHousehold(casa)" e publique; depois volte para "if false".
+      allow create: if false;
+
+      // Responsável: renomeia, adiciona e remove pessoas.
       allow update: if signedIn()
         && resource.data.ownerEmail == myEmail()
         && request.resource.data.ownerEmail == resource.data.ownerEmail
+        && request.resource.data.get('createdAt', null) == resource.data.get('createdAt', null)
         && validHousehold(request.resource.data);
+
+      // Outra pessoa da casa: só pode tirar o próprio e-mail da lista (sair).
+      allow update: if signedIn()
+        && resource.data.ownerEmail != myEmail()
+        && myEmail() in resource.data.memberEmails
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['memberEmails'])
+        && request.resource.data.memberEmails.toSet()
+             == resource.data.memberEmails.toSet().difference([myEmail()].toSet());
 
       allow delete: if false;
 
       // Dados do app: um documento por registro, com o JSON em "v".
       // Qualquer coleção com nome simples (cardápio, receitas, despensa,
-      // tarefas, layouts do display e as que vierem em versões futuras).
+      // tarefas, layouts do display, marcações, arquivo mensal, imagens e as
+      // que vierem em versões futuras).
       match /{colecao}/{id} {
         allow read, delete: if isMember(casa) && validCollection(colecao);
 

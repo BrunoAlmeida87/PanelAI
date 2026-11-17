@@ -129,3 +129,27 @@ svg {
     scroll-behavior: auto !important;
   }
 }
+
+/* Tela carregada sob demanda */
+.page-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 40vh;
+  color: var(--text-2);
+}
+.boot p {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+}
+.spin {
+  animation: spin 1s linear infinite;
+}
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}

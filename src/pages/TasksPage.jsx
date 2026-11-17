@@ -97,8 +97,8 @@ export function TasksPage() {
     if (!dates.includes(day)) setDay(dates.includes(today) ? today : dates[0]);
   }, [weekId]);
 
-  const summary = weekSummary(tasks, dates);
-  const overdueBefore = overdueTasks(tasks, today).filter((t) => t.date < weekId);
+  const summary = useMemo(() => weekSummary(tasks, dates), [tasks, dates]);
+  const overdueBefore = useMemo(() => overdueTasks(tasks, today).filter((t) => t.date < weekId), [tasks, today, weekId]);
   const people = useMemo(() => {
     const set = new Map();
     for (const t of tasks) if (t.assignee) set.set(normalizeText(t.assignee), t.assignee);
