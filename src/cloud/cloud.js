@@ -48,7 +48,7 @@ import {
 } from 'firebase/firestore';
 import { initializeAppCheck, ReCaptchaV3Provider } from 'firebase/app-check';
 import { appCheckSiteKey, emulatorHost, firebaseConfig } from './firebase-config.js';
-import { ALL_COLLECTIONS, MARKS, Mirror, archiveColl, bundleRaw, foldRaw, isArchivable, archiveMonth, nextBundleId, parseRaw, MAX_DOC_CHARS } from './layout.js';
+import { ALL_COLLECTIONS, BASE_STORES, MARKS, Mirror, archiveColl, bundleRaw, foldRaw, isArchivable, archiveMonth, nextBundleId, parseRaw, MAX_DOC_CHARS } from './layout.js';
 import { todayISO } from '../utils/dates.js';
 import { uid } from '../utils/id.js';
 
@@ -290,8 +290,11 @@ export function startSync(householdId, { onChanges, onHousehold, onPending, onEr
       clearTimeout(timer);
       resolve(target.mirror.flush());
     };
+    let timedOut = false;
+    // Cópia local com os dados da casa (as configurações só existem depois de um download completo).
+    const localCopy = () => BASE_STORES.every((c) => seen.get(c).any) && target.mirror.docs.get('meta').has('settings');
     const check = () => {
-      if (!resolved && (all('server') || (!requireServer && all('any') && target.mirror.docCount() > 0))) finish();
+      if (!resolved && (all('server') || (!requireServer && all('any') && target.mirror.docCount() > 0) || (timedOut && localCopy()))) finish();
       if (!serverDone && all('server')) {
         serverDone = true;
         onServerSynced();
@@ -300,8 +303,9 @@ export function startSync(householdId, { onChanges, onHousehold, onPending, onEr
     // Sem resposta do servidor: com cópia local, abre com ela; sem cópia, avisa e espera.
     const timer = setTimeout(() => {
       if (resolved) return;
-      if (requireServer) onWaiting();
-      else finish();
+      timedOut = true;
+      if (!requireServer || localCopy()) finish();
+      else onWaiting();
     }, 12000);
 
     target.unsubs.push(
