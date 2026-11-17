@@ -9,7 +9,7 @@ import { validateBackup } from '../services/backup.js';
 import { WEEKDAY_SHORT, todayISO } from '../utils/dates.js';
 import { usePref } from '../utils/hooks.js';
 import { Chip, Segmented, Stepper, toast, confirmDialog } from '../components/ui.jsx';
-import { ShortcutsModal } from '../App.jsx';
+import { ShortcutsModal } from '../components/ShortcutsModal.jsx';
 import { getInstallPrompt, onInstallPromptChange } from '../utils/install.js';
 import { CloudSection } from './settings/CloudSection.jsx';
 

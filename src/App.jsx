@@ -1,22 +1,30 @@
 import { useEffect, useState } from 'preact/hooks';
-import { BookOpen, CalendarDays, Check, ListChecks, MonitorSmartphone, CloudCheck, CloudOff, CloudUpload, Loader2, Package, Settings, ShoppingCart, TriangleAlert } from 'lucide-preact';
+import { Suspense } from 'preact/compat';
+import { BookOpen, CalendarDays, Check, ListChecks, MonitorSmartphone, CloudCheck, CloudOff, CloudUpload, Loader2, Package, Settings, ShoppingCart, TriangleAlert, WifiOff } from 'lucide-preact';
 import { useStore } from './storage/store.js';
+import { ensureRecurringAround } from './storage/taskActions.js';
 import { useRoute, navigate } from './utils/router.js';
 import { useWeekId, shiftWeek, goToCurrentWeek } from './storage/ui.js';
 import { useOnline } from './utils/hooks.js';
-import { ToastRegion, ConfirmHost, Modal } from './components/ui.jsx';
+import { lazyPage } from './utils/lazy.js';
+import { ToastRegion, ConfirmHost } from './components/ui.jsx';
+import { ShortcutsModal } from './components/ShortcutsModal.jsx';
 import { WeekSelector } from './components/WeekSelector.jsx';
 import { MenuPage } from './pages/MenuPage.jsx';
 import { ShoppingPage } from './pages/ShoppingPage.jsx';
-import { PantryPage } from './pages/PantryPage.jsx';
 import { RecipesPage } from './pages/RecipesPage.jsx';
-import { RecipeDetailPage } from './pages/RecipeDetailPage.jsx';
-import { RecipeFormPage } from './pages/RecipeFormPage.jsx';
-import { SettingsPage } from './pages/SettingsPage.jsx';
-import { HistoryPage } from './pages/HistoryPage.jsx';
-import { TasksPage } from './pages/TasksPage.jsx';
-import { DisplayPage, DisplayScreen } from './pages/DisplayPage.jsx';
 import { useWeekShopping } from './pages/useWeekData.js';
+
+// Telas usadas com menos frequência: baixadas só quando abertas
+// (ficam no cache do aplicativo e continuam funcionando offline).
+const PantryPage = lazyPage(() => import('./pages/PantryPage.jsx'), 'PantryPage');
+const RecipeDetailPage = lazyPage(() => import('./pages/RecipeDetailPage.jsx'), 'RecipeDetailPage');
+const RecipeFormPage = lazyPage(() => import('./pages/RecipeFormPage.jsx'), 'RecipeFormPage');
+const SettingsPage = lazyPage(() => import('./pages/SettingsPage.jsx'), 'SettingsPage');
+const HistoryPage = lazyPage(() => import('./pages/HistoryPage.jsx'), 'HistoryPage');
+const TasksPage = lazyPage(() => import('./pages/TasksPage.jsx'), 'TasksPage');
+const DisplayPage = lazyPage(() => import('./pages/DisplayPage.jsx'), 'DisplayPage');
+const DisplayScreen = lazyPage(() => import('./pages/DisplayPage.jsx'), 'DisplayScreen');
 
 const NAV = [
   { id: 'cardapio', path: '/cardapio', long: 'Cardápio', short: 'Cardápio', icon: CalendarDays },
@@ -33,6 +41,13 @@ function navSection(routeName) {
 
 const isTyping = (el) => el && (el.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(el.tagName));
 
+/** Página carregando (telas baixadas sob demanda). */
+const PageLoading = () => (
+  <div class="page-loading" role="status" aria-live="polite">
+    <Loader2 size={20} class="spin" /> Carregando…
+  </div>
+);
+
 export function App() {
   const state = useStore();
   const route = useRoute();
@@ -40,7 +55,6 @@ export function App() {
   const online = useOnline();
   const [showShortcuts, setShowShortcuts] = useState(false);
   const section = navSection(route.name);
-  const { list } = useWeekShopping(weekId);
 
   // Atalhos de teclado (desktop)
   useEffect(() => {
@@ -77,20 +91,21 @@ export function App() {
     window.scrollTo({ top: 0 });
   }, [route.name, route.arg]);
 
-  const counts = { compras: list?.summary.remaining || null };
   const showWeek = ['cardapio', 'compras', 'tarefas'].includes(route.name);
 
-  if (!state.ready) {
-    return (
-      <div class="boot" role="status">
-        <img src={`${import.meta.env.BASE_URL}logo.svg`} alt="" width="72" height="72" />
-        <p>Carregando o PanelAI…</p>
-      </div>
-    );
-  }
+  if (!state.ready) return <BootScreen waiting={state.cloud.waiting} online={online} />;
 
   // Tela do display: só o conteúdo, sem menus (para o aparelho e-ink).
-  if (route.name === 'display-tela') return <DisplayScreen params={route.params} />;
+  if (route.name === 'display-tela') {
+    return (
+      <>
+        <RecurringTasks />
+        <Suspense fallback={<PageLoading />}>
+          <DisplayScreen params={route.params} />
+        </Suspense>
+      </>
+    );
+  }
 
   return (
     <>
@@ -111,7 +126,7 @@ export function App() {
                 <n.icon size={18} />
                 <span class="nav-long">{n.long}</span>
                 <span class="nav-short">{n.short}</span>
-                {counts[n.id] ? <span class="count">{counts[n.id]}</span> : null}
+                {n.id === 'compras' && <ShoppingCount weekId={weekId} cls="count" />}
               </a>
             ))}
           </nav>
@@ -121,7 +136,7 @@ export function App() {
               <CloudOff size={14} /> <span class="hide-mobile">Offline</span>
             </span>
           )}
-          <SaveIndicator status={state.saveStatus} persistent={state.persistent} cloud={state.mode === 'cloud' ? state.cloud : null} online={online} />
+          <SaveIndicator online={online} />
           {showWeek && <WeekSelector />}
           <div class="header-actions">
             <a
@@ -155,7 +170,9 @@ export function App() {
       )}
 
       <main id="conteudo" class="main" tabIndex={-1}>
-        <Route route={route} weekId={weekId} />
+        <Suspense fallback={<PageLoading />}>
+          <Route route={route} weekId={weekId} />
+        </Suspense>
       </main>
 
       <nav class="bottom-nav" aria-label="Módulos">
@@ -165,16 +182,73 @@ export function App() {
               <n.icon size={21} strokeWidth={section === n.id ? 2.2 : 1.8} />
             </span>
             {n.short}
-            {counts[n.id] ? <span class="nav-badge" aria-label={`${counts[n.id]} itens`}>{counts[n.id]}</span> : null}
+            {n.id === 'compras' && <ShoppingCount weekId={weekId} cls="nav-badge" label />}
           </a>
         ))}
       </nav>
 
       <ToastRegion />
       <ConfirmHost />
+      <RecurringTasks />
       <ShortcutsModal open={showShortcuts} onClose={() => setShowShortcuts(false)} />
     </>
   );
+}
+
+/** Abertura: carregando ou, na nuvem, aguardando a primeira sincronização. */
+function BootScreen({ waiting, online }) {
+  return (
+    <div class="boot" role="status" aria-live="polite">
+      <img src={`${import.meta.env.BASE_URL}logo.svg`} alt="" width="72" height="72" />
+      {waiting ? (
+        <>
+          <p>
+            <WifiOff size={16} /> Aguardando a primeira sincronização
+          </p>
+          <p class="small muted" style="max-width:320px;text-align:center">
+            Os dados da casa ainda não foram baixados neste aparelho.{' '}
+            {online ? 'A conexão com a nuvem está lenta; o PanelAI abre assim que os dados chegarem.' : 'Conecte-se à internet; o PanelAI abre sozinho quando os dados chegarem.'}
+          </p>
+          <button type="button" class="btn btn-secondary" onClick={() => window.location.reload()}>
+            Tentar de novo
+          </button>
+        </>
+      ) : (
+        <p>Carregando o PanelAI…</p>
+      )}
+    </div>
+  );
+}
+
+/** Quantos itens faltam comprar (barra de navegação). Componente próprio para não redesenhar a tela inteira. */
+function ShoppingCount({ weekId, cls, label = false }) {
+  const { list } = useWeekShopping(weekId);
+  const n = list?.summary.remaining;
+  if (!n) return null;
+  return (
+    <span class={cls} aria-label={label ? `${n} itens` : undefined}>
+      {n}
+    </span>
+  );
+}
+
+/**
+ * Tarefas fixas da semana atual e da próxima: criadas ao abrir o app (inclusive
+ * na tela do display, que ninguém abre na aba Tarefas) e conferidas de hora em
+ * hora para virar o dia/semana com o aparelho ligado. Na nuvem, só depois da
+ * confirmação do servidor.
+ */
+function RecurringTasks() {
+  const s = useStore();
+  const allowed = s.ready && (s.mode !== 'cloud' || s.cloud.serverSynced);
+  const templates = s.taskTemplates;
+  useEffect(() => {
+    if (!allowed) return undefined;
+    ensureRecurringAround();
+    const t = setInterval(() => ensureRecurringAround(), 3600_000);
+    return () => clearInterval(t);
+  }, [allowed, templates]);
+  return null;
 }
 
 function Route({ route, weekId }) {
@@ -204,7 +278,11 @@ function Route({ route, weekId }) {
   }
 }
 
-function SaveIndicator({ status, persistent, cloud, online }) {
+function SaveIndicator({ online }) {
+  const state = useStore();
+  const status = state.saveStatus;
+  const persistent = state.persistent;
+  const cloud = state.mode === 'cloud' ? state.cloud : null;
   if (cloud && status !== 'error') {
     const s = cloud.error
       ? { icon: TriangleAlert, text: 'Erro na nuvem', cls: 'error', title: cloud.error }
@@ -236,35 +314,6 @@ function SaveIndicator({ status, persistent, cloud, online }) {
     <span class={`save-indicator ${status}`} role="status" aria-live="polite" title={s.text}>
       <s.icon size={14} /> <span class="text">{s.text}</span>
     </span>
-  );
-}
-
-const SHORTCUTS = [
-  ['1 – 5', 'Ir para Cardápio, Lista, Mercado, Receitas e Tarefas'],
-  ['← / →', 'Semana anterior / próxima'],
-  ['T', 'Voltar para a semana atual'],
-  ['/', 'Buscar na tela atual'],
-  ['N', 'Nova receita (em Receitas)'],
-  ['Esc', 'Fechar janelas'],
-  ['?', 'Mostrar esta ajuda'],
-];
-
-export function ShortcutsModal({ open, onClose }) {
-  return (
-    <Modal open={open} onClose={onClose} title="Atalhos de teclado" size="sm">
-      <table class="table">
-        <tbody>
-          {SHORTCUTS.map(([k, d]) => (
-            <tr key={k}>
-              <td class="nowrap">
-                <span class="kbd">{k}</span>
-              </td>
-              <td>{d}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </Modal>
   );
 }
 

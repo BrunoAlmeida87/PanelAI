@@ -6,7 +6,7 @@
 //  - modo "local": IndexedDB deste navegador (padrão);
 //  - modo "cloud": Firestore da casa (src/cloud), compartilhado entre aparelhos.
 
-import { useSyncExternalStore } from 'preact/compat';
+import { useEffect, useReducer, useRef } from 'preact/hooks';
 import { initDB, loadAll, writeBatch } from './db.js';
 import { DEFAULT_SETTINGS } from '../models/constants.js';
 import { cloudConfigured } from '../cloud/firebase-config.js';
@@ -58,13 +58,39 @@ export function subscribe(fn) {
 }
 
 /**
- * Hook: re-renderiza o componente quando o estado muda.
- * useSyncExternalStore confere o estado no momento da inscrição, então uma
- * mudança ocorrida entre a renderização e a inscrição (ex.: carregamento muito
- * rápido do IndexedDB) não se perde.
+ * Hook: devolve o estado e re-renderiza o componente só quando muda alguma
+ * parte que ele leu na última renderização (ex.: s.recipes). Assim o indicador
+ * "Salvando…" ou a fila da nuvem não redesenham a tela inteira a cada toque.
+ *
+ * A inscrição confere o estado ao começar, então uma mudança ocorrida entre a
+ * renderização e a inscrição (ex.: carregamento muito rápido do IndexedDB) não
+ * se perde.
  */
 export function useStore() {
-  return useSyncExternalStore(subscribe, getState);
+  const [, force] = useReducer((n) => n + 1, 0);
+  const snap = state;
+  const keys = new Set();
+  const tracked = useRef(null);
+  tracked.current = { snap, keys };
+  useEffect(() => {
+    const check = (next) => {
+      const t = tracked.current;
+      for (const k of t.keys) {
+        if (next[k] !== t.snap[k]) {
+          force();
+          return;
+        }
+      }
+    };
+    check(state);
+    return subscribe(check);
+  }, []);
+  return new Proxy(snap, {
+    get(target, key) {
+      if (typeof key === 'string') keys.add(key);
+      return target[key];
+    },
+  });
 }
 
 // ---------- Persistência ----------

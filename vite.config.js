@@ -11,7 +11,9 @@ export default defineConfig({
   plugins: [
     preact(),
     VitePWA({
-      registerType: 'autoUpdate',
+      // A versão nova fica esperando até a pessoa tocar em "Atualizar" (ou até a próxima abertura),
+      // para não trocar os arquivos no meio do uso.
+      registerType: 'prompt',
       injectRegister: false,
       includeAssets: ['favicon.svg', 'logo.svg', 'logo-horizontal.svg', 'apple-touch-icon.png'],
       manifest: false, // usamos public/manifest.webmanifest
