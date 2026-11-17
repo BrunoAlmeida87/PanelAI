@@ -410,3 +410,38 @@
   text-align: center;
   margin: 0;
 }
+.demo-cta {
+  width: 100%;
+  display: grid;
+  gap: 10px;
+}
+
+/* ---------- Faixa do modo de teste ---------- */
+.demo-banner {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  padding: 8px var(--gutter);
+  background: var(--amber-light);
+  color: var(--text);
+  font-size: 0.875rem;
+}
+.demo-banner svg {
+  color: var(--amber);
+  flex: none;
+}
+.demo-banner .grow {
+  flex: 1 1 220px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.demo-banner .btn {
+  min-height: 36px;
+}
+@media print {
+  .demo-banner {
+    display: none;
+  }
+}

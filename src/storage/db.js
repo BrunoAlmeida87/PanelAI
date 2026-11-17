@@ -3,6 +3,8 @@
 // usamos memória e avisamos o usuário de que os dados não serão mantidos.
 
 const DB_NAME = 'panelai';
+/** Banco separado do modo de teste (dados de exemplo), para não misturar com dados reais. */
+export const DEMO_DB_NAME = 'panelai-demo';
 const DB_VERSION = 2; // v2: tarefas, modelos de tarefa e layouts do display
 
 export const STORES = {
@@ -22,9 +24,9 @@ export const STORES = {
 let dbPromise = null;
 let memory = null;
 
-function openDB(factory) {
+function openDB(factory, name) {
   return new Promise((resolve, reject) => {
-    const req = factory.open(DB_NAME, DB_VERSION);
+    const req = factory.open(name, DB_VERSION);
     req.onupgradeneeded = () => {
       const db = req.result;
       for (const [name, keyPath] of Object.entries(STORES)) {
@@ -38,13 +40,13 @@ function openDB(factory) {
 }
 
 /** Inicializa o banco. Retorna { persistent: boolean }. */
-export async function initDB(factory = globalThis.indexedDB) {
+export async function initDB(factory = globalThis.indexedDB, name = DB_NAME) {
   if (!factory) {
     memory = Object.fromEntries(Object.keys(STORES).map((s) => [s, new Map()]));
     return { persistent: false };
   }
   try {
-    dbPromise = openDB(factory);
+    dbPromise = openDB(factory, name);
     await dbPromise;
     return { persistent: true };
   } catch (err) {

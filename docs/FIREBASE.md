@@ -9,6 +9,10 @@ Com o Firebase configurado, **o PanelAI só abre depois do login** com um e-mail
 Quem tiver só o link vê a tela de entrar e não consegue ver nem alterar nada. Cada alteração fica
 registrada com o e-mail de quem a fez.
 
+Na tela de entrar, **"Experimentar sem conta"** abre o **modo de teste**, para quem quer conhecer o app:
+ele usa os dados de exemplo e salva só naquele navegador. O Firebase nem é carregado e nada vai para a
+nuvem; os dados de teste também nunca são enviados ao criar uma casa.
+
 Sem a configuração (campo `apiKey` vazio), nada disso existe: o PanelAI salva só no aparelho, sem login.
 
 ---

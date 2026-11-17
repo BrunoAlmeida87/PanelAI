@@ -2,8 +2,8 @@
 // O módulo do Firebase é carregado só quando necessário.
 
 import { useEffect, useState } from 'preact/hooks';
-import { Cloud, CloudOff, LogIn, LogOut, Mail, RefreshCw, Trash2, UserPlus, Users } from 'lucide-preact';
-import { useStore } from '../../storage/store.js';
+import { Cloud, CloudOff, FlaskConical, LogIn, LogOut, Mail, RefreshCw, Trash2, UserPlus, Users } from 'lucide-preact';
+import { exitDemo, useStore } from '../../storage/store.js';
 import { toast, confirmDialog } from '../../components/ui.jsx';
 
 const api = () => import('../../cloud/session.js');
@@ -57,7 +57,7 @@ export function CloudSection({ gate = false }) {
 
   // Sem a nuvem ativa, o Firebase só é carregado agora (ao abrir esta tela).
   useEffect(() => {
-    if (c.configured && s.mode !== 'cloud') {
+    if (c.configured && s.mode !== 'cloud' && s.mode !== 'demo') {
       api()
         .then((a) => a.initCloudUi())
         .catch((err) => setError(errorText(err)));
@@ -66,7 +66,7 @@ export function CloudSection({ gate = false }) {
 
   // Usuário já logado, sem casa aberta: procura a casa ao abrir a tela.
   useEffect(() => {
-    if (s.mode !== 'cloud' && c.user?.verified && found === undefined) {
+    if (s.mode !== 'cloud' && s.mode !== 'demo' && c.user?.verified && found === undefined) {
       run((a) => a.findMyHousehold()).then((h) => setFound(h ?? null));
     }
   }, [s.mode, c.user?.email, c.user?.verified]);
@@ -102,6 +102,23 @@ function Body({ s, c, busy, run, found, setFound, afterLogin, gate }) {
           (passo a passo em <code>docs/FIREBASE.md</code> no projeto).
         </span>
       </div>
+    );
+  }
+  if (s.mode === 'demo') {
+    return (
+      <>
+        <div class="notice info">
+          <FlaskConical size={18} />
+          <span>
+            Você está no <strong>modo de teste</strong>, com dados de exemplo. Nada é enviado para a nuvem: as alterações ficam só neste navegador.
+          </span>
+        </div>
+        <div class="toolbar">
+          <button type="button" class="btn btn-primary" onClick={exitDemo}>
+            <LogIn size={16} /> Sair do teste e entrar na conta
+          </button>
+        </div>
+      </>
     );
   }
   if (c.status === 'checking') return <p class="small muted">Verificando a conta…</p>;

@@ -7,7 +7,7 @@
 //  - modo "cloud": Firestore da casa (src/cloud), compartilhado entre aparelhos.
 
 import { useEffect, useReducer, useRef } from 'preact/hooks';
-import { initDB, loadAll, writeBatch } from './db.js';
+import { DEMO_DB_NAME, initDB, loadAll, writeBatch } from './db.js';
 import { DEFAULT_SETTINGS } from '../models/constants.js';
 import { cloudConfigured } from '../cloud/firebase-config.js';
 
@@ -31,7 +31,9 @@ let state = {
   tasks: {},
   taskTemplates: {},
   displayLayouts: {},
-  mode: 'local', // 'local' | 'cloud' | 'gate' (nuvem configurada, sem login: só a tela de entrar)
+  // 'local' | 'cloud' | 'gate' (nuvem configurada, sem login: só a tela de entrar)
+  // | 'demo' (modo de teste: dados de exemplo só neste navegador, sem nuvem)
+  mode: 'local',
   cloud: {
     configured: cloudConfigured,
     status: cloudConfigured ? 'checking' : 'off', // off | checking | idle | active
@@ -218,7 +220,47 @@ export function loadFromChanges(initial) {
   setState(s);
 }
 
+// ---------- Modo de teste ----------
+// Na tela de entrar, qualquer pessoa pode experimentar o PanelAI com os dados
+// de exemplo. Os dados ficam num banco separado deste navegador e nada vai
+// para a nuvem (o Firebase nem é carregado).
+
+const DEMO_KEY = 'panelai.demo';
+
+function demoChosen() {
+  try {
+    return localStorage.getItem(DEMO_KEY) === '1';
+  } catch {
+    return false;
+  }
+}
+
+/** Botão "Experimentar sem conta". */
+export async function startDemo() {
+  try {
+    localStorage.setItem(DEMO_KEY, '1');
+  } catch {
+    /* sem localStorage: o teste dura até fechar a página */
+  }
+  setState({ ready: false });
+  await bootstrapLocal({ demo: true });
+}
+
+/** Sai do modo de teste e volta para a tela de entrar (os dados de teste ficam guardados para a próxima vez). */
+export function exitDemo() {
+  try {
+    localStorage.removeItem(DEMO_KEY);
+  } catch {
+    /* ignora */
+  }
+  window.location.reload();
+}
+
 export async function bootstrap() {
+  if (cloudConfigured && demoChosen()) {
+    await bootstrapLocal({ demo: true });
+    return;
+  }
   if (cloudConfigured) {
     // Com a nuvem configurada, só quem entrou com um e-mail da casa usa o app.
     // Sem login não há modo local: aparece apenas a tela de entrar.
@@ -268,9 +310,10 @@ export async function readLocalData() {
   }
 }
 
-async function bootstrapLocal() {
+async function bootstrapLocal({ demo = false } = {}) {
   try {
-    const { persistent } = await initDB();
+    setWriter(writeBatch);
+    const { persistent } = await initDB(undefined, demo ? DEMO_DB_NAME : undefined);
     const all = await loadAll();
     const meta = byKey(all.meta, 'key');
     if (!meta.seeded?.value) {
@@ -296,11 +339,11 @@ async function bootstrapLocal() {
         displayLayouts: byKey(all.displayLayouts, 'id'),
       });
     }
-    setState({ ready: true, persistent });
+    setState({ ready: true, persistent, mode: demo ? 'demo' : 'local' });
     // Pede ao navegador para não apagar os dados em caso de pouco espaço.
     navigator.storage?.persist?.().catch(() => {});
   } catch (err) {
     console.error(err);
-    setState({ ready: true, loadError: String(err?.message ?? err) });
+    setState({ ready: true, mode: demo ? 'demo' : 'local', loadError: String(err?.message ?? err) });
   }
 }

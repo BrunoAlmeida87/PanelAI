@@ -50,7 +50,7 @@ Funciona no computador e no celular (layouts diferentes para cada um), pode ser 
   - Duas pessoas marcando a lista (ou contando a despensa, ou no mercado do mês) ao mesmo tempo não apagam as marcações uma da outra: cada item vale pela alteração mais recente.
   - Registros antigos (histórico, compras, tarefas concluídas, semanas passadas) são agrupados por mês na nuvem, para a abertura do app não ficar mais cara com o tempo.
   - Num aparelho novo sem internet, o app espera os dados da casa em vez de abrir vazio.
-  - **Login obrigatório:** sem login aparece só a tela de entrar (também em `#/display/tela`). Cada alteração fica registrada com o e-mail de quem a fez. Importar, restaurar demonstração e começar do zero ficam só com o responsável pela casa, e as regras do Firestore bloqueiam a criação de casas novas.
+  - **Login obrigatório:** sem login aparece só a tela de entrar (também em `#/display/tela`). Nela, **"Experimentar sem conta"** abre o **modo de teste**: qualquer pessoa com o link conhece o app com os dados de exemplo, guardados só naquele navegador (banco separado, sem Firebase e sem nada na nuvem). Uma faixa no topo lembra que é teste e tem o botão "Entrar na conta". Cada alteração fica registrada com o e-mail de quem a fez. Importar, restaurar demonstração e começar do zero ficam só com o responsável pela casa, e as regras do Firestore bloqueiam a criação de casas novas.
 - Sem Firebase configurado, não há sincronização entre aparelhos: exporte e importe para levar os dados.
 
 ## Instalar como aplicativo

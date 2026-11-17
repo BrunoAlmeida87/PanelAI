@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'preact/hooks';
 import { Suspense } from 'preact/compat';
-import { BookOpen, CalendarDays, Check, ListChecks, MonitorSmartphone, CloudCheck, CloudOff, CloudUpload, Loader2, Package, Settings, ShoppingCart, TriangleAlert, WifiOff } from 'lucide-preact';
-import { useStore } from './storage/store.js';
+import { BookOpen, CalendarDays, Check, ListChecks, MonitorSmartphone, CloudCheck, CloudOff, CloudUpload, Loader2, Package, Settings, ShoppingCart, TriangleAlert, WifiOff, FlaskConical, LogIn } from 'lucide-preact';
+import { exitDemo, useStore } from './storage/store.js';
 import { ensureRecurringAround } from './storage/taskActions.js';
 import { useRoute, navigate } from './utils/router.js';
 import { useWeekId, shiftWeek, goToCurrentWeek } from './storage/ui.js';
@@ -175,6 +175,8 @@ export function App() {
         </div>
       </header>
 
+      {state.mode === 'demo' && <DemoBanner />}
+
       {state.loadError && (
         <div class="main" style="padding-bottom:0">
           <div class="notice">
@@ -206,6 +208,22 @@ export function App() {
       <RecurringTasks />
       <ShortcutsModal open={showShortcuts} onClose={() => setShowShortcuts(false)} />
     </>
+  );
+}
+
+/** Modo de teste: lembra que os dados são de exemplo e ficam só neste navegador. */
+function DemoBanner() {
+  return (
+    <div class="demo-banner" role="note">
+      <span class="grow">
+        <FlaskConical size={16} /> <span>
+          <strong>Modo de teste</strong> — dados de exemplo, salvos só neste navegador.
+        </span>
+      </span>
+      <button type="button" class="btn btn-secondary" onClick={exitDemo}>
+        <LogIn size={16} /> Entrar na conta
+      </button>
+    </div>
   );
 }
 

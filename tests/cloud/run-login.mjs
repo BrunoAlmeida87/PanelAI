@@ -110,6 +110,39 @@ await step('sem login só aparece a tela de entrar', async () => {
   assert((await page.locator('.eink-frame').count()) === 0, 'o display não deveria aparecer');
 });
 
+await step('modo de teste: dados de exemplo só no navegador, sem falar com a nuvem', async () => {
+  const cloudRequests = [];
+  const onRequest = (r) => {
+    if (r.url().includes(':8080/') || r.url().includes(':9099/')) cloudRequests.push(r.url());
+  };
+  // Página nova: o Firebase ainda não foi carregado nela.
+  const demo = await browser.newPage({ viewport: { width: 1280, height: 900 } });
+  demo.on('pageerror', (e) => errors.push(String(e)));
+  await demo.goto(`${BASE}#/cardapio`);
+  await demo.getByRole('heading', { name: 'Entrar no PanelAI' }).waitFor({ timeout: 20000 });
+  demo.on('request', onRequest);
+  await demo.getByRole('button', { name: 'Experimentar sem conta' }).click();
+  await demo.getByRole('heading', { name: 'Cardápio' }).waitFor({ timeout: 20000 });
+  await demo.getByText('Modo de teste').first().waitFor();
+  // Continua no teste depois de recarregar, com os dados de exemplo.
+  await demo.reload();
+  await demo.getByRole('heading', { name: 'Cardápio' }).waitFor({ timeout: 20000 });
+  await demo.goto(`${BASE}#/receitas`);
+  await demo.getByRole('heading', { name: 'Receitas' }).waitFor({ timeout: 20000 });
+  const n = await demo.locator('.recipe-card').count();
+  assert(n > 0, 'deveria haver receitas de exemplo');
+  // Em Configurações não há como enviar os dados de teste para a nuvem.
+  await demo.goto(`${BASE}#/ajustes`);
+  await demo.getByText('Você está no').waitFor({ timeout: 20000 });
+  assert((await demo.getByRole('button', { name: /Criar casa/ }).count()) === 0, 'não deveria oferecer criar casa');
+  assert(!cloudRequests.length, `o modo de teste falou com a nuvem: ${cloudRequests[0]}`);
+  // "Entrar na conta" sai do teste e volta para a tela de entrar.
+  await demo.getByRole('button', { name: 'Entrar na conta', exact: true }).click();
+  await demo.getByRole('heading', { name: 'Entrar no PanelAI' }).waitFor({ timeout: 20000 });
+  await demo.close();
+  return `${n} receitas de exemplo`;
+});
+
 await step('e-mail fora da casa vê o aviso e não cria casa (regras publicadas)', async () => {
   await loadRules(false);
   await page.goto(`${BASE}#/cardapio`);

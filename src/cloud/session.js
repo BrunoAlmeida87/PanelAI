@@ -202,6 +202,8 @@ export function joinHousehold(household) {
  */
 export async function createHouseholdFromThisDevice(name) {
   let s = getState();
+  // Dados do modo de teste nunca vão para a nuvem.
+  if (s.mode === 'demo') throw new Error('No modo de teste não é possível criar uma casa. Saia do teste e entre na sua conta.');
   if (s.mode === 'gate') s = (await readLocalData()) ?? (await import('../data/seed.js')).buildSeed();
   const ops = seedOps({
     ingredients: s.ingredients,
