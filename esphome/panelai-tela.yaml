@@ -72,7 +72,8 @@ globals:
   - id: proximas
     type: std::array<uint32_t, 24>
     restore_value: true
-    initial_value: "{}"
+    # Tipo explícito: só "{}" fica ambíguo para o compilador.
+    initial_value: "std::array<uint32_t, 24>{}"
   # Horário que o aparelho estava esperando quando foi dormir (0 = nenhum).
   - id: alvo
     type: uint32_t
