@@ -2,7 +2,7 @@
 // O módulo do Firebase é carregado só quando necessário.
 
 import { useEffect, useState } from 'preact/hooks';
-import { Cloud, CloudOff, FlaskConical, LogIn, LogOut, Mail, RefreshCw, Trash2, UserPlus, Users } from 'lucide-preact';
+import { Cloud, CloudOff, FlaskConical, LogIn, LogOut, Mail, MonitorSmartphone, RefreshCw, Trash2, UserPlus, Users } from 'lucide-preact';
 import { exitDemo, useStore } from '../../storage/store.js';
 import { toast, confirmDialog } from '../../components/ui.jsx';
 
@@ -227,12 +227,25 @@ function NoHouseholdYet({ c, busy, run, found, setFound, gate }) {
   if (found) {
     return (
       <>
-        <p style="margin:0">
-          Você faz parte da casa <strong>{found.name}</strong>.
-        </p>
-        <p class="small muted" style="margin:0">
-          Ao entrar, este aparelho passa a mostrar os dados da casa, atualizados na hora.
-        </p>
+        {found.role === 'viewer' ? (
+          <>
+            <p style="margin:0">
+              Esta é uma <strong>conta de tela</strong> da casa <strong>{found.name}</strong>.
+            </p>
+            <p class="small muted" style="margin:0">
+              Ela só lê os dados, para mostrar o display (não altera nada).
+            </p>
+          </>
+        ) : (
+          <>
+            <p style="margin:0">
+              Você faz parte da casa <strong>{found.name}</strong>.
+            </p>
+            <p class="small muted" style="margin:0">
+              Ao entrar, este aparelho passa a mostrar os dados da casa, atualizados na hora.
+            </p>
+          </>
+        )}
         <div class="toolbar">
           <button type="button" class="btn btn-primary" disabled={busy} onClick={() => run((a) => a.joinHousehold(found))}>
             <Cloud size={16} /> Entrar na casa
@@ -375,6 +388,7 @@ function ActiveHousehold({ s, c, busy, run }) {
           </ul>
         </div>
       )}
+      {h && (isOwner || h.viewerEmails?.length > 0) && <ViewerAccounts h={h} isOwner={isOwner} busy={busy} run={run} />}
       {isOwner && (
         <form class="field" onSubmit={add}>
           <span class="label">Convidar pessoa</span>
@@ -401,6 +415,79 @@ function ActiveHousehold({ s, c, busy, run }) {
         <SignOutButton busy={busy} run={run} label="Sair da conta neste aparelho" />
       </div>
     </>
+  );
+}
+
+/**
+ * Contas de tela (só leitura): a conta que o GitHub usa para gerar a imagem do
+ * display (docs/DISPLAY.md). Leem os dados da casa, mas não gravam nada.
+ */
+function ViewerAccounts({ h, isOwner, busy, run }) {
+  const [email, setEmail] = useState('');
+  const viewers = h.viewerEmails ?? [];
+
+  const add = (e) => {
+    e.preventDefault();
+    run(async (a) => {
+      await a.addViewer(email);
+      toast(`${email} cadastrada como conta de tela (só leitura).`);
+      setEmail('');
+    });
+  };
+
+  const remove = async (m) => {
+    const ok = await confirmDialog({
+      title: 'Remover conta de tela',
+      message: `${m} deixará de ler os dados da casa. A imagem do display para de ser atualizada até outra conta de tela ser cadastrada.`,
+      confirmLabel: 'Remover',
+      danger: true,
+    });
+    if (ok) run((a) => a.removeViewer(m));
+  };
+
+  return (
+    <div class="field">
+      <span class="label with-icon">
+        <MonitorSmartphone size={14} /> Contas de tela (só leitura)
+      </span>
+      {viewers.length > 0 ? (
+        <ul style="list-style:none;margin:0;padding:0;display:grid;gap:6px">
+          {viewers.map((m) => (
+            <li key={m} style="display:flex;gap:8px;align-items:center;justify-content:space-between">
+              <span>{m}</span>
+              {isOwner && (
+                <button type="button" class="btn btn-danger-ghost" disabled={busy} onClick={() => remove(m)} aria-label={`Remover a conta de tela ${m}`}>
+                  <Trash2 size={16} />
+                </button>
+              )}
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p class="small muted" style="margin:0">Nenhuma conta de tela.</p>
+      )}
+      {isOwner && (
+        <form style="display:flex;gap:8px;flex-wrap:wrap" onSubmit={add}>
+          <input
+            class="input"
+            style="flex:1;min-width:200px"
+            type="email"
+            required
+            placeholder="tela@exemplo.com"
+            value={email}
+            onInput={(e) => setEmail(e.currentTarget.value)}
+            aria-label="E-mail da conta de tela"
+          />
+          <button type="submit" class="btn btn-secondary" disabled={busy || !email}>
+            <MonitorSmartphone size={16} /> Adicionar tela
+          </button>
+        </form>
+      )}
+      <span class="hint">
+        Use um e-mail só para a tela. Ela lê os dados da casa para gerar a imagem do display, mas não consegue alterar nem apagar nada. Passo a passo
+        em <code>docs/DISPLAY.md</code>.
+      </span>
+    </div>
   );
 }
 

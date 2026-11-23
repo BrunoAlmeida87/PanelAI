@@ -4,7 +4,9 @@
 // (src/cloud/firebase-config.js), para não pesar no uso apenas local.
 //
 // Modelo no Firestore:
-//   households/{casa}                    { name, ownerEmail, memberEmails[], createdAt }
+//   households/{casa}                    { name, ownerEmail, memberEmails[], viewerEmails[]?, createdAt }
+//     memberEmails: pessoas da casa (leem e alteram);
+//     viewerEmails: contas de tela, só leitura (ex.: a que gera a imagem do display).
 //   households/{casa}/{coleção}/{id}     { v: JSON, t: data do servidor, by: e-mail }
 // As coleções são as mesmas do IndexedDB (src/storage/db.js), mais as de
 // marcações, arquivo mensal e imagens. Como os registros do app viram
@@ -55,6 +57,7 @@ import { uid } from '../utils/id.js';
 const HOUSEHOLDS = 'households';
 const BATCH_SIZE = 400; // limite do Firestore: 500 gravações por lote
 export const MAX_MEMBERS = 10;
+export const MAX_VIEWERS = 3;
 
 let app = null;
 let auth = null;
@@ -191,16 +194,34 @@ export async function signOutAndClear() {
 
 const householdFromSnap = (snap) => {
   const d = snap.data();
-  return { id: snap.id, name: d.name ?? 'Casa', ownerEmail: d.ownerEmail, memberEmails: d.memberEmails ?? [] };
+  return { id: snap.id, name: d.name ?? 'Casa', ownerEmail: d.ownerEmail, memberEmails: d.memberEmails ?? [], viewerEmails: d.viewerEmails ?? [] };
 };
 
-/** Procura a casa em que o e-mail do usuário está cadastrado. */
+/** Papel de um e-mail na casa: 'member' (lê e altera), 'viewer' (tela, só lê) ou null. */
+export function roleIn(household, email) {
+  const e = normalizeEmail(email);
+  if (!household || !e) return null;
+  if (household.memberEmails.includes(e)) return 'member';
+  if ((household.viewerEmails ?? []).includes(e)) return 'viewer';
+  return null;
+}
+
+/**
+ * Procura a casa em que o e-mail do usuário está cadastrado: primeiro como
+ * pessoa da casa, depois como conta de tela. Devolve a casa com `role`.
+ */
 export async function findMyHousehold() {
   init();
   const email = normalizeEmail(auth.currentUser?.email);
   if (!email) return null;
-  const snap = await getDocs(query(collection(db, HOUSEHOLDS), where('memberEmails', 'array-contains', email)));
-  return snap.empty ? null : householdFromSnap(snap.docs[0]);
+  for (const [field, role] of [
+    ['memberEmails', 'member'],
+    ['viewerEmails', 'viewer'],
+  ]) {
+    const snap = await getDocs(query(collection(db, HOUSEHOLDS), where(field, 'array-contains', email)));
+    if (!snap.empty) return { ...householdFromSnap(snap.docs[0]), role };
+  }
+  return null;
 }
 
 /**
@@ -229,6 +250,17 @@ export async function addMember(householdId, email) {
 export async function removeMember(householdId, email) {
   init();
   await updateDoc(doc(db, HOUSEHOLDS, householdId), { memberEmails: arrayRemove(normalizeEmail(email)) });
+}
+
+/** Conta de tela (só leitura). Só o responsável adiciona e remove. */
+export async function addViewer(householdId, email) {
+  init();
+  await updateDoc(doc(db, HOUSEHOLDS, householdId), { viewerEmails: arrayUnion(normalizeEmail(email)) });
+}
+
+export async function removeViewer(householdId, email) {
+  init();
+  await updateDoc(doc(db, HOUSEHOLDS, householdId), { viewerEmails: arrayRemove(normalizeEmail(email)) });
 }
 
 /** Pessoa (que não é a responsável) sai da casa. */

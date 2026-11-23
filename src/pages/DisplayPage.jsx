@@ -28,6 +28,7 @@ import {
   clampCard,
   defaultGrid,
   newCard,
+  newLayout,
   overlappingIds,
   placeNewCard,
   presetCards,
@@ -35,24 +36,23 @@ import {
   screenSize,
 } from '../display/model.js';
 import { buildDisplayData } from '../display/data.js';
+import { formatTimes, normalizeDisplayDevice } from '../display/schedule.js';
 import { DisplayRender, cardTitle } from '../display/DisplayRender.jsx';
 import { Chip, Menu, Modal, Segmented, Stepper, confirmDialog, toast } from '../components/ui.jsx';
 import { formatDateTime } from '../utils/dates.js';
 import { uid } from '../utils/id.js';
+import { useNow } from '../utils/hooks.js';
 
-function useNow(intervalMs = 60000) {
-  const [now, setNow] = useState(() => new Date());
-  useEffect(() => {
-    const t = setInterval(() => setNow(new Date()), intervalMs);
-    return () => clearInterval(t);
-  }, [intervalMs]);
-  return now;
-}
-
-function useDisplayData() {
+/** Dados dos cards. `fixedNow` (Date) congela o relógio: a imagem gerada "para" um horário. */
+function useDisplayData(fixedNow = null) {
   const s = useStore();
-  const now = useNow();
-  return useMemo(() => buildDisplayData(s, now), [s.weeks, s.tasks, s.recipes, s.marmitas, s.pantry, s.ingredients, s.settings, now]);
+  const ticking = useNow();
+  const now = fixedNow ?? ticking;
+  const at = now.getTime();
+  return useMemo(
+    () => buildDisplayData(s, now),
+    [s.weeks, s.tasks, s.taskTemplates, s.recipes, s.marmitas, s.pantry, s.ingredients, s.settings, at],
+  );
 }
 
 function useWidth(ref) {
@@ -402,6 +402,8 @@ function Editor({ layout: stored, layouts, activeId, onSwitch }) {
 }
 
 function ScreenInspector({ layout, isActive, onChange }) {
+  const s = useStore();
+  const { times } = normalizeDisplayDevice(s.settings.displayDevice);
   const model = DISPLAY_MODELS.find((m) => m.id === layout.modelId) ?? DISPLAY_MODELS[0];
   const setGrid = (patch) => {
     const grid = { ...layout.grid, ...patch };
@@ -500,9 +502,11 @@ function ScreenInspector({ layout, isActive, onChange }) {
         </div>
       </div>
       <div class="field">
-        <span class="label">Atualizar a cada</span>
-        <Stepper value={layout.refreshMinutes ?? 30} min={5} max={720} step={5} decimals={0} unit="min" label="Intervalo de atualização" onChange={(v) => onChange({ ...layout, refreshMinutes: v })} />
-        <span class="hint">Usado quando o aparelho for conectado. Telas e-ink gastam pouca energia com atualizações espaçadas.</span>
+        <span class="label">Horários de atualização da tela</span>
+        <span>{times.length ? formatTimes(times) : 'Só pelo botão do aparelho'}</span>
+        <span class="hint">
+          Valem para o aparelho, com o layout marcado "no display". <a href="#/ajustes">Alterar em Configurações → Tela e-ink</a>.
+        </span>
       </div>
     </>
   );
@@ -650,11 +654,30 @@ function OptionField({ def, value, onChange }) {
   }
 }
 
-/** #/display/tela — a tela pronta, para o aparelho (ou para conferir em tela cheia). */
+/** `momento` na rota: segundos UTC (epoch). Inválido ou ausente → relógio normal. */
+function parseMoment(value) {
+  const sec = Number(value);
+  return value && Number.isFinite(sec) && sec > 0 ? new Date(sec * 1000) : null;
+}
+
+/**
+ * #/display/tela — a tela pronta, para o aparelho (ou para conferir em tela cheia).
+ *
+ * Parâmetros (usados por scripts/display-png.mjs, que gera a imagem):
+ *  - id=<layout>     layout a mostrar (padrão: o escolhido para o display);
+ *  - exato=1         tamanho real em pixels, sem escala nem legenda;
+ *  - momento=<epoch> mostra os dados "como estarão" nesse instante (segundos UTC);
+ *  - publicar=1      expõe, num elemento oculto, o que o script precisa para publicar
+ *                    (agenda, código do endereço e tamanho da tela).
+ */
 export function DisplayScreen({ params }) {
   const s = useStore();
-  const data = useDisplayData();
-  const layout = s.displayLayouts[params.id] ?? s.displayLayouts[s.settings.displayLayoutId] ?? Object.values(s.displayLayouts)[0];
+  const fixedNow = useMemo(() => parseMoment(params.momento), [params.momento]);
+  const data = useDisplayData(fixedNow);
+  // Sem nenhum layout salvo (ninguém abriu a aba Display ainda): mostra o sugerido
+  // "Cozinha" em 800 × 480, sem gravar nada (a conta da tela é só leitura).
+  const fallback = useMemo(() => newLayout({ name: 'Cozinha' }), []);
+  const layout = s.displayLayouts[params.id] ?? s.displayLayouts[s.settings.displayLayoutId] ?? Object.values(s.displayLayouts)[0] ?? fallback;
   const exact = params.exato === '1';
   const [win, setWin] = useState({ w: window.innerWidth, h: window.innerHeight });
   useEffect(() => {
@@ -662,13 +685,21 @@ export function DisplayScreen({ params }) {
     window.addEventListener('resize', on);
     return () => window.removeEventListener('resize', on);
   }, []);
-  if (!layout) return <p style="padding:24px">Nenhum layout criado. Abra a aba Display no PanelAI.</p>;
   const { w, h } = screenSize(layout);
   const scale = exact ? 1 : Math.min(win.w / w, win.h / h);
+  const publish =
+    params.publicar === '1'
+      ? JSON.stringify({
+          device: normalizeDisplayDevice(s.settings.displayDevice),
+          layout: { id: layout.id, name: layout.name, width: w, height: h, colorMode: layout.colorMode },
+          moment: data.now.getTime(),
+        })
+      : null;
   return (
     <div class={`display-fullscreen ${exact ? 'exact' : ''}`}>
       <DisplayRender layout={layout} data={data} scale={scale} />
       {!exact && <span class="fs-hint">{layout.name} · {w}×{h}</span>}
+      {publish && <div hidden id="panelai-publicacao" data-json={publish} />}
     </div>
   );
 }

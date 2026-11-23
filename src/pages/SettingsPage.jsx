@@ -12,6 +12,7 @@ import { Chip, Segmented, Stepper, toast, confirmDialog } from '../components/ui
 import { ShortcutsModal } from '../components/ShortcutsModal.jsx';
 import { getInstallPrompt, onInstallPromptChange } from '../utils/install.js';
 import { CloudSection } from './settings/CloudSection.jsx';
+import { DisplayDeviceSection } from './settings/DisplayDeviceSection.jsx';
 
 const MARKET_ORDER = [1, 2, 3, 4, 5, 6, 0];
 
@@ -148,6 +149,8 @@ export function SettingsPage() {
 
       <CloudSection />
 
+      <DisplayDeviceSection />
+
       <section class="card card-pad form-section" style="margin-top:16px" aria-labelledby="dados">
         <h2 id="dados" class="section-title" style="margin:0">Dados e backup</h2>
         <div class="notice info">
@@ -261,7 +264,7 @@ export function SettingsPage() {
           </p>
         )}
         <p class="small muted" style="display:flex;gap:6px;align-items:center">
-          <Info size={14} /> PanelAI 1.2 · {shared ? 'dados sincronizados no Firebase da casa' : 'dados locais · sem envio de informações para servidores'}.
+          <Info size={14} /> PanelAI {__APP_VERSION__} · {shared ? 'dados sincronizados no Firebase da casa' : 'dados locais · sem envio de informações para servidores'}.
         </p>
       </section>
       <ShortcutsModal open={shortcuts} onClose={() => setShortcuts(false)} />

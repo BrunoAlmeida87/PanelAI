@@ -155,13 +155,16 @@ const { weekStartOf, todayISO, addDays } = await import('../../src/utils/dates.j
 const aliceUid = await createVerifiedUser('alice@exemplo.com');
 await createVerifiedUser('bob@exemplo.com');
 const carolUid = await createVerifiedUser('carol@exemplo.com');
+await createVerifiedUser('tela@exemplo.com');
 
 const alice = await device('alice', 'alice@exemplo.com');
 const bob = await device('bob', 'bob@exemplo.com');
 const carol = await device('carol', 'carol@exemplo.com');
+const tela = await device('tela', 'tela@exemplo.com');
 await alice.signIn();
 await bob.signIn();
 await carol.signIn();
+await tela.signIn();
 
 const seed = buildSeed();
 const WEEK = weekStartOf(todayISO());
@@ -301,6 +304,43 @@ await step('regras: gravações precisam identificar a pessoa certa', async () =
   const db = getFirestore(getApp('bob'));
   await expectDenied(setDoc(doc(db, 'households', hid, 'recipes', 'x'), { v: '{}', t: serverTimestamp(), by: 'alice@exemplo.com' }), 'gravar em nome de outra pessoa');
   await expectDenied(setDoc(doc(db, 'households', hid, 'recipes', 'x'), { v: '{}', t: serverTimestamp(), by: 'bob@exemplo.com', extra: 1 }), 'campo extra');
+});
+
+await step('conta de tela: só o responsável cadastra; ela acha a casa e lê tudo', async () => {
+  await expectDenied(bob.cloud.addViewer(hid, 'tela@exemplo.com'), 'pessoa (não responsável) cadastrando tela');
+  await expectDenied(alice.cloud.addViewer(hid, 'alice@exemplo.com'), 'responsável como conta de tela');
+  await alice.cloud.addViewer(hid, 'tela@exemplo.com');
+  const found = await tela.cloud.findMyHousehold();
+  assert(found?.id === hid && found.role === 'viewer', `a tela deveria achar a casa como "viewer" (veio ${found?.role})`);
+  assert((await bob.cloud.findMyHousehold())?.role === 'member', 'Bob continua pessoa da casa');
+  await tela.start(hid);
+  for (const [store, n] of Object.entries(counts)) {
+    if (store === 'tasks') continue; // tarefas mudam nos passos anteriores
+    assert(Object.keys(tela.state[store] ?? {}).length >= n, `${store}: a tela deveria ler ${n}`);
+  }
+  await waitFor(() => tela.serverSynced, 'tela sincronizada');
+  return `${Object.keys(tela.state.recipes).length} receitas lidas`;
+});
+
+await step('conta de tela: não grava, não apaga e não mexe na casa', async () => {
+  const { getFirestore, doc, setDoc, deleteDoc, updateDoc, arrayRemove, serverTimestamp } = await import('firebase/firestore');
+  const { getApp } = await import('firebase/app');
+  const db = getFirestore(getApp('tela'));
+  await expectDenied(setDoc(doc(db, 'households', hid, 'recipes', 'x'), { v: '{}', t: serverTimestamp(), by: 'tela@exemplo.com' }), 'gravar receita');
+  await expectDenied(deleteDoc(doc(db, 'households', hid, 'recipes', 'bolo-teste')), 'apagar receita');
+  await expectDenied(updateDoc(doc(db, 'households', hid), { name: 'Hackeada' }), 'renomear a casa');
+  await expectDenied(updateDoc(doc(db, 'households', hid), { viewerEmails: arrayRemove('tela@exemplo.com') }), 'tirar-se da lista');
+  await expectDenied(updateDoc(doc(db, 'households', hid), { memberEmails: ['alice@exemplo.com', 'bob@exemplo.com', 'tela@exemplo.com'] }), 'virar pessoa da casa');
+  tela.cloud.stopSync();
+});
+
+await step('conta de tela removida pelo responsável deixa de ler', async () => {
+  const { getFirestore, doc, getDoc } = await import('firebase/firestore');
+  const { getApp } = await import('firebase/app');
+  await alice.cloud.removeViewer(hid, 'tela@exemplo.com');
+  const db = getFirestore(getApp('tela'));
+  await expectDenied(getDoc(doc(db, 'households', hid, 'recipes', 'bolo-teste')), 'ler receita depois de removida');
+  assert((await tela.cloud.findMyHousehold()) == null, 'não deveria mais achar a casa');
 });
 
 await step('regras: quem não é responsável não remove outras pessoas, mas pode sair', async () => {

@@ -1,6 +1,8 @@
 // Vocabulário fixo do domínio. IDs são estáveis e usados na persistência;
 // os rótulos podem mudar sem quebrar dados salvos.
 
+import { DEFAULT_DISPLAY_DEVICE } from '../display/schedule.js';
+
 export const MEAL_SLOTS = [
   { id: 'lanche_manha', label: 'Lanche da manhã', short: 'Manhã', snack: true },
   { id: 'almoco', label: 'Almoço', short: 'Almoço', snack: false },
@@ -108,4 +110,7 @@ export const DEFAULT_SETTINGS = {
   trackSnacks: false,
   // Layout do display e-ink em uso.
   displayLayoutId: null,
+  // Tela física (reTerminal): horários de atualização, fuso e código do
+  // endereço da imagem. Formato e regras em src/display/schedule.js.
+  displayDevice: DEFAULT_DISPLAY_DEVICE,
 };

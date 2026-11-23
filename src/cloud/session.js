@@ -25,22 +25,26 @@ const lsSet = (k, v) => {
   }
 };
 
+/** Casa (e papel nela) já encontrada para este e-mail neste aparelho: { id, role } ou null. */
 function readCache(email) {
   try {
     const v = JSON.parse(localStorage.getItem(CACHE_KEY) ?? 'null');
-    return v?.email === email ? v.id : null;
+    // Caches antigos não tinham o papel: eram sempre de pessoas da casa.
+    return v?.email === email && v.id ? { id: v.id, role: v.role === 'viewer' ? 'viewer' : 'member' } : null;
   } catch {
     return null;
   }
 }
 
-function writeCache(email, id) {
+function writeCache(email, id, role = 'member') {
   try {
-    localStorage.setItem(CACHE_KEY, JSON.stringify({ email, id }));
+    localStorage.setItem(CACHE_KEY, JSON.stringify({ email, id, role }));
   } catch {
     /* ignora */
   }
 }
+
+const READ_ONLY_MESSAGE = 'Esta é uma conta de tela (só leitura): ela não altera os dados da casa.';
 
 function clearCache() {
   try {
@@ -86,23 +90,23 @@ export async function startCloudIfReady() {
     patchCloud({ status: 'idle' });
     return false;
   }
-  let householdId = readCache(user.email);
-  if (!householdId) {
+  let found = readCache(user.email);
+  if (!found) {
     try {
       const h = await withTimeout(cloud.findMyHousehold(), 8000);
       if (h) {
-        householdId = h.id;
-        writeCache(user.email, h.id);
+        found = { id: h.id, role: h.role };
+        writeCache(user.email, h.id, h.role);
       }
     } catch (err) {
       console.warn('Não foi possível procurar a casa na nuvem', err);
     }
   }
-  if (!householdId) {
+  if (!found) {
     patchCloud({ status: 'idle' });
     return false;
   }
-  await startSync(householdId);
+  await startSync(found.id, found.role);
   return true;
 }
 
@@ -122,10 +126,13 @@ function describeError(err, where) {
 let maintenanceTimer = null;
 function scheduleMaintenance(householdId) {
   clearTimeout(maintenanceTimer);
+  // A manutenção grava (incorpora marcações, arquiva): conta de tela não faz.
+  if (getState().cloud.readOnly) return;
   const last = Number(lsGet(`${MAINT_KEY}.${householdId}`)) || 0;
   if (Date.now() - last < MAINT_EVERY_MS) return;
   maintenanceTimer = setTimeout(async () => {
     if (typeof navigator !== 'undefined' && navigator.onLine === false) return;
+    if (getState().cloud.readOnly) return;
     try {
       const r = await cloud.runMaintenance();
       lsSet(`${MAINT_KEY}.${householdId}`, String(Date.now()));
@@ -136,8 +143,13 @@ function scheduleMaintenance(householdId) {
   }, 8000);
 }
 
-async function startSync(householdId) {
+/**
+ * Abre os dados da casa. `role` vem do cache ou da busca da casa ('member' ou
+ * 'viewer') e é confirmado pela própria casa assim que ela chega do servidor.
+ */
+async function startSync(householdId, role = 'member') {
   const requireServer = lsGet(SYNCED_KEY) !== householdId;
+  patchCloud({ readOnly: role === 'viewer' });
   const initial = await cloud.startSync(householdId, {
     requireServer,
     onWaiting: () => patchCloud({ waiting: true }),
@@ -149,7 +161,15 @@ async function startSync(householdId) {
     onChanges: applyRemoteChanges,
     onHousehold: (household) => {
       householdOk = !!household;
-      patchCloud({ household });
+      const email = getState().cloud.user?.email;
+      const now = cloud.roleIn(household, email);
+      if (now) {
+        // O responsável pode ter mudado o papel desta conta: vale o que a casa diz.
+        writeCache(email, householdId, now);
+        patchCloud({ household, readOnly: now === 'viewer' });
+      } else {
+        patchCloud({ household });
+      }
     },
     onPending: (pending) => patchCloud({ pending }),
     onError: (err, where) => {
@@ -159,7 +179,7 @@ async function startSync(householdId) {
     },
   });
   loadFromChanges(initial);
-  setWriter((ops) => cloud.writeOps(ops));
+  setWriter((ops) => (getState().cloud.readOnly ? Promise.reject(new Error(READ_ONLY_MESSAGE)) : cloud.writeOps(ops)));
   setState({ mode: 'cloud', ready: true, persistent: true, loadError: null });
   patchCloud({ status: 'active', error: null, waiting: false });
 }
@@ -191,7 +211,7 @@ export async function checkVerification() {
 /** Passa a usar os dados da casa neste aparelho. */
 export function joinHousehold(household) {
   const user = getState().cloud.user;
-  writeCache(user.email, household.id);
+  writeCache(user.email, household.id, household.role ?? 'member');
   reloadApp();
 }
 
@@ -237,6 +257,22 @@ export async function addMember(email) {
 export async function removeMember(email) {
   const h = getState().cloud.household;
   await cloud.removeMember(h.id, email);
+}
+
+/** Conta de tela (só leitura), ex.: a que o GitHub usa para gerar a imagem do display. */
+export async function addViewer(email) {
+  const h = getState().cloud.household;
+  const e = cloud.normalizeEmail(email);
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e)) throw new Error('E-mail inválido.');
+  if (h.memberEmails.includes(e)) throw new Error('Esse e-mail é de uma pessoa da casa. A conta da tela precisa ser um e-mail só para ela.');
+  if ((h.viewerEmails ?? []).includes(e)) throw new Error('Essa conta de tela já está cadastrada.');
+  if ((h.viewerEmails ?? []).length >= cloud.MAX_VIEWERS) throw new Error(`Limite de ${cloud.MAX_VIEWERS} contas de tela.`);
+  await cloud.addViewer(h.id, e);
+}
+
+export async function removeViewer(email) {
+  const h = getState().cloud.household;
+  await cloud.removeViewer(h.id, email);
 }
 
 /** Sai da casa (quem não é responsável): este aparelho volta aos próprios dados. */

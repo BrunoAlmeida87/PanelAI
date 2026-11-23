@@ -161,10 +161,11 @@ export function restoreTask(task) {
  * Tarefas fixas só são criadas quando os dados estão completos: no modo local,
  * sempre; na nuvem, só depois de a casa ter sido lida do servidor (senão uma
  * cópia desatualizada poderia recriar como "a fazer" uma tarefa já feita em
- * outro aparelho).
+ * outro aparelho). Contas de tela (só leitura) nunca criam: o display mostra
+ * as tarefas fixas do dia sem gravá-las (src/display/data.js).
  */
 export function canGenerateRecurring(s = getState()) {
-  return s.ready && (s.mode !== 'cloud' || !!s.cloud?.serverSynced);
+  return s.ready && (s.mode !== 'cloud' || (!!s.cloud?.serverSynced && !s.cloud?.readOnly));
 }
 
 /** Cria as tarefas fixas que faltam nas datas (a partir de hoje). */

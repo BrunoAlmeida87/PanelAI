@@ -1,0 +1,51 @@
+name: Firmware da tela
+
+# Confere se a configuração do reTerminal E1001 (esphome/panelai-tela.yaml) é
+# válida e compila, com segredos de exemplo. Não grava nada em aparelho nenhum.
+# A versão do ESPHome é a mesma indicada em docs/DISPLAY.md.
+
+on:
+  push:
+    paths: ['esphome/**', '.github/workflows/esphome.yml']
+  pull_request:
+    paths: ['esphome/**', '.github/workflows/esphome.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  compilar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    env:
+      ESPHOME_VERSION: 2026.11.0
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Instalar ESPHome
+        run: pip install "esphome==$ESPHOME_VERSION"
+
+      - name: Cache das ferramentas de compilação
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.platformio
+            esphome/.esphome
+          key: esphome-${{ env.ESPHOME_VERSION }}-${{ hashFiles('esphome/panelai-tela.yaml') }}
+          restore-keys: esphome-${{ env.ESPHOME_VERSION }}-
+
+      - name: Segredos de exemplo
+        run: |
+          cp esphome/secrets.yaml.exemplo esphome/secrets.yaml
+          sed -i 's#COLE_AQUI_O_CODIGO#CodigoDeExemploSoParaCompilar01234#' esphome/secrets.yaml
+
+      - name: Validar a configuração
+        run: esphome config esphome/panelai-tela.yaml > /dev/null
+
+      - name: Compilar
+        run: esphome compile esphome/panelai-tela.yaml

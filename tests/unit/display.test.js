@@ -72,4 +72,21 @@ describe('display: dados dos cards', () => {
     expect(d.tasksOn('2026-11-17').map((t) => t.title)).toContain('Levar roupas na lavanderia');
     expect(CARD_TYPES.length).toBeGreaterThanOrEqual(10);
   });
+
+  it('mostra as tarefas fixas do dia mesmo sem ninguém ter aberto o app (sem duplicar)', () => {
+    const now = new Date('2026-11-16T09:00:00');
+    const base = buildSeed(now);
+    const tpl = { id: 'tpl_lixo', title: 'Tirar o lixo', category: 'casa', assignee: '', notes: '', repeat: { kind: 'weekly', weekdays: [1, 3] }, startDate: '2026-11-01' };
+    const s = { ...base, tasks: {}, taskTemplates: { [tpl.id]: tpl } };
+    const d = buildDisplayData(s, now);
+    expect(d.tasksOn('2026-11-16').map((t) => t.title)).toEqual(['Tirar o lixo']);
+    expect(d.tasksOn('2026-11-18').map((t) => t.title)).toEqual(['Tirar o lixo']);
+    expect(d.tasksOn('2026-11-17')).toEqual([]);
+    // Já criada no app (feita): aparece uma vez só, com o estado salvo.
+    const saved = { ...d.tasksOn('2026-11-16')[0], status: 'done' };
+    const d2 = buildDisplayData({ ...s, tasks: { [saved.id]: saved } }, now);
+    expect(d2.tasksOn('2026-11-16').map((t) => t.status)).toEqual(['done']);
+    // Nada foi gravado no estado.
+    expect(s.tasks).toEqual({});
+  });
 });

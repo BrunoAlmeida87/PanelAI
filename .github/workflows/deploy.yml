@@ -110,6 +110,11 @@ jobs:
     if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
     needs: [build, e2e, cloud]
     runs-on: ubuntu-latest
+    # Uma publicação do Pages por vez, em fila com a do workflow "Imagem do display"
+    # (que roda logo depois desta e devolve a imagem da tela ao site).
+    concurrency:
+      group: pages-deploy
+      cancel-in-progress: false
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}

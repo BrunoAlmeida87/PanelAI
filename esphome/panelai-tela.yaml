@@ -1,0 +1,312 @@
+# PanelAI — tela e-ink no Seeed reTerminal E1001 (7,5", 800 × 480, preto e branco)
+#
+# O aparelho passa quase o tempo todo em sono profundo (gasta quase nada) e acorda:
+#   - nos horários de PanelAI → Configurações → Tela e-ink: baixa a imagem da
+#     tela, mostra e volta a dormir;
+#   - no meio do caminho, a cada no máximo 6 horas, só para acertar o relógio e
+#     reler os horários (a tela não pisca);
+#   - quando alguém aperta o botão verde: atualiza na hora.
+# A imagem (tela.png) e os horários (config.json) são publicados pelo GitHub no
+# endereço secreto da casa. Como tudo funciona e como gravar: docs/DISPLAY.md.
+#
+# Antes de gravar: copie secrets.yaml.exemplo para secrets.yaml (nesta pasta) e
+# preencha. O secrets.yaml nunca vai para o repositório (.gitignore).
+#
+# Gravar (com o aparelho no USB):  esphome run esphome/panelai-tela.yaml
+# Testado com ESPHome 2026.11 (validação da configuração).
+
+substitutions:
+  nome: panelai-tela
+  # Endereço da imagem, de Configurações → Tela e-ink (fica no secrets.yaml).
+  endereco: !secret panelai_endereco
+  # Posição da tela: 0 = deitada (como vem). Para um layout "Em pé", use 90 ou 270.
+  rotacao: "0"
+
+esphome:
+  name: ${nome}
+  friendly_name: PanelAI Tela
+  min_version: 2026.7.0
+  on_boot:
+    - priority: 600
+      then:
+        # Liga o divisor de tensão que mede a bateria (GPIO21 no E1001).
+        - output.turn_on: bateria_medir
+    - priority: -100
+      then:
+        - script.execute: vigia
+        - script.execute: acordar
+
+esp32:
+  board: esp32-s3-devkitc-1
+  framework:
+    type: esp-idf
+
+psram:
+  mode: octal
+  speed: 80MHz
+
+logger:
+  level: INFO
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_senha
+  # Sem rede, não reinicia: dorme e tenta de novo mais tarde (economiza bateria).
+  reboot_timeout: 0s
+
+time:
+  - platform: sntp
+    id: relogio
+    # Só para os registros (logs): os horários chegam prontos, em UTC, no config.json.
+    timezone: America/Sao_Paulo
+
+http_request:
+  verify_ssl: true
+  timeout: 20s
+  follow_redirects: true
+  useragent: PanelAI-Tela/1.0
+
+globals:
+  # Próximas atualizações (segundos UTC), lidas do config.json. Guardadas para
+  # o aparelho seguir a agenda mesmo se ficar um tempo sem internet.
+  - id: proximas
+    type: std::array<uint32_t, 24>
+    restore_value: true
+    initial_value: "{}"
+  # Horário que o aparelho estava esperando quando foi dormir (0 = nenhum).
+  - id: alvo
+    type: uint32_t
+    restore_value: true
+    initial_value: "0"
+  # Falhas seguidas (sem Wi-Fi, sem imagem): espera cada vez mais entre as tentativas.
+  - id: falhas
+    type: uint8_t
+    restore_value: true
+    initial_value: "0"
+  # Nesta vez acordado: baixa a imagem e redesenha a tela?
+  - id: atualizar_tela
+    type: bool
+    initial_value: "false"
+  # Quanto tempo dormir (ms), calculado pelo script "dormir".
+  - id: soneca_ms
+    type: uint32_t
+    initial_value: "1800000"
+
+output:
+  - platform: gpio
+    pin: GPIO21
+    id: bateria_medir
+
+sensor:
+  - platform: adc
+    pin: GPIO1
+    id: bateria
+    attenuation: 12db
+    update_interval: 2s
+    filters:
+      - multiply: 2.0 # divisor de tensão da placa
+
+deep_sleep:
+  id: sono
+  # Botão verde (GPIO3, aperta = nível baixo) acorda o aparelho.
+  wakeup_pin:
+    number: GPIO3
+    inverted: true
+    # O botão verde da placa fica num pino de "strapping" por projeto da Seeed.
+    ignore_strapping_warning: true
+  wakeup_pin_mode: INVERT_WAKEUP
+
+spi:
+  clk_pin: GPIO7
+  mosi_pin: GPIO9
+
+image:
+  - platform: online_image
+    id: tela_img
+    url: ${endereco}/tela.png
+    format: PNG
+    type: BINARY
+    update_interval: never
+    on_download_finished:
+      then:
+        - logger.log: "Imagem baixada; desenhando a tela"
+        - component.update: epaper
+        - wait_until:
+            condition:
+              lambda: "return !id(epaper).is_updating();"
+            timeout: 40s
+        - script.execute:
+            id: dormir
+            falhou: false
+    on_error:
+      then:
+        - logger.log:
+            level: WARN
+            format: "Não foi possível baixar a imagem"
+        - script.execute:
+            id: dormir
+            falhou: true
+
+display:
+  - platform: epaper_spi
+    id: epaper
+    model: seeed-reterminal-e1001
+    rotation: ${rotacao}
+    update_interval: never
+    lambda: |-
+      it.image(0, 0, id(tela_img));
+      // Bateria fraca (abaixo de ~20%): ícone pequeno no canto de baixo, à direita.
+      const float v = id(bateria).state;
+      if (!std::isnan(v) && v > 2.5f && v < 3.5f) {
+        const int x = it.get_width() - 46, y = it.get_height() - 24;
+        it.filled_rectangle(x - 4, y - 4, 48, 24, Color::WHITE);
+        it.rectangle(x, y, 34, 16, Color::BLACK);
+        it.filled_rectangle(x + 34, y + 5, 3, 6, Color::BLACK);
+        const int nivel = std::max(1, (int) ((v - 3.27f) / (3.5f - 3.27f) * 6));
+        it.filled_rectangle(x + 2, y + 2, nivel, 12, Color::BLACK);
+      }
+
+script:
+  # Segurança: se algo travar (rede lenta, servidor fora do ar), dorme mesmo assim.
+  - id: vigia
+    then:
+      - delay: 150s
+      - logger.log:
+          level: WARN
+          format: "Acordado há muito tempo; voltando a dormir"
+      - script.execute:
+          id: dormir
+          falhou: true
+
+  - id: acordar
+    then:
+      - lambda: |-
+          const auto causa = esp_sleep_get_wakeup_cause();
+          // Botão ou ligado agora (não foi o relógio): atualiza a tela de qualquer jeito.
+          const bool pelo_relogio = causa == ESP_SLEEP_WAKEUP_TIMER;
+          id(atualizar_tela) = !pelo_relogio;
+          ESP_LOGI("panelai", "Acordou: %s", pelo_relogio ? "horário" : (causa == ESP_SLEEP_WAKEUP_UNDEFINED ? "ligado" : "botão"));
+      - wait_until:
+          condition: wifi.connected
+          timeout: 40s
+      - if:
+          condition:
+            not: wifi.connected
+          then:
+            - logger.log:
+                level: WARN
+                format: "Sem Wi-Fi"
+            - lambda: |-
+                // Sem rede, o relógio interno (que segue andando durante o sono) decide se era a hora.
+                const uint32_t agora = (uint32_t) ::time(nullptr);
+                if (agora > 1700000000u && id(alvo) != 0 && agora + 120 >= id(alvo)) id(atualizar_tela) = true;
+            - script.execute:
+                id: dormir
+                falhou: true
+          else:
+            - script.execute: online
+
+  - id: online
+    then:
+      - wait_until:
+          condition:
+            time.has_time:
+              id: relogio
+          timeout: 20s
+      - http_request.get:
+          url: ${endereco}/config.json
+          capture_response: true
+          max_response_buffer_size: 4kB
+          on_response:
+            then:
+              - lambda: |-
+                  if (response->status_code != 200) {
+                    ESP_LOGW("panelai", "config.json: HTTP %d", response->status_code);
+                    return;
+                  }
+                  const bool ok = json::parse_json(body, [](JsonObject raiz) -> bool {
+                    JsonArray lista = raiz["proximas"].as<JsonArray>();
+                    if (lista.isNull()) return false;
+                    auto &prox = id(proximas);
+                    prox.fill(0);
+                    size_t i = 0;
+                    for (JsonVariant v : lista) {
+                      if (i >= prox.size()) break;
+                      prox[i++] = v.as<uint32_t>();
+                    }
+                    return true;
+                  });
+                  if (!ok) ESP_LOGW("panelai", "config.json inválido; seguindo a agenda guardada");
+          on_error:
+            then:
+              - logger.log:
+                  level: WARN
+                  format: "Não foi possível baixar o config.json; seguindo a agenda guardada"
+      - lambda: |-
+          // Com o relógio certo (internet): chegou a hora da atualização agendada?
+          const uint32_t agora = (uint32_t) ::time(nullptr);
+          if (agora > 1700000000u && id(alvo) != 0 && agora + 120 >= id(alvo)) id(atualizar_tela) = true;
+      - if:
+          condition:
+            lambda: "return id(atualizar_tela);"
+          then:
+            # Baixa a imagem; ao terminar (on_download_finished / on_error) desenha e dorme.
+            - component.update: tela_img
+          else:
+            - script.execute:
+                id: dormir
+                falhou: false
+
+  # Calcula até quando dormir e dorme.
+  - id: dormir
+    mode: single
+    parameters:
+      falhou: bool
+    then:
+      - lambda: |-
+          const uint32_t FOLGA = 120;              // "chegou a hora" até 2 min antes
+          const uint32_t ULTIMA_ETAPA = 3600;      // a última soneca antes do horário dura até 1 h
+          const uint32_t SALTO_MAX = 6 * 3600;     // fora isso, acorda a cada 6 h no máximo
+          const uint32_t agora = (uint32_t) ::time(nullptr);
+          const bool tem_hora = agora > 1700000000u;
+
+          if (falhou) {
+            if (id(falhas) < 10) id(falhas)++;
+          } else {
+            id(falhas) = 0;
+          }
+
+          // Próximo horário agendado (os que já passaram ficam de fora).
+          uint32_t proximo = 0;
+          if (tem_hora) {
+            for (const uint32_t t : id(proximas)) {
+              if (t > agora + FOLGA) {
+                proximo = t;
+                break;
+              }
+            }
+          }
+
+          uint32_t segundos;
+          if (falhou && id(atualizar_tela) && tem_hora) {
+            // A atualização não deu certo: fica pendente e tenta de novo em 5, 10, 20, 30 min.
+            id(alvo) = agora;
+            segundos = std::min<uint32_t>(1800, 300u << std::min<int>(id(falhas) - 1, 3));
+          } else {
+            id(alvo) = proximo;
+            if (!tem_hora) {
+              segundos = 1800;
+            } else if (proximo == 0) {
+              segundos = SALTO_MAX;  // sem horários: só relê a agenda de tempos em tempos
+            } else {
+              const uint32_t falta = proximo - agora;
+              segundos = falta <= ULTIMA_ETAPA + 300 ? falta : std::min(falta - ULTIMA_ETAPA, SALTO_MAX);
+            }
+            if (falhou) segundos = std::min<uint32_t>(segundos, 1800);
+          }
+          segundos = std::max<uint32_t>(segundos, 60);
+          id(soneca_ms) = segundos * 1000;
+          ESP_LOGI("panelai", "Dormindo %" PRIu32 " min (próximo horário: %" PRIu32 ", falhas seguidas: %d)", segundos / 60, id(alvo), (int) id(falhas));
+      - deep_sleep.enter:
+          id: sono
+          sleep_duration: !lambda "return id(soneca_ms);"

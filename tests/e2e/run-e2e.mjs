@@ -242,6 +242,30 @@ async function flows(browser, label, opts) {
     await page.getByRole('button', { name: new RegExp(`^${RECIPE}`) }).first().waitFor({ timeout: 4000 });
   });
 
+  await step(`[${label}] 14b. tela e-ink: horários de atualização`, async () => {
+    await page.goto(`${BASE}#/ajustes`);
+    const section = page.locator('section[aria-labelledby="tela-eink"]');
+    await section.getByRole('button', { name: 'Remover o horário 06:00' }).waitFor();
+    await section.getByLabel('Novo horário de atualização').fill('18:30');
+    await section.getByRole('button', { name: 'Adicionar horário' }).click();
+    await section.getByRole('button', { name: 'Remover o horário 18:30' }).waitFor();
+    await section.getByRole('button', { name: 'Remover o horário 06:00' }).click();
+    await page.waitForTimeout(200);
+    assert((await section.getByRole('button', { name: 'Remover o horário 06:00' }).count()) === 0, '06:00 deveria sair');
+    await section.getByText(/Próximas: .*18:30/).waitFor();
+    // Sem a nuvem (build de teste), o endereço da imagem não pode ser ativado.
+    await section.getByText('Entre na conta da casa para ativar').waitFor();
+    // A aba Display mostra os horários escolhidos.
+    await page.goto(`${BASE}#/display`);
+    await page.getByText('Horários de atualização da tela').waitFor();
+    await page.locator('.display-inspector').getByText('18:30', { exact: true }).waitFor();
+    // Continua salvo depois de recarregar.
+    await page.goto(`${BASE}#/ajustes`);
+    await page.reload();
+    await page.locator('section[aria-labelledby="tela-eink"]').getByRole('button', { name: 'Remover o horário 18:30' }).waitFor();
+    await shot('tela-eink');
+  });
+
   if (mobile) {
     await step(`[${label}] 15. navegação inferior não cobre o conteúdo`, async () => {
       await page.goto(`${BASE}#/compras`);

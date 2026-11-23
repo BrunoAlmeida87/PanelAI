@@ -12,7 +12,8 @@ export default [
       ecmaVersion: 'latest',
       sourceType: 'module',
       parserOptions: { ecmaFeatures: { jsx: true } },
-      globals: { ...globals.browser },
+      // __APP_VERSION__: versão do package.json, definida no vite.config.js.
+      globals: { ...globals.browser, __APP_VERSION__: 'readonly' },
     },
     plugins: { 'react-hooks': reactHooks },
     rules: {
