@@ -1,7 +1,7 @@
 {
   "name": "panelai",
   "private": true,
-  "version": "1.3.0",
+  "version": "1.4.0",
   "description": "PanelAI — planejamento de refeições, receitas, lista de compras e despensa.",
   "type": "module",
   "scripts": {
@@ -12,7 +12,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:e2e": "node tests/e2e/run-e2e.mjs",
-    "test:cloud": "npx --yes firebase-tools@15.36.0 emulators:exec --only auth,firestore --project demo-panelai \"node tests/cloud/run-cloud.mjs && node tests/cloud/run-login.mjs\"",
+    "test:cloud": "npx --yes firebase-tools@15.36.0 emulators:exec --only auth,firestore --project demo-panelai \"node tests/cloud/run-cloud.mjs && node tests/cloud/run-login.mjs && node tests/cloud/run-display.mjs\"",
     "lint": "eslint .",
     "icons": "node scripts/generate-icons.mjs",
     "display:png": "node scripts/display-png.mjs"

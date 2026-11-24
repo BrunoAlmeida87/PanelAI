@@ -2,7 +2,7 @@ import { useEffect, useState } from 'preact/hooks';
 import { Suspense } from 'preact/compat';
 import { BookOpen, CalendarDays, Check, ListChecks, MonitorSmartphone, CloudCheck, CloudOff, CloudUpload, Loader2, Package, Settings, ShoppingCart, TriangleAlert, WifiOff, FlaskConical, LogIn } from 'lucide-preact';
 import { exitDemo, useStore } from './storage/store.js';
-import { ensureRecurringAround } from './storage/taskActions.js';
+import { canGenerateRecurring, ensureRecurringAround } from './storage/taskActions.js';
 import { useRoute, navigate } from './utils/router.js';
 import { useWeekId, shiftWeek, goToCurrentWeek } from './storage/ui.js';
 import { useOnline } from './utils/hooks.js';
@@ -26,6 +26,7 @@ const TasksPage = lazyPage(() => import('./pages/TasksPage.jsx'), 'TasksPage');
 const DisplayPage = lazyPage(() => import('./pages/DisplayPage.jsx'), 'DisplayPage');
 const DisplayScreen = lazyPage(() => import('./pages/DisplayPage.jsx'), 'DisplayScreen');
 const LoginGate = lazyPage(() => import('./pages/LoginGate.jsx'), 'LoginGate');
+const ViewerNotice = lazyPage(() => import('./pages/ViewerNotice.jsx'), 'ViewerNotice');
 
 const NAV = [
   { id: 'cardapio', path: '/cardapio', long: 'Cardápio', short: 'Cardápio', icon: CalendarDays },
@@ -102,6 +103,19 @@ export function App() {
       <>
         <Suspense fallback={<PageLoading />}>
           <LoginGate />
+        </Suspense>
+        <ToastRegion />
+        <ConfirmHost />
+      </>
+    );
+  }
+
+  // Conta de tela (só leitura): ela existe só para mostrar o display.
+  if (state.mode === 'cloud' && state.cloud.readOnly && route.name !== 'display-tela') {
+    return (
+      <>
+        <Suspense fallback={<PageLoading />}>
+          <ViewerNotice />
         </Suspense>
         <ToastRegion />
         <ConfirmHost />
@@ -272,7 +286,7 @@ function ShoppingCount({ weekId, cls, label = false }) {
  */
 function RecurringTasks() {
   const s = useStore();
-  const allowed = s.ready && (s.mode !== 'cloud' || s.cloud.serverSynced);
+  const allowed = canGenerateRecurring(s);
   const templates = s.taskTemplates;
   useEffect(() => {
     if (!allowed) return undefined;

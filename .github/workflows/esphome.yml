@@ -1,0 +1,123 @@
+name: Firmware da tela
+
+# Programa da tela e-ink (kit TRMNL 7,5" DIY: esphome/panelai-tela.yaml).
+#  - Em todo push/PR que mexe em esphome/: testa as regras do aparelho (g++),
+#    valida a configuração e compila. Não grava nada em aparelho nenhum.
+#  - Na main (ou manualmente): publica o firmware pronto e o manifest do
+#    instalador no branch "firmware". A página <site>/instalar-tela.html lê
+#    esses arquivos de raw.githubusercontent.com. O firmware não tem segredos
+#    (Wi-Fi e endereço da imagem são informados no próprio aparelho).
+# A versão do ESPHome é a mesma indicada em docs/DISPLAY.md.
+
+on:
+  push:
+    paths: ['esphome/**', '.github/workflows/esphome.yml']
+  pull_request:
+    paths: ['esphome/**', '.github/workflows/esphome.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  compilar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    env:
+      ESPHOME_VERSION: 2026.11.0
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Testar as regras do aparelho (C++)
+        run: |
+          g++ -std=c++17 -Wall -Wextra -Werror -I esphome esphome/testes/panelai_tela_teste.cpp -o "$RUNNER_TEMP/teste"
+          "$RUNNER_TEMP/teste"
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Instalar ESPHome
+        run: pip install "esphome==$ESPHOME_VERSION"
+
+      - name: Cache das ferramentas de compilação
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.platformio
+            ~/.cache/esphome
+            esphome/.esphome
+          key: esphome-${{ env.ESPHOME_VERSION }}-${{ hashFiles('esphome/panelai-tela.yaml', 'esphome/panelai_tela.h') }}
+          restore-keys: esphome-${{ env.ESPHOME_VERSION }}-
+
+      - name: Validar a configuração
+        run: esphome config esphome/panelai-tela.yaml > /dev/null
+
+      - name: Compilar
+        run: esphome compile esphome/panelai-tela.yaml
+
+      - name: Separar o firmware para o instalador
+        id: firmware
+        run: |
+          bin=$(find esphome/.esphome/build/panelai-tela -name '*.factory.bin' -print -quit)
+          if [ -z "$bin" ]; then
+            echo "::error::Não achei o arquivo .factory.bin da compilação."
+            exit 1
+          fi
+          mkdir -p "$RUNNER_TEMP/firmware"
+          cp "$bin" "$RUNNER_TEMP/firmware/panelai-tela.factory.bin"
+          versao="$(grep -m1 -oP 'version: "\K[^"]+' esphome/panelai-tela.yaml)+${GITHUB_SHA::7}"
+          cat > "$RUNNER_TEMP/firmware/manifest.json" <<EOF
+          {
+            "name": "PanelAI Tela",
+            "version": "$versao",
+            "new_install_prompt_erase": true,
+            "new_install_improv_wait_time": 20,
+            "builds": [
+              { "chipFamily": "ESP32-S3", "parts": [{ "path": "panelai-tela.factory.bin", "offset": 0 }] }
+            ]
+          }
+          EOF
+          echo "dir=$RUNNER_TEMP/firmware" >> "$GITHUB_OUTPUT"
+          ls -la "$RUNNER_TEMP/firmware"
+
+      - name: Guardar o firmware desta execução
+        uses: actions/upload-artifact@v4
+        with:
+          name: firmware-panelai-tela
+          path: ${{ steps.firmware.outputs.dir }}
+          retention-days: 14
+
+  publicar:
+    # Só o firmware da main vai para o instalador.
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    needs: compilar
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    concurrency:
+      group: firmware-da-tela
+      cancel-in-progress: false
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: firmware-panelai-tela
+          path: firmware
+
+      # Branch com um único commit (só a versão atual, sem histórico de binários).
+      # Pushes feitos com o GITHUB_TOKEN não disparam outros workflows.
+      - name: Publicar no branch "firmware"
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cd firmware
+          git init -q -b firmware
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          printf '%s\n' "Firmware da tela do PanelAI, publicado pelo workflow \"Firmware da tela\"." \
+            "Gerado a partir de esphome/panelai-tela.yaml (commit ${GITHUB_SHA}). Não edite à mão." > README.md
+          git add -A
+          git commit -q -m "Firmware da tela (${GITHUB_SHA::7})"
+          git push -q -f "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" firmware
+          echo "Publicado: https://raw.githubusercontent.com/${GITHUB_REPOSITORY}/firmware/manifest.json"

@@ -8,3 +8,7 @@ firebase-debug.log
 firestore-debug.log
 ui-debug.log
 tests/cloud/dist/
+tests/cloud/dist-display/
+# Configuração do aparelho com Wi-Fi e endereço secreto (nunca no repositório)
+esphome/secrets.yaml
+esphome/.esphome/

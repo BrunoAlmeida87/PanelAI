@@ -1,0 +1,186 @@
+name: Imagem do display
+
+# Gera a imagem da tela e-ink (kit TRMNL 7,5" DIY) e publica junto com o site, no
+# endereço secreto de Configurações → Tela e-ink: <site>/tela/<código>/tela.png
+# e config.json. O aparelho baixa esses arquivos pela internet nos horários
+# escolhidos. Como tudo funciona e o que configurar: docs/DISPLAY.md.
+#
+# Quando roda:
+#  - a cada 30 minutos (o GitHub às vezes atrasa alguns minutos);
+#  - logo depois de cada publicação do site, que substitui o site inteiro;
+#  - manualmente: Actions → Imagem do display → Run workflow.
+#
+# Segredos (Settings → Secrets and variables → Actions):
+#  - PANELAI_TELA_EMAIL e PANELAI_TELA_SENHA: a conta de tela da casa (só leitura).
+#    Sem eles, o workflow não faz nada (e não falha).
+#  - PANELAI_APPCHECK_DEBUG_TOKEN (opcional): só se o App Check estiver ativado.
+#
+# Segurança: o código do endereço nunca aparece nos logs (o script o mascara) e
+# o artefato com a imagem é apagado logo depois da publicação.
+
+on:
+  schedule:
+    - cron: '17,47 * * * *'
+  workflow_run:
+    workflows: ['Testes e publicação']
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+  # Ler as publicações do site, apagar o artefato com a imagem e manter o agendamento ativo.
+  actions: write
+
+# Uma geração por vez; a mais nova vale.
+concurrency:
+  group: imagem-do-display
+  cancel-in-progress: true
+
+jobs:
+  gerar:
+    # Depois de uma publicação, só se o site foi mesmo publicado (main, sem erro).
+    if: >-
+      github.event_name != 'workflow_run' ||
+      (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event != 'pull_request')
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      TEM_CONTA: ${{ secrets.PANELAI_TELA_EMAIL != '' && secrets.PANELAI_TELA_SENHA != '' }}
+    outputs:
+      publicar: ${{ steps.pronto.outputs.publicar }}
+    steps:
+      - name: Conta de tela configurada?
+        if: env.TEM_CONTA != 'true'
+        run: echo "::notice::Sem os segredos PANELAI_TELA_EMAIL e PANELAI_TELA_SENHA, nada a fazer. Veja docs/DISPLAY.md."
+
+      # Sempre a versão do site que está no ar (a última publicação bem-sucedida da main):
+      # a imagem é publicada junto com o site, que é substituído inteiro.
+      - name: Descobrir a versão publicada do site
+        if: env.TEM_CONTA == 'true'
+        id: versao
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SHA_DO_DEPLOY: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          sha="$SHA_DO_DEPLOY"
+          if [ -z "$sha" ]; then
+            sha=$(gh run list --repo "$GITHUB_REPOSITORY" --workflow deploy.yml --branch main --status success --limit 30 \
+              --json headSha,event --jq '[.[] | select(.event == "push" or .event == "workflow_dispatch")][0].headSha // empty')
+          fi
+          if [ -z "$sha" ]; then
+            echo "::error::Nenhuma publicação do site encontrada (workflow Testes e publicação na main)."
+            exit 1
+          fi
+          echo "sha=$sha" >> "$GITHUB_OUTPUT"
+          echo "Versão publicada do site: $sha"
+
+      - uses: actions/checkout@v4
+        if: env.TEM_CONTA == 'true'
+        with:
+          ref: ${{ steps.versao.outputs.sha }}
+
+      # Publicações antigas (antes desta função existir) não têm o modo --publicar.
+      - name: Versão publicada sabe gerar a imagem?
+        if: env.TEM_CONTA == 'true'
+        id: suporte
+        run: |
+          if grep -q -- '--publicar' scripts/display-png.mjs 2>/dev/null; then
+            echo "ok=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "::notice::A versão publicada do site ainda não gera a imagem do display. Publique a versão nova (main)."
+            echo "ok=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/setup-node@v4
+        if: steps.suporte.outputs.ok == 'true'
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Instalar dependências
+        if: steps.suporte.outputs.ok == 'true'
+        run: npm ci
+
+      # Mesmo build da publicação (o resultado é idêntico byte a byte): quem está
+      # com o app aberto não recebe aviso de versão nova por causa da imagem.
+      - name: Build do site
+        if: steps.suporte.outputs.ok == 'true'
+        run: npm run build
+
+      - name: Cache do navegador (Playwright)
+        if: steps.suporte.outputs.ok == 'true'
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-1.63.0-${{ runner.os }}
+
+      - name: Instalar Playwright e Chromium
+        if: steps.suporte.outputs.ok == 'true'
+        run: |
+          npm install --no-save playwright@1.63.0
+          npx playwright install --with-deps chromium
+
+      # Entra no site publicado com a conta de tela e grava dist/tela/<código>/.
+      - name: Gerar a imagem da tela
+        if: steps.suporte.outputs.ok == 'true'
+        id: imagem
+        env:
+          PANELAI_TELA_EMAIL: ${{ secrets.PANELAI_TELA_EMAIL }}
+          PANELAI_TELA_SENHA: ${{ secrets.PANELAI_TELA_SENHA }}
+          PANELAI_APPCHECK_DEBUG_TOKEN: ${{ secrets.PANELAI_APPCHECK_DEBUG_TOKEN }}
+        run: node scripts/display-png.mjs --publicar dist
+
+      - name: Enviar artefato do site com a imagem
+        if: steps.suporte.outputs.ok == 'true'
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+          retention-days: 1
+
+      - name: Pronto para publicar
+        if: steps.suporte.outputs.ok == 'true'
+        id: pronto
+        run: echo "publicar=true" >> "$GITHUB_OUTPUT"
+
+      # O GitHub desativa agendamentos de repositórios sem atividade há 60 dias.
+      - name: Manter o agendamento ativo
+        if: github.event_name == 'schedule'
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh api -X PUT "repos/$GITHUB_REPOSITORY/actions/workflows/display.yml/enable"
+
+  publicar:
+    needs: gerar
+    if: needs.gerar.outputs.publicar == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    # Uma publicação do Pages por vez, em fila com a do workflow "Testes e publicação".
+    concurrency:
+      group: pages-deploy
+      cancel-in-progress: false
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Publicar no GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
+
+  limpar:
+    # O artefato tem a imagem e o código do endereço: some assim que não é mais necessário.
+    needs: [gerar, publicar]
+    if: always() && needs.gerar.outputs.publicar == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Apagar o artefato desta execução
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          for id in $(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID/artifacts" --jq '.artifacts[].id'); do
+            gh api -X DELETE "repos/$GITHUB_REPOSITORY/actions/artifacts/$id"
+          done

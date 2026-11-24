@@ -1,6 +1,9 @@
 import { defineConfig } from 'vite';
 import preact from '@preact/preset-vite';
 import { VitePWA } from 'vite-plugin-pwa';
+import { readFileSync } from 'node:fs';
+
+const { version } = JSON.parse(readFileSync(new URL('./package.json', import.meta.url), 'utf8'));
 
 // O site é publicado em https://brunoalmeida87.github.io/PanelAI/,
 // por isso todos os caminhos partem de /PanelAI/.
@@ -8,6 +11,8 @@ const base = process.env.PANELAI_BASE ?? '/PanelAI/';
 
 export default defineConfig({
   base,
+  // Versão mostrada em Configurações (vem do package.json).
+  define: { __APP_VERSION__: JSON.stringify(version) },
   plugins: [
     preact(),
     VitePWA({
@@ -22,6 +27,8 @@ export default defineConfig({
         // Só os subconjuntos latinos da fonte (português) entram no cache offline.
         globIgnores: ['**/inter-{cyrillic,cyrillic-ext,greek,greek-ext,vietnamese}-*.woff2'],
         navigateFallback: `${base}index.html`,
+        // Não são telas do app: imagem da tela e-ink (abre em nova aba) e instalador do aparelho.
+        navigateFallbackDenylist: [/\/tela\//, /\/instalar-tela\.html$/],
         cleanupOutdatedCaches: true,
       },
     }),

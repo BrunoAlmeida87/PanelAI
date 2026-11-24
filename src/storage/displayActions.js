@@ -4,6 +4,7 @@ import { getState, setState, persist } from './store.js';
 import { currentActor } from './actor.js';
 import { updateSettings } from './actions.js';
 import { newLayout } from '../display/model.js';
+import { normalizeDisplayDevice } from '../display/schedule.js';
 import { uid } from '../utils/id.js';
 
 export function saveLayout(layout) {
@@ -44,4 +45,15 @@ export function deleteLayout(id) {
 /** Layout que o aparelho deve mostrar. */
 export function setActiveLayout(id) {
   updateSettings({ displayLayoutId: id });
+}
+
+/**
+ * Tela física: horários, fuso e código do endereço (Configurações → Tela e-ink).
+ * Sempre grava num formato válido (src/display/schedule.js).
+ */
+export function updateDisplayDevice(patch) {
+  const current = normalizeDisplayDevice(getState().settings.displayDevice);
+  const next = normalizeDisplayDevice({ ...current, ...patch });
+  updateSettings({ displayDevice: next });
+  return next;
 }

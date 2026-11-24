@@ -73,6 +73,10 @@ por `allow create: if canCreateHousehold(casa);`, publique, crie a casa no app (
 > **Versão 1.3:** publique as regras de novo para bloquear a criação de casas novas e ativar
 > "Sair da casa". Sem isso tudo continua funcionando; só o botão "Sair da casa" mostra
 > "Sem permissão no Firestore" e a criação de casas continua liberada.
+>
+> **Versão 1.4:** publique as regras de novo para ativar as **contas de tela** (só leitura), usadas
+> pela tela e-ink ([DISPLAY.md](DISPLAY.md)). Sem isso o resto continua igual; só "Adicionar tela"
+> mostra "Sem permissão no Firestore".
 
 ### 6. Colocar a configuração no PanelAI
 
@@ -146,6 +150,7 @@ Pronto: o que um altera aparece no aparelho do outro em segundos. O topo da tela
 - Se duas pessoas alterarem **o cardápio da mesma semana** exatamente ao mesmo tempo, vale a última gravação. Na prática, com o app aberto, cada um já vê a mudança do outro antes de editar.
 - **Primeira abertura num aparelho novo sem internet:** o PanelAI espera os dados da casa chegarem em vez de abrir vazio.
 - Um mesmo e-mail participa de uma casa. Até 10 pessoas por casa.
+- **Contas de tela** (Configurações → Sincronização na nuvem → Contas de tela): contas só de leitura, usadas para gerar a imagem da tela e-ink pelo GitHub. Leem os dados da casa, mas as regras não deixam gravar, apagar nem mexer na casa. Só o responsável adiciona e remove (até 3). Passo a passo em [DISPLAY.md](DISPLAY.md).
 
 ### Quanto da cota gratuita a casa usa
 
@@ -161,7 +166,7 @@ bem abaixo de 20% da cota. Para conferir: Firestore Database → aba **Uso**.
 ## Como os dados ficam no Firestore
 
 ```
-households/{id da conta do responsável}   name, ownerEmail, memberEmails[], createdAt
+households/{id da conta do responsável}   name, ownerEmail, memberEmails[], viewerEmails[] (contas de tela, só leitura), createdAt
 households/{casa}/recipes/{id}            v (JSON da receita), t (data), by (e-mail de quem alterou)
 households/{casa}/weeks/{segunda-feira}   ...
 households/{casa}/pantry|ingredients|marmitas|movements|purchases|tasks|taskTemplates|displayLayouts|meta/...

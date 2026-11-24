@@ -1,0 +1,228 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Instalar a tela do PanelAI</title>
+    <meta name="description" content="Instala o programa do PanelAI na tela e-ink (kit TRMNL 7,5&quot; DIY da Seeed) pelo navegador, com o cabo USB." />
+    <meta name="robots" content="noindex" />
+    <link rel="icon" type="image/svg+xml" href="./favicon.svg" />
+    <!--
+      Instalador do programa da tela e-ink (esphome/panelai-tela.yaml) pelo
+      navegador, com ESP Web Tools (Web Serial: Chrome ou Edge no computador).
+      O firmware e o manifest são publicados pelo CI (.github/workflows/esphome.yml)
+      no branch "firmware" e lidos de raw.githubusercontent.com (permite CORS).
+      Passo a passo completo: docs/DISPLAY.md.
+    -->
+    <script type="module" src="https://unpkg.com/esp-web-tools@10.4.0/dist/web/install-button.js?module"></script>
+    <style>
+      :root {
+        --bg: #faf9f6;
+        --card: #ffffff;
+        --text: #30332f;
+        --muted: #747874;
+        --border: #e8e7e2;
+        --green: #789582;
+        --green-dark: #52765d;
+        --green-light: #e7efe8;
+        --amber: #fdf3dc;
+        --amber-text: #6b4f1d;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --bg: #1b1d1b;
+          --card: #242724;
+          --text: #e8e9e6;
+          --muted: #a9aca8;
+          --border: #353935;
+          --green: #8fae99;
+          --green-dark: #a6c4af;
+          --green-light: #2c3a30;
+          --amber: #3a3220;
+          --amber-text: #f0d9a6;
+        }
+      }
+      * {
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--text);
+        font: 16px/1.55 system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+      }
+      main {
+        max-width: 720px;
+        margin: 0 auto;
+        padding: 24px 16px 48px;
+      }
+      header {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        margin-bottom: 8px;
+      }
+      header img {
+        width: 44px;
+        height: 44px;
+      }
+      h1 {
+        font-size: 1.5rem;
+        margin: 0;
+      }
+      .sub {
+        color: var(--muted);
+        margin: 0 0 20px;
+      }
+      .card {
+        background: var(--card);
+        border: 1px solid var(--border);
+        border-radius: 16px;
+        padding: 20px;
+        margin-top: 16px;
+      }
+      h2 {
+        font-size: 1.1rem;
+        margin: 0 0 8px;
+      }
+      ol {
+        margin: 0;
+        padding-left: 22px;
+      }
+      li + li {
+        margin-top: 10px;
+      }
+      .muted {
+        color: var(--muted);
+        font-size: 0.92rem;
+      }
+      .notice {
+        background: var(--amber);
+        color: var(--amber-text);
+        border-radius: 12px;
+        padding: 12px 14px;
+        font-size: 0.95rem;
+      }
+      .ok {
+        background: var(--green-light);
+        color: var(--green-dark);
+      }
+      .install {
+        margin: 18px 0 6px;
+      }
+      .install [slot='unsupported'],
+      .install [slot='not-allowed'] {
+        display: block;
+      }
+      /* Enquanto o instalador não carregou, só o botão aparece. */
+      esp-web-install-button:not(:defined) [slot='unsupported'],
+      esp-web-install-button:not(:defined) [slot='not-allowed'] {
+        display: none;
+      }
+      .btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        min-height: 48px;
+        padding: 0 22px;
+        border: 0;
+        border-radius: 12px;
+        background: var(--green-dark);
+        color: #fff;
+        font: inherit;
+        font-weight: 600;
+        cursor: pointer;
+      }
+      .btn:hover {
+        filter: brightness(1.05);
+      }
+      .btn:focus-visible {
+        outline: 3px solid var(--green);
+        outline-offset: 2px;
+      }
+      code {
+        font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+        font-size: 0.9em;
+        background: var(--green-light);
+        border-radius: 4px;
+        padding: 1px 5px;
+      }
+      a {
+        color: var(--green-dark);
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header>
+        <img src="./logo.svg" alt="" />
+        <h1>Instalar a tela do PanelAI</h1>
+      </header>
+      <p class="sub">Coloca o programa do PanelAI na tela e-ink (kit TRMNL 7,5" DIY da Seeed) pelo cabo USB. Faz-se uma vez só.</p>
+
+      <div class="notice" id="sem-suporte" hidden>
+        Este navegador não consegue falar com o aparelho pelo cabo USB. Use o <strong>Chrome</strong> ou o <strong>Edge</strong> num
+        <strong>computador</strong> (Windows, Mac ou Linux). Celulares não servem para esta etapa.
+      </div>
+
+      <section class="card">
+        <h2>Antes de começar</h2>
+        <ol>
+          <li>Um computador com <strong>Chrome</strong> ou <strong>Edge</strong> e um cabo USB-C <strong>de dados</strong> (cabos só de carga não funcionam).</li>
+          <li>O endereço da imagem à mão: no PanelAI, <strong>Configurações → Tela e-ink → Copiar endereço</strong>.</li>
+          <li>O nome e a senha do Wi-Fi da casa (rede de 2,4 GHz).</li>
+        </ol>
+      </section>
+
+      <section class="card">
+        <h2>1. Instalar</h2>
+        <ol>
+          <li>Ligue a placa da tela no computador pelo cabo USB-C (chave liga/desliga em <em>ON</em>).</li>
+          <li>Clique no botão abaixo e escolha o aparelho na lista (algo como <code>USB JTAG/serial debug unit</code>).</li>
+          <li>Marque <strong>"Erase device" / "Apagar o aparelho"</strong> (remove o programa do TRMNL) e confirme. Leva 1 a 2 minutos.</li>
+        </ol>
+        <div class="install">
+          <esp-web-install-button manifest="https://raw.githubusercontent.com/BrunoAlmeida87/PanelAI/firmware/manifest.json">
+            <button slot="activate" class="btn" type="button">Instalar o PanelAI na tela</button>
+            <span slot="unsupported" class="notice">Use o Chrome ou o Edge num computador.</span>
+            <span slot="not-allowed" class="notice">Abra esta página pelo endereço https:// do site.</span>
+          </esp-web-install-button>
+        </div>
+        <p class="muted">
+          O aparelho não aparece na lista? Com o cabo ligado, segure o botãozinho <strong>BOOT</strong> da placa XIAO (ao lado do USB), aperte e solte o
+          <strong>RESET</strong>, solte o BOOT e tente de novo.
+        </p>
+      </section>
+
+      <section class="card">
+        <h2>2. Wi-Fi</h2>
+        <p style="margin: 0">
+          Ao terminar, na mesma janela, escolha a rede Wi-Fi da casa e digite a senha. Se a janela fechar antes disso, a tela mostra como fazer pelo
+          celular: conectar na rede <code>PanelAI-Tela</code> (senha <code>panelai123</code>) e escolher a rede da casa.
+        </p>
+      </section>
+
+      <section class="card">
+        <h2>3. Endereço da imagem</h2>
+        <ol>
+          <li>Clique em <strong>"Visit device" / "Visitar o aparelho"</strong> (ou abra o endereço <code>http://…</code> que aparece na tela).</li>
+          <li>No campo <strong>Endereço da imagem</strong>, cole o endereço de Configurações → Tela e-ink e confirme.</li>
+          <li>Em poucos segundos a tela mostra o PanelAI. Pode tirar o cabo: daqui em diante ela segue os horários de Configurações → Tela e-ink.</li>
+        </ol>
+      </section>
+
+      <section class="card">
+        <h2>Depois</h2>
+        <ul style="margin: 0; padding-left: 22px">
+          <li><strong>Apertar o botão</strong> do aparelho (o mesmo que acordava o TRMNL): atualiza a tela na hora.</li>
+          <li><strong>Segurar o botão por 5 segundos</strong>: modo de configuração (trocar o endereço ou o Wi-Fi). A tela mostra as instruções.</li>
+          <li>Para voltar ao programa do TRMNL: <a href="https://trmnl.com/flash" rel="noopener">trmnl.com/flash</a>.</li>
+        </ul>
+      </section>
+    </main>
+    <script>
+      if (!('serial' in navigator)) document.getElementById('sem-suporte').hidden = false;
+    </script>
+  </body>
+</html>

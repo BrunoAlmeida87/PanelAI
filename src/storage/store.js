@@ -43,6 +43,7 @@ let state = {
     error: null,
     waiting: false, // sem internet e sem cópia da casa neste aparelho: aguardando o servidor
     serverSynced: false, // dados da casa confirmados pelo servidor nesta abertura
+    readOnly: false, // conta de tela: só lê os dados da casa (não grava nada)
   },
 };
 

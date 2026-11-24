@@ -20,7 +20,7 @@ Funciona no computador e no celular (layouts diferentes para cada um), pode ser 
 | **Lista da semana** | Gerada do cardápio: ingredientes somados, convertidos e comparados com o estoque. Agrupada por dia de mercado e categoria. Marcação com um toque, itens avulsos, ajuste manual de quantidade, "já tenho em casa", rastreio de quais receitas geraram cada item, registro da compra no estoque, WhatsApp e impressão. |
 | **Mercado do mês** | **Estoque** (quantidade, mínimo, desejado, última atualização), **Contagem** (inventário da despensa com rascunho salvo) e **No mercado** (compras recorrentes com reposição calculada e finalização única). |
 | **Tarefas** | Tarefas da casa por dia da semana: marcar como feita, registrar pendência com recado, adiar para outra data (a nova data mostra de onde veio e a antiga mostra para onde foi), recados e histórico completo de quem fez cada alteração. Toda tarefa fica salva para usar de novo; tarefas fixas se repetem sozinhas (semanal, quinzenal ou mensal). Filtros por situação e pessoa, cópia da semana anterior e envio pelo WhatsApp. |
-| **Display e-ink** | Editor visual do que aparece na tela e-ink: modelo e posição da tela, cores, grade, cards arrastáveis e redimensionáveis (data, cardápio do dia/semana, tarefas, pendências, lista de compras, despensa, marmitas, preparos, resumo, recado), tamanho do texto, borda e destaque por card, layouts sugeridos e vários layouts salvos. A tela pronta fica em `#/display/tela`; para aparelhos que só mostram imagens (Kindle, Inkplate, TRMNL…), `npm run display:png` gera e serve a tela como PNG na rede de casa ([como usar](#display-e-ink-como-imagem)). |
+| **Display e-ink** | Editor visual do que aparece na tela e-ink: modelo e posição da tela, cores, grade, cards arrastáveis e redimensionáveis (data, cardápio do dia/semana, tarefas, pendências, lista de compras, despensa, marmitas, preparos, resumo, recado), tamanho do texto, borda e destaque por card, layouts sugeridos e vários layouts salvos. A tela pronta fica em `#/display/tela`. A tela física da casa (**kit TRMNL 7,5" DIY da Seeed, com o programa do PanelAI**, sem o serviço pago do TRMNL) se atualiza sozinha pela internet nos horários de Configurações → Tela e-ink, sem computador ligado: o GitHub gera a imagem a cada 30 minutos com uma conta de tela só de leitura e publica num endereço secreto; o programa do aparelho é instalado pelo navegador ([como funciona e como configurar](docs/DISPLAY.md)). |
 | **Receitas** | Pratos e lanches com ingredientes estruturados, porções, tempo, dificuldade, proteína, composição, modo de preparo, marmita, congelamento, preparo antecipado e imagem opcional. Busca, filtros, favoritas, duplicar, excluir e **"Com o que tenho"** (sugestões pelo estoque). |
 | **Configurações e histórico** | Pessoas na casa, dias de mercado, exportar/importar JSON, restaurar demonstração, compras concluídas, movimentações de estoque e semanas anteriores. |
 
@@ -71,7 +71,7 @@ npm run build      # gera dist/
 npm run preview    # serve o build em http://localhost:4173/PanelAI/
 ```
 
-Testes da sincronização na nuvem, das regras do Firestore e do login no navegador, nos emuladores do Firebase (precisa de Java 11+ e Playwright; nada toca o projeto real):
+Testes da sincronização na nuvem, das regras do Firestore (inclusive a conta de tela, só leitura), do login no navegador e da publicação da imagem do display, nos emuladores do Firebase (precisa de Java 11+ e Playwright; nada toca o projeto real):
 
 ```bash
 npm run test:cloud
@@ -91,7 +91,9 @@ Cobrem os fluxos em desktop (1440 px) e celular (Pixel 7): criar receita, seleci
 
 ### Display e-ink como imagem
 
-Para telas que não rodam o PanelAI, um computador da casa que fica ligado (ex.: Raspberry Pi) gera a imagem da tela e a serve na rede local. Precisa de Node.js 20+ e Playwright (`npm i -g playwright && npx playwright install chromium`).
+**Tela da casa (kit TRMNL 7,5" DIY):** a imagem é gerada pelo GitHub e baixada pela internet; nada fica ligado em casa. Passo a passo completo em [docs/DISPLAY.md](docs/DISPLAY.md): conta de tela (só leitura), segredos do GitHub, horários e instalação do programa no aparelho pelo navegador (`instalar-tela.html`, firmware ESPHome em `esphome/panelai-tela.yaml`).
+
+**Outras telas na rede de casa** (Kindle, Inkplate, TRMNL…): um computador da casa que fica ligado (ex.: Raspberry Pi) gera a imagem da tela e a serve na rede local. Precisa de Node.js 20+ e Playwright (`npm i -g playwright && npx playwright install chromium`).
 
 ```bash
 npm run display:png -- --entrar                     # uma vez: abre o navegador para entrar na conta da casa
@@ -99,11 +101,16 @@ npm run display:png -- --saida tela.png             # gera uma imagem
 npm run display:png -- --servir 8080 --a-cada 15    # gera a cada 15 min em http://<ip>:8080/tela.png
 ```
 
-Opções: `--layout ID`, `--cinza`, `--pb` (preto e branco puro), `--girar 90|180|270`, `--site URL`. Em `http://<ip>:8080/` há uma página só com a imagem, que se atualiza sozinha (para o navegador de e-readers). A página fica aberta entre uma imagem e outra, então cada atualização só lê o que mudou na nuvem.
+Opções: `--layout ID`, `--cinza`, `--pb` (preto e branco puro, 1 bit), `--limiar N` (claridade do preto e branco), `--girar 90|180|270`, `--site URL`. Em `http://<ip>:8080/` há uma página só com a imagem, que se atualiza sozinha (para o navegador de e-readers). A página fica aberta entre uma imagem e outra, então cada atualização só lê o que mudou na nuvem.
 
 ## Publicação (GitHub Pages)
 
 O workflow `.github/workflows/deploy.yml` roda em todo push: verifica o código (ESLint), roda os testes de unidade, os de ponta a ponta (Playwright) e os da nuvem (emuladores) e gera o build. Em pushes na branch `main` ele publica no GitHub Pages, só se tudo passar.
+
+Outros workflows:
+
+- `.github/workflows/display.yml` (**Imagem do display**): a cada 30 minutos e logo depois de cada publicação, gera a imagem da tela e-ink e publica o mesmo site com ela no endereço secreto ([docs/DISPLAY.md](docs/DISPLAY.md)).
+- `.github/workflows/esphome.yml` (**Firmware da tela**): quando `esphome/` muda, testa as regras do aparelho, valida e compila o firmware; na `main`, publica o firmware para o instalador pelo navegador (branch `firmware`).
 
 Quando sai uma versão nova, o app mostra **"Nova versão do PanelAI disponível — Atualizar"** (ou atualiza sozinho na próxima abertura). A tela do display se atualiza sem precisar tocar.
 
@@ -117,7 +124,7 @@ O caminho-base `/PanelAI/` está em `vite.config.js` (pode ser trocado pela vari
 PanelAI/
 ├── index.html
 ├── vite.config.js            # base /PanelAI/, PWA (service worker)
-├── public/                   # logo.svg, logo-horizontal.svg, favicon.svg, ícones, manifest
+├── public/                   # logo.svg, logo-horizontal.svg, favicon.svg, ícones, manifest, instalar-tela.html (instalador da tela e-ink)
 ├── src/
 │   ├── main.jsx, App.jsx     # entrada, cabeçalho, navegação, atalhos
 │   ├── components/           # modal/bottom sheet, toasts, confirmação, stepper, seletor de semana
@@ -126,7 +133,7 @@ PanelAI/
 │   ├── models/               # constantes, unidades e conversões, validação de receitas
 │   ├── storage/              # IndexedDB, estado global, ações
 │   ├── cloud/                # Firebase: configuração, login, casa, sincronização e formato na nuvem (layout.js)
-│   ├── display/              # display e-ink: modelos, cards, layouts sugeridos e renderização
+│   ├── display/              # display e-ink: modelos, cards, layouts, renderização e agenda da tela (schedule.js)
 │   ├── data/                 # catálogo de ingredientes, receitas e dados de demonstração
 │   ├── utils/                # datas, roteador, hooks
 │   └── styles/               # tokens, componentes, layout e telas
@@ -135,8 +142,11 @@ PanelAI/
 ├── tests/cloud/              # sincronização e regras nos emuladores do Firebase
 ├── firestore.rules           # regras de segurança do Firestore
 ├── firebase.json             # emuladores locais (testes)
-├── scripts/                  # generate-icons.mjs, display-png.mjs (display e-ink como imagem)
-└── docs/referencias-visuais/ # capturas usadas como referência (não publicadas)
+├── scripts/                  # generate-icons.mjs, display-png.mjs (imagem do display), lib/png.mjs (PNG 1 bit)
+├── esphome/                  # programa da tela e-ink (ESPHome), regras em C++ (panelai_tela.h) e testes
+├── .github/workflows/        # deploy.yml (testes e site), display.yml (imagem da tela), esphome.yml (firmware)
+├── CLAUDE.md                 # contexto do projeto para sessões futuras com o Claude
+└── docs/                     # FIREBASE.md, DISPLAY.md e referências visuais (não publicadas)
 ```
 
 ## Identidade visual
@@ -151,3 +161,4 @@ Panela minimalista verde-sálvia (`#789582`) sobre fundo verde muito claro (`#E7
 - Sugestões usam regras locais (sem IA externa).
 - Conversões entre massa, volume e unidades dependem dos dados do ingrediente; sem eles, as quantidades aparecem separadas na lista.
 - Imagens de receitas são reduzidas e guardadas localmente; muitas imagens aumentam o tamanho do backup.
+- A tela e-ink mostra a imagem gerada até ~30 minutos antes do horário de atualização; quem tiver o endereço secreto vê a imagem (não o sistema). Detalhes em [docs/DISPLAY.md](docs/DISPLAY.md).

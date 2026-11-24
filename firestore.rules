@@ -12,7 +12,10 @@ rules_version = '2';
 //  - Na primeira configuração (criação liberada), cada conta cria no máximo uma
 //    casa (o id da casa é o id da conta).
 //  - Todas as pessoas da casa leem e alteram cardápio, receitas, despensa etc.
-//  - Ninguém de fora da lista vê nada.
+//  - Contas de tela (viewerEmails, ex.: a conta que gera a imagem do display
+//    no GitHub) só LEEM: não gravam nada e não mexem na casa. Só o responsável
+//    adiciona ou remove contas de tela.
+//  - Ninguém de fora das listas vê nada.
 
 service cloud.firestore {
   match /databases/{database}/documents {
@@ -32,15 +35,24 @@ service cloud.firestore {
         && myEmail() in get(/databases/$(database)/documents/households/$(casa)).data.memberEmails;
     }
 
+    // Pessoa da casa ou conta de tela (só leitura).
+    function canRead(casa) {
+      let d = get(/databases/$(database)/documents/households/$(casa)).data;
+      return signedIn()
+        && (myEmail() in d.memberEmails || myEmail() in d.get('viewerEmails', []));
+    }
+
     function validCollection(nome) {
       return nome.matches('^[A-Za-z]{1,40}$');
     }
 
     function validHousehold(d) {
-      return d.keys().hasOnly(['name', 'ownerEmail', 'memberEmails', 'createdAt'])
+      return d.keys().hasOnly(['name', 'ownerEmail', 'memberEmails', 'viewerEmails', 'createdAt'])
         && d.name is string && d.name.size() <= 60
         && d.memberEmails is list && d.memberEmails.size() <= 10
-        && d.ownerEmail in d.memberEmails;
+        && d.ownerEmail in d.memberEmails
+        && d.get('viewerEmails', []) is list && d.get('viewerEmails', []).size() <= 3
+        && !(d.ownerEmail in d.get('viewerEmails', []));
     }
 
     function canCreateHousehold(casa) {
@@ -52,14 +64,15 @@ service cloud.firestore {
     }
 
     match /households/{casa} {
-      allow read: if signedIn() && myEmail() in resource.data.memberEmails;
+      allow read: if signedIn()
+        && (myEmail() in resource.data.memberEmails || myEmail() in resource.data.get('viewerEmails', []));
 
       // Criar casas novas está BLOQUEADO (a casa já existe; ninguém de fora cria
       // nada no banco). Na primeira configuração de um projeto novo, troque
       // "if false" por "if canCreateHousehold(casa)" e publique; depois volte para "if false".
       allow create: if false;
 
-      // Responsável: renomeia, adiciona e remove pessoas.
+      // Responsável: renomeia, adiciona e remove pessoas e contas de tela.
       allow update: if signedIn()
         && resource.data.ownerEmail == myEmail()
         && request.resource.data.ownerEmail == resource.data.ownerEmail
@@ -67,6 +80,7 @@ service cloud.firestore {
         && validHousehold(request.resource.data);
 
       // Outra pessoa da casa: só pode tirar o próprio e-mail da lista (sair).
+      // Contas de tela não alteram a casa (quem tira é o responsável).
       allow update: if signedIn()
         && resource.data.ownerEmail != myEmail()
         && myEmail() in resource.data.memberEmails
@@ -79,9 +93,10 @@ service cloud.firestore {
       // Dados do app: um documento por registro, com o JSON em "v".
       // Qualquer coleção com nome simples (cardápio, receitas, despensa,
       // tarefas, layouts do display, marcações, arquivo mensal, imagens e as
-      // que vierem em versões futuras).
+      // que vierem em versões futuras). Contas de tela só leem.
       match /{colecao}/{id} {
-        allow read, delete: if isMember(casa) && validCollection(colecao);
+        allow read: if canRead(casa) && validCollection(colecao);
+        allow delete: if isMember(casa) && validCollection(colecao);
 
         allow create, update: if isMember(casa)
           && validCollection(colecao)
