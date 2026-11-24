@@ -1,6 +1,6 @@
 name: Imagem do display
 
-# Gera a imagem da tela e-ink (reTerminal E1001) e publica junto com o site, no
+# Gera a imagem da tela e-ink (kit TRMNL 7,5" DIY) e publica junto com o site, no
 # endereço secreto de Configurações → Tela e-ink: <site>/tela/<código>/tela.png
 # e config.json. O aparelho baixa esses arquivos pela internet nos horários
 # escolhidos. Como tudo funciona e o que configurar: docs/DISPLAY.md.

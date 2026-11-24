@@ -1,9 +1,9 @@
 // Gera a imagem (PNG) da tela do display e-ink a partir de #/display/tela.
-// Aparelhos e-ink como o reTerminal E1001 não rodam o PanelAI: eles só baixam
+// Aparelhos e-ink (como o kit TRMNL 7,5" DIY da casa) não rodam o PanelAI: eles só baixam
 // a imagem pronta. Este script abre a tela num navegador sem janela, já logado
 // na casa, e tira a "foto".
 //
-// ── 1. Publicação pelo GitHub (como o PanelAI atende o reTerminal E1001) ──
+// ── 1. Publicação pelo GitHub (como o PanelAI atende a tela e-ink da casa) ──
 //
 //   node scripts/display-png.mjs --publicar dist
 //

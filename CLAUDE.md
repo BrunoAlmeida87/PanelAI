@@ -48,7 +48,9 @@ Publicado em https://brunoalmeida87.github.io/PanelAI/ (GitHub Pages), com dados
 - `firestore.rules` — segurança. **Mudou? O dono precisa publicar no console do Firebase**
   (avise e documente em `docs/FIREBASE.md`, seção "Ao atualizar o PanelAI").
 - `scripts/display-png.mjs` + `scripts/lib/png.mjs` — gera a imagem do display (PNG 1 bit sem deps).
-- `esphome/panelai-tela.yaml` — firmware do reTerminal E1001.
+- `esphome/panelai-tela.yaml` — programa (firmware ESPHome) da tela e-ink; regras em C++ em
+  `esphome/panelai_tela.h` (testes `esphome/testes/`); instalador pelo navegador em
+  `public/instalar-tela.html`.
 - Docs: `README.md`, `docs/FIREBASE.md` (nuvem), `docs/DISPLAY.md` (tela e-ink, passo a passo).
 
 ## Nuvem (Firebase)
@@ -64,13 +66,27 @@ Publicado em https://brunoalmeida87.github.io/PanelAI/ (GitHub Pages), com dados
 
 ## Display e-ink (decisões já tomadas — não refazer sem o dono pedir)
 
-- **Aparelho:** Seeed **reTerminal E1001** (7,5", 800 × 480, preto e branco, ESP32-S3, bateria).
+- **Aparelho (confirmado por foto em 24/11/2026):** **kit TRMNL 7,5" (OG) DIY da Seeed** — XIAO
+  ESP32-S3 Plus + "XIAO ePaper Display Board" + tela 7,5" 800 × 480 preto e branco (UC8179) +
+  bateria 2000 mAh. **Não** é o reTerminal E1001 (o dono chamava de "reTerminal"; a primeira versão
+  do firmware foi feita para o E1001 por engano e foi substituída).
+- **Programa próprio, não o do TRMNL:** o kit vem com o firmware do TRMNL, que pede licença paga
+  (BYOD, ~US$ 50) ou servidor próprio. O dono **recusou o TRMNL** ("quero o meu programa"). Usamos
+  **ESPHome** (suporte oficial da Seeed para o kit), firmware genérico **sem segredos**:
+  Wi-Fi por Improv (no instalador) ou pela rede `PanelAI-Tela` (senha `panelai123`, captive portal);
+  endereço da imagem colado na página do aparelho (entidade `text` "Endereço da imagem",
+  `restore_value`). Pinos: SPI CLK 7 / MOSI 9; tela CS 44, DC 10, RST 38, BUSY 4 (invertido),
+  `epaper_spi` modelo `waveshare-7.5in-v2`; botões D1 GPIO2, D2 GPIO3, **D4 GPIO5 (acorda, ext0)**;
+  bateria ADC GPIO1 com ADC_EN GPIO6. Botão: apertar = atualizar; segurar 5 s = modo de configuração
+  (fica acordado até 15 min com instruções na tela).
+- **Instalação:** `public/instalar-tela.html` (ESP Web Tools 10.4.0 via unpkg) lê
+  `https://raw.githubusercontent.com/BrunoAlmeida87/PanelAI/firmware/manifest.json` (raw tem CORS).
+  O branch `firmware` (um commit só) é publicado pelo `esphome.yml` a cada mudança em `esphome/` na
+  main. Voltar ao TRMNL: trmnl.com/flash.
 - **Sem computador ligado em casa.** A tela atualiza **nos horários escolhidos em Configurações →
   Tela e-ink** (um ou mais, ex.: 06:00 e 18:00) buscando a imagem **pela internet**.
-- **Não é custom firmware do zero nem o programa de fábrica (SenseCraft HMI):** SenseCraft só
-  atualiza por intervalo e não passa do login. Usamos **ESPHome** (suporte oficial da Seeed),
-  configuração em `esphome/panelai-tela.yaml` (modelo `seeed-reterminal-e1001` do `epaper_spi`,
-  `image: platform online_image`, sono profundo, botão verde GPIO3 acorda, bateria GPIO1/GPIO21).
+- **Programas de fábrica descartados:** SenseCraft HMI (Seeed) e TRMNL só atualizam por intervalo e
+  não passam do login do PanelAI; o TRMNL ainda é pago.
 - **Quem gera a imagem:** GitHub Actions (`.github/workflows/display.yml`, a cada 30 min, minutos
   17 e 47, e depois de cada deploy) roda `node scripts/display-png.mjs --publicar dist`: entra no site
   publicado com a **conta de tela** (segredos `PANELAI_TELA_EMAIL`/`PANELAI_TELA_SENHA`), abre
@@ -88,14 +104,17 @@ Publicado em https://brunoalmeida87.github.io/PanelAI/ (GitHub Pages), com dados
   `DEVICE_CONFIG_VERSION`.
 - **Aparelho:** dorme no máximo 6 h por vez (relógio do ESP32 deriva), última soneca ≤ 1 h antes do
   horário; nas acordadas intermediárias só relê o `config.json`; no horário/botão/ligado baixa a
-  imagem e redesenha; falhas tentam de novo em 5/10/20/30 min; vigia de 150 s.
+  imagem e redesenha; falhas tentam de novo em 5/10/20/30 min; vigia de 150 s. Essas regras ficam em
+  `esphome/panelai_tela.h` (C++ puro, testado com g++ no CI) — mude lá, não nos lambdas.
 - **Tarefas fixas no display:** `buildDisplayData` inclui ocorrências ainda não criadas
   (`missingRecurring`) sem gravar — a conta de tela não grava.
-- **CI do firmware:** `.github/workflows/esphome.yml` compila com ESPHome 2026.11.0 e segredos de
-  exemplo (aqui no ambiente do Claude os hosts do PlatformIO/Espressif costumam estar bloqueados;
-  `esphome config` funciona com `pip install esphome`).
+- **CI do firmware:** `.github/workflows/esphome.yml` testa as regras (g++), valida e compila com
+  ESPHome 2026.11.0; na main publica o firmware. Aqui no ambiente do Claude os hosts do
+  PlatformIO/Espressif costumam estar bloqueados: `esphome config` funciona (`pip install esphome`),
+  a compilação só no CI — **sempre confira o resultado do CI** depois de mudar o YAML (já pegou erro
+  de C++ que a validação não pega).
 - **Modo local antigo** (`npm run display:png -- --servir 8080`, Raspberry Pi na rede de casa) continua
-  existindo para outras telas, mas **não** é o caminho do reTerminal.
+  existindo para outras telas, mas **não** é o caminho da tela da casa.
 
 ## Armadilhas conhecidas
 
@@ -108,5 +127,7 @@ Publicado em https://brunoalmeida87.github.io/PanelAI/ (GitHub Pages), com dados
 - A chave da API do Firebase pode estar restrita por referenciador a `brunoalmeida87.github.io`:
   por isso o script fotografa o **site publicado**, não um servidor local.
 - Em JSX/Preact, hooks antes de qualquer `return` condicional (há um caso em `DisplayScreen`).
+- O service worker do PWA não pode tratar `/tela/…` e `/instalar-tela.html` como telas do app
+  (`navigateFallbackDenylist` no `vite.config.js`), senão o link da imagem abre o app.
 - `__APP_VERSION__` vem do `package.json` (definido no `vite.config.js`); ao lançar versão, suba o
   `version` do `package.json` (e do `package-lock.json`).

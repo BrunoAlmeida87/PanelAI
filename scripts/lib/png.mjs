@@ -1,5 +1,5 @@
-// PNG de 1 bit (preto e branco) sem dependências: o formato que o reTerminal
-// E1001 baixa (ESPHome, image: platform online_image, type: BINARY).
+// PNG de 1 bit (preto e branco) sem dependências: o formato que a tela e-ink
+// baixa (programa do PanelAI em ESPHome: image: platform online_image, type: BINARY).
 // No PNG de 1 bit em tons de cinza, o bit 1 é branco e o 0 é preto.
 
 import { deflateSync } from 'node:zlib';

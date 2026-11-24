@@ -1,4 +1,4 @@
-// Agenda da tela física (ex.: reTerminal E1001) e endereço de publicação da imagem.
+// Agenda da tela física (kit TRMNL 7,5" DIY com o programa do PanelAI) e endereço de publicação da imagem.
 //
 // Funções puras, sem navegador: usadas pelo app (Configurações → Tela e-ink) e
 // pelo script que gera a imagem no GitHub (scripts/display-png.mjs).

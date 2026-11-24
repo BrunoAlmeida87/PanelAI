@@ -1,9 +1,9 @@
-// Configurações → Tela e-ink: horários em que o aparelho (reTerminal E1001)
+// Configurações → Tela e-ink: horários em que o aparelho (kit TRMNL 7,5" DIY da Seeed, com o programa do PanelAI)
 // atualiza e o endereço secreto da imagem que o GitHub publica para ele.
 // Como tudo funciona: docs/DISPLAY.md.
 
 import { useEffect, useState } from 'preact/hooks';
-import { Clock, Copy, ExternalLink, KeyRound, MonitorSmartphone, Plus, Power, X } from 'lucide-preact';
+import { Clock, Copy, Download, ExternalLink, KeyRound, MonitorSmartphone, Plus, Power, X } from 'lucide-preact';
 import { useStore } from '../../storage/store.js';
 import { updateDisplayDevice } from '../../storage/displayActions.js';
 import { screenSize } from '../../display/model.js';
@@ -23,10 +23,12 @@ import { copyText } from '../../services/share.js';
 import { useNow } from '../../utils/hooks.js';
 import { confirmDialog, toast } from '../../components/ui.jsx';
 
-// Tela do reTerminal E1001: 7,5", 800 × 480, preto e branco.
+// Tela do kit TRMNL 7,5" DIY: 800 × 480, preto e branco.
 const DEVICE_SCREEN = { w: 800, h: 480 };
 
 const siteUrl = () => `${window.location.origin}${import.meta.env.BASE_URL}`;
+// Página que instala o programa do PanelAI no aparelho pelo cabo USB (public/instalar-tela.html).
+const installerUrl = () => `${import.meta.env.BASE_URL}instalar-tela.html`;
 
 export function DisplayDeviceSection() {
   const s = useStore();
@@ -60,8 +62,8 @@ export function DisplayDeviceSection() {
         <MonitorSmartphone size={18} /> Tela e-ink
       </h2>
       <p class="small muted" style="margin:0">
-        O aparelho (reTerminal E1001) fica desligado e acorda sozinho nos horários abaixo: baixa a imagem da tela pela internet, mostra e volta a
-        dormir. O botão verde do aparelho atualiza na hora.
+        O aparelho fica desligado e acorda sozinho nos horários abaixo: baixa a imagem da tela pela internet, mostra e volta a dormir. O botão do
+        aparelho atualiza na hora.
       </p>
 
       <div class="field">
@@ -80,7 +82,7 @@ export function DisplayDeviceSection() {
           </div>
         ) : (
           <p class="small muted" style="margin:0">
-            Nenhum horário: a tela só atualiza quando alguém aperta o botão verde.
+            Nenhum horário: a tela só atualiza quando alguém aperta o botão do aparelho.
           </p>
         )}
         <form class="toolbar" style="margin-top:6px" onSubmit={addTime}>
@@ -110,7 +112,7 @@ export function DisplayDeviceSection() {
         </span>
         <span class="hint">
           O aparelho confere os horários sempre que acorda (pelo menos a cada 6 horas), então uma mudança aqui vale a partir da próxima vez que
-          ele acordar. Para valer na hora, aperte o botão verde.
+          ele acordar. Para valer na hora, aperte o botão do aparelho.
         </span>
       </div>
 
@@ -122,7 +124,7 @@ export function DisplayDeviceSection() {
   );
 }
 
-/** Confere se o layout escolhido combina com a tela do reTerminal E1001. */
+/** Confere se o layout escolhido combina com a tela do aparelho (800 × 480, preto e branco). */
 function LayoutCheck({ layout }) {
   if (!layout) {
     return (
@@ -143,7 +145,7 @@ function LayoutCheck({ layout }) {
         <div class="notice" role="note">
           <MonitorSmartphone size={18} />
           <span>
-            O reTerminal E1001 tem tela de 800 × 480 em preto e branco.
+            A tela do aparelho é de 800 × 480, em preto e branco.
             {!sizeOk && ' Escolha o modelo 7,5" (800 × 480) no layout, senão a imagem fica cortada ou com sobra.'}
             {!colorOk && ' Use as cores "Preto e branco": cinzas e cores claras somem ou viram preto na tela.'}
           </span>
@@ -204,8 +206,8 @@ function Publish({ device, cloud }) {
         <span class="label">Endereço para o aparelho</span>
         <input class="input" readOnly value={url} onFocus={(e) => e.currentTarget.select()} spellcheck={false} />
         <span class="hint">
-          Vai no arquivo <code>secrets.yaml</code> do aparelho, na linha <code>panelai_endereco</code> (o botão abaixo copia a linha pronta). Guarde só lá:
-          é a chave para ver a imagem.
+          Cole este endereço na página do aparelho, no campo <strong>Endereço da imagem</strong> (veja <a href={installerUrl()} target="_blank" rel="noopener">Instalar o
+          programa na tela</a>). Não compartilhe: é a chave para ver a imagem.
         </span>
       </label>
       <PublishedStatus status={status} />
@@ -213,12 +215,15 @@ function Publish({ device, cloud }) {
         <button
           type="button"
           class="btn btn-secondary"
-          onClick={async () => toast((await copyText(`panelai_endereco: "${url}"`)) ? 'Linha do secrets.yaml copiada' : 'Não foi possível copiar')}
+          onClick={async () => toast((await copyText(url)) ? 'Endereço copiado' : 'Não foi possível copiar')}
         >
-          <Copy size={16} /> Copiar para o secrets.yaml
+          <Copy size={16} /> Copiar endereço
         </button>
         <a class="btn btn-ghost" href={`${url}/${IMAGE_FILE}`} target="_blank" rel="noopener noreferrer">
           <ExternalLink size={16} /> Ver imagem publicada
+        </a>
+        <a class="btn btn-ghost" href={installerUrl()} target="_blank" rel="noopener">
+          <Download size={16} /> Instalar o programa na tela
         </a>
         <button
           type="button"
@@ -233,7 +238,7 @@ function Publish({ device, cloud }) {
             });
             if (ok) {
               updateDisplayDevice({ code: newPublishCode() });
-              toast('Endereço trocado. Atualize o secrets.yaml do aparelho.');
+              toast('Endereço trocado. Cole o novo na página do aparelho (segure o botão dele por 5 s).');
             }
           }}
         >

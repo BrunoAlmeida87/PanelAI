@@ -7,7 +7,7 @@
 import { uid } from '../utils/id.js';
 
 export const DISPLAY_MODELS = [
-  { id: '7in5', label: '7,5" — 800 × 480 (reTerminal E1001, Waveshare, TRMNL)', w: 800, h: 480 },
+  { id: '7in5', label: '7,5" — 800 × 480 (kit TRMNL DIY, Waveshare, reTerminal E1001)', w: 800, h: 480 },
   { id: '7in5hd', label: '7,5" HD — 880 × 528', w: 880, h: 528 },
   { id: '6in', label: '6" — 800 × 600 (Inkplate 6, Kindle antigo)', w: 800, h: 600 },
   { id: '9in7', label: '9,7" — 1200 × 825 (Inkplate 10)', w: 1200, h: 825 },

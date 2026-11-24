@@ -110,7 +110,7 @@ export const DEFAULT_SETTINGS = {
   trackSnacks: false,
   // Layout do display e-ink em uso.
   displayLayoutId: null,
-  // Tela física (reTerminal): horários de atualização, fuso e código do
+  // Tela física (kit TRMNL 7,5" DIY): horários de atualização, fuso e código do
   // endereço da imagem. Formato e regras em src/display/schedule.js.
   displayDevice: DEFAULT_DISPLAY_DEVICE,
 };

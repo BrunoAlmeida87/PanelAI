@@ -27,6 +27,8 @@ export default defineConfig({
         // Só os subconjuntos latinos da fonte (português) entram no cache offline.
         globIgnores: ['**/inter-{cyrillic,cyrillic-ext,greek,greek-ext,vietnamese}-*.woff2'],
         navigateFallback: `${base}index.html`,
+        // Não são telas do app: imagem da tela e-ink (abre em nova aba) e instalador do aparelho.
+        navigateFallbackDenylist: [/\/tela\//, /\/instalar-tela\.html$/],
         cleanupOutdatedCaches: true,
       },
     }),

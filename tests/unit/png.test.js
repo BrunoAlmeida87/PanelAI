@@ -23,7 +23,7 @@ function chunks(png) {
   return out;
 }
 
-describe('PNG de 1 bit (imagem do reTerminal)', () => {
+describe('PNG de 1 bit (imagem da tela e-ink)', () => {
   it('CRC-32 igual ao do padrão PNG', () => {
     expect(crc32(Buffer.from('IEND'))).toBe(0xae426082);
     expect(crc32(Buffer.from('123456789'))).toBe(0xcbf43926);
@@ -55,7 +55,7 @@ describe('PNG de 1 bit (imagem do reTerminal)', () => {
     expect(() => pngSize(Buffer.from('não sou um png, sou um texto qualquer'))).toThrow();
   });
 
-  it('a tela inteira do reTerminal fica pequena (bom para a bateria)', () => {
+  it('a tela inteira (800 × 480) fica pequena (bom para a bateria)', () => {
     const w = 800;
     const h = 480;
     const rgba = Buffer.alloc(w * h * 4, 255);
