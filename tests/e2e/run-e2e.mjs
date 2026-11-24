@@ -269,6 +269,8 @@ async function flows(browser, label, opts) {
   if (mobile) {
     await step(`[${label}] 15. navegação inferior não cobre o conteúdo`, async () => {
       await page.goto(`${BASE}#/compras`);
+      // Espera a lista aparecer antes de rolar (vindo de outra tela, ela redesenha depois do goto).
+      await page.locator('#conteudo .cat-block').first().waitFor();
       await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
       await page.waitForTimeout(300);
       const r = await page.evaluate(() => {

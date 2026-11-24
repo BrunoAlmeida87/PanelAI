@@ -97,11 +97,13 @@ http_request:
 globals:
   # Próximas atualizações (segundos UTC), lidas do config.json. Guardadas para
   # o aparelho seguir a agenda mesmo se ficar um tempo sem internet.
+  # (Mesmo tipo que panelai::Agenda; escrito por extenso porque as variáveis
+  # globais são declaradas antes de panelai_tela.h ser incluído.)
   - id: proximas
-    type: panelai::Agenda
+    type: std::array<uint32_t, 24>
     restore_value: true
     # Tipo explícito: só "{}" fica ambíguo para o compilador.
-    initial_value: "panelai::Agenda{}"
+    initial_value: "std::array<uint32_t, 24>{}"
   # Horário que o aparelho estava esperando quando foi dormir (0 = nenhum).
   - id: alvo
     type: uint32_t
@@ -293,11 +295,12 @@ display:
           it.print(32, y, id(fonte_texto), preto, t.c_str());
           y += 36;
         };
-        const std::string ip = id(ip).state;
-        const bool com_wifi = !ip.empty() && ip != "0.0.0.0";
+        // (Nome diferente do sensor "ip": id(ip) dentro de "const auto ip = …" pegaria a própria variável.)
+        const std::string endereco_ip = id(ip).state;
+        const bool com_wifi = !endereco_ip.empty() && endereco_ip != "0.0.0.0";
         if (com_wifi) {
           linha("1. No celular ou no computador (mesma rede Wi-Fi), abra:");
-          linha("      http://" + ip);
+          linha("      http://" + endereco_ip);
         } else {
           linha("1. No celular, conecte-se à rede Wi-Fi \"${rede_config}\"");
           linha("    (senha: ${senha_config}) e escolha a rede da casa.");

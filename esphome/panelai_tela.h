@@ -26,6 +26,7 @@ constexpr uint32_t SEM_HORA = 1800;
 constexpr uint32_t SONECA_MIN = 60;
 
 // Próximas atualizações (segundos UTC), em ordem; 0 = vazio. Vem do config.json.
+// O YAML declara a variável global com o mesmo tipo escrito por extenso.
 using Agenda = std::array<uint32_t, 24>;
 
 inline bool hora_valida(uint32_t agora) { return agora > HORA_VALIDA; }
