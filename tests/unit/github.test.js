@@ -79,6 +79,13 @@ describe('geração automática quando algo muda', () => {
     expect(nextAutoRequest({ lastChange: T, lastRequest: T + 5 })).toBeNull();
   });
 
+  it('tentativa que falhou (sem internet) continua pendente e tenta de novo depois do intervalo', () => {
+    const falhou = T + AUTO_DEBOUNCE_MS;
+    expect(nextAutoRequest({ lastChange: T, lastRequest: 0, lastAttempt: falhou })).toBe(falhou + AUTO_MIN_GAP_MS);
+    // Depois de um pedido aceito, a mesma mudança não pede de novo.
+    expect(nextAutoRequest({ lastChange: T, lastRequest: falhou + AUTO_MIN_GAP_MS, lastAttempt: falhou + AUTO_MIN_GAP_MS })).toBeNull();
+  });
+
   it('só mudanças que aparecem na tela pedem imagem nova', () => {
     expect(touchesDisplay([{ store: 'weeks', type: 'put', value: { id: 'x' } }])).toBe(true);
     expect(touchesDisplay([{ store: 'meta', type: 'put', value: { key: 'settings', value: {} } }])).toBe(true);

@@ -43,11 +43,11 @@ export function ScreenAutoUpdate() {
     if (!active) return undefined;
     let timer = null;
     let lastChange = readChange();
-    let lastAttempt = 0; // tentativas que falharam também esperam o intervalo mínimo
+    let lastAttempt = 0; // tentativas (mesmo as que falharam) esperam o intervalo mínimo
     let stopped = false; // chave recusada: para até o app ser aberto de novo
 
-    const lastRequest = () => Math.max(lastScreenRequest(), lastAttempt);
-    const due = () => nextAutoRequest({ lastChange, lastRequest: lastRequest() });
+    // Pendente até o GitHub aceitar um pedido; uma falha (sem internet) só adia.
+    const due = () => nextAutoRequest({ lastChange, lastRequest: lastScreenRequest(), lastAttempt });
 
     const fire = async (keepalive = false) => {
       clearTimeout(timer);
@@ -86,7 +86,7 @@ export function ScreenAutoUpdate() {
     // mesmo com a página fechada), desde que respeite o intervalo mínimo.
     const onHide = () => {
       if (document.visibilityState !== 'hidden' || stopped || due() == null) return;
-      if (lastRequest() + AUTO_MIN_GAP_MS <= Date.now()) fire(true);
+      if (Math.max(lastScreenRequest(), lastAttempt) + AUTO_MIN_GAP_MS <= Date.now()) fire(true);
     };
     document.addEventListener('visibilitychange', onHide);
     schedule(); // mudança que ficou pendente da última vez que o app foi fechado

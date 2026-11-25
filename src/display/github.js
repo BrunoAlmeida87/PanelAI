@@ -88,13 +88,14 @@ export async function requestImageGeneration({ token, repo = DEFAULT_REPO, fetch
 }
 
 /**
- * Geração automática: quando pedir, dado o momento da última mudança e do
- * último pedido feito por este aparelho. Devolve o instante (ms) ou null se não
- * há mudança pendente.
+ * Geração automática: quando pedir, dado o momento da última mudança, do último
+ * pedido aceito pelo GitHub e da última tentativa (que pode ter falhado) deste
+ * aparelho. Devolve o instante (ms) ou null se não há mudança pendente.
+ * Uma tentativa que falhou não "consome" a mudança: só adia a próxima.
  */
-export function nextAutoRequest({ lastChange, lastRequest, debounceMs = AUTO_DEBOUNCE_MS, minGapMs = AUTO_MIN_GAP_MS }) {
+export function nextAutoRequest({ lastChange, lastRequest, lastAttempt = 0, debounceMs = AUTO_DEBOUNCE_MS, minGapMs = AUTO_MIN_GAP_MS }) {
   if (!lastChange || (lastRequest && lastRequest >= lastChange)) return null;
-  return Math.max(lastChange + debounceMs, (lastRequest || 0) + minGapMs);
+  return Math.max(lastChange + debounceMs, (lastRequest || 0) + minGapMs, (lastAttempt || 0) + minGapMs);
 }
 
 /** Coleções cujas mudanças alteram o que aparece na tela (as outras não pedem imagem nova). */

@@ -93,22 +93,23 @@ export function setGithubToken(token) {
 
 /**
  * Espera as gravações deste aparelho chegarem ao servidor da nuvem (o app
- * grava primeiro no aparelho e envia em seguida). Desiste depois de `timeoutMs`.
+ * grava primeiro no aparelho e envia em seguida). Resolve com true quando
+ * chegaram, ou false se não chegaram em `timeoutMs`.
  */
-async function cloudSaved(timeoutMs = 15_000) {
+async function cloudSaved(timeoutMs = 20_000) {
   await flush();
-  if (getState().mode !== 'cloud' || !getState().cloud?.pending) return;
-  await new Promise((resolve) => {
+  if (getState().mode !== 'cloud' || !getState().cloud?.pending) return true;
+  return new Promise((resolve) => {
     let off = () => {};
     const timer = setTimeout(() => {
       off();
-      resolve();
+      resolve(false);
     }, timeoutMs);
     off = subscribe((st) => {
       if (st.cloud?.pending) return;
       clearTimeout(timer);
       off();
-      resolve();
+      resolve(true);
     });
   });
 }
@@ -127,8 +128,11 @@ export async function requestScreenUpdate({ auto = false, keepalive = false } = 
   const now = Date.now();
   if (!auto) {
     updateDisplayDevice({ requestedAt: now });
-    // O pedido precisa estar no servidor antes de o GitHub ler as configurações.
-    await cloudSaved();
+    // O pedido precisa estar no servidor antes de o GitHub ler as configurações;
+    // sem isso, a imagem sairia sem o pedido e a tela não redesenharia.
+    if (!(await cloudSaved())) {
+      return { ok: false, status: 0, message: 'O pedido ainda não chegou à nuvem (internet lenta?). Tente de novo em instantes.' };
+    }
   }
   const result = await requestImageGeneration({ token: getState().githubToken, repo: siteRepo(), keepalive });
   if (result.ok) rememberScreenRequest(Date.now());
