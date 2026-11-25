@@ -6,6 +6,9 @@
 //   a necessidade deles é somada na reposição mensal (ver pantry.monthlyList).
 // - Ajustes manuais (overrides) e marcações são guardados por chave estável
 //   `ingredienteId|unidade`, preservados enquanto o item continuar existindo.
+// - Modo manual (`settings.shoppingFromMenu === false`): o cardápio NÃO gera itens;
+//   a lista tem só o que a pessoa escreveu (avulsos), cada um no dia escolhido
+//   (qualquer dia da semana, não só os dias de mercado).
 
 import { CATEGORY_IDS } from '../models/constants.js';
 import { convert, roundForPurchase } from '../models/units.js';
@@ -35,9 +38,20 @@ export function assignMarketDate(firstDate, marketDates) {
   return chosen ?? marketDates[0];
 }
 
+/** Lista de compras puxa os ingredientes do cardápio? (padrão: sim) */
+export const shoppingFromMenu = (settings) => settings?.shoppingFromMenu !== false;
+
+/** Dias em que se pode comprar: dias de mercado (automático) ou todos os dias da semana (manual). */
+export function shoppingDates(weekId, settings) {
+  if (shoppingFromMenu(settings)) return marketDatesForWeek(weekId, settings?.marketDays ?? []);
+  return Array.from({ length: 7 }, (_, i) => addDays(weekId, i));
+}
+
 export function buildShoppingList({ weekId, week, demand, pantry, ingredientsById, settings }) {
   const state = week?.shopping ?? { checked: {}, overrides: {}, extras: [] };
-  const marketDates = marketDatesForWeek(weekId, settings?.marketDays ?? []);
+  const fromMenu = shoppingFromMenu(settings);
+  const marketDates = shoppingDates(weekId, settings);
+  if (!fromMenu) demand = new Map();
   const items = [];
   const monthly = [];
   const toCheck = [];
@@ -129,6 +143,7 @@ export function buildShoppingList({ weekId, week, demand, pantry, ingredientsByI
     pendingToCheck.filter((t) => t.checked).length;
 
   return {
+    fromMenu,
     marketDates,
     items,
     buyItems,
@@ -187,4 +202,60 @@ export function purchasableLines(list) {
     }
   }
   return lines;
+}
+
+// ---------- Lista escrita à mão ----------
+
+const UNIT_WORDS = [
+  [/^(kg|kgs|quilos?|kilos?)$/, 'kg'],
+  [/^(g|gr|grs|gramas?)$/, 'g'],
+  [/^(l|lt|lts|litros?)$/, 'l'],
+  [/^(ml|mls)$/, 'ml'],
+  [/^(un|und|unid|unidades?)$/, 'un'],
+  [/^(pct|pcts|pacotes?)$/, 'pacote'],
+  [/^(cx|cxs|caixas?)$/, 'caixa'],
+  [/^(latas?)$/, 'lata'],
+  [/^(macos?|maços?)$/, 'maco'],
+  [/^(rolos?)$/, 'rolo'],
+  [/^(duzias?|dúzias?)$/, 'duzia'],
+];
+
+/**
+ * Uma linha escrita ("2 kg de batata", "- Pão", "6 ovos") → { name, qty, unit }.
+ * Sem número no começo, a quantidade fica vazia (só o nome).
+ */
+export function parseShoppingLine(line) {
+  const clean = String(line ?? '')
+    .replace(/^\s*(?:[-*•·–]|\[ ?\]|☐|\d+[.)](?=\s))\s*/, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+  if (!clean) return null;
+  const m = clean.match(/^(\d+(?:[.,]\d+)?|\d+\/\d+)\s*([a-zà-ú]+\.?)?\s+(.+)$/i);
+  if (!m) return { name: clean, qty: null, unit: 'un' };
+  const [, num, word, rest] = m;
+  const qty = num.includes('/') ? Number(num.split('/')[0]) / Number(num.split('/')[1]) : Number(num.replace(',', '.'));
+  const w = (word ?? '').toLowerCase().replace(/\.$/, '');
+  let unit = 'un';
+  let name = rest;
+  const hit = w && UNIT_WORDS.find(([re]) => re.test(w));
+  if (hit) {
+    if (hit[1] === 'duzia') {
+      return { name: rest.replace(/^de\s+/i, ''), qty: qty * 12, unit: 'un' };
+    }
+    unit = hit[1];
+    name = rest.replace(/^de\s+/i, '');
+  } else if (word) {
+    name = `${word} ${rest}`;
+  }
+  if (!(qty > 0)) return { name: clean, qty: null, unit: 'un' };
+  return { name: name.trim(), qty, unit };
+}
+
+/** Texto com um item por linha → itens (linhas vazias ignoradas). */
+export function parseShoppingText(text) {
+  return String(text ?? '')
+    .split(/\r?\n|;/)
+    .map(parseShoppingLine)
+    .filter(Boolean)
+    .map((i) => ({ ...i, name: i.name.slice(0, 80) }));
 }

@@ -104,6 +104,8 @@ Publicado em https://brunoalmeida87.github.io/PanelAI/ (GitHub Pages), com dados
 - **Momento da imagem:** perto de um horário (≤ 60 min), a imagem é gerada "para" ele
   (`renderMoment`), então meia-noite mostra o dia novo. O fuso da casa vem de `displayDevice.timeZone`
   (o script ajusta o fuso do navegador via CDP).
+  O "Atualizado às" do card de data usa a hora **real** da geração (`data.updatedAt`, terceiro
+  argumento de `buildDisplayData`), não o momento — antes mostrava sempre o horário agendado (ex.: 00:00).
 - **Contrato `config.json` v1** (`buildDeviceConfig`): `versao, gerado, referencia, horarios, fuso,
   proximas[] (epoch UTC, até 24), largura, altura`. Mudar campos exige mudar o firmware e subir
   `DEVICE_CONFIG_VERSION`.
@@ -111,6 +113,13 @@ Publicado em https://brunoalmeida87.github.io/PanelAI/ (GitHub Pages), com dados
   horário; nas acordadas intermediárias só relê o `config.json`; no horário/botão/ligado baixa a
   imagem e redesenha; falhas tentam de novo em 5/10/20/30 min; vigia de 150 s. Essas regras ficam em
   `esphome/panelai_tela.h` (C++ puro, testado com g++ no CI) — mude lá, não nos lambdas.
+- **Card de clima** (`weather`): previsão do **Open-Meteo** (grátis, sem chave, CORS liberado), pedida
+  pelo navegador com o fuso do navegador. Regras puras em `src/display/weather.js` (testes
+  `tests/unit/weather.test.js`); busca e cache (memória + localStorage até 12 h) em
+  `src/display/useWeather.js`. A cidade fica nas opções do card (`options.place = { name, label, lat, lon }`,
+  campo `type: 'place'` no editor). `#/display/tela?publicar=1` só expõe `#panelai-publicacao` depois que
+  a previsão chegou (ou após 20 s), para a foto não sair sem o clima. Aqui no ambiente do Claude os hosts
+  do Open-Meteo costumam estar bloqueados: teste com `page.route` (Playwright) simulando a resposta.
 - **Tarefas fixas no display:** `buildDisplayData` inclui ocorrências ainda não criadas
   (`missingRecurring`) sem gravar — a conta de tela não grava.
 - **CI do firmware:** `.github/workflows/esphome.yml` testa as regras (g++), valida e compila com
@@ -120,6 +129,15 @@ Publicado em https://brunoalmeida87.github.io/PanelAI/ (GitHub Pages), com dados
   de C++ que a validação não pega).
 - **Modo local antigo** (`npm run display:png -- --servir 8080`, Raspberry Pi na rede de casa) continua
   existindo para outras telas, mas **não** é o caminho da tela da casa.
+
+## Compras e cardápio escritos à mão
+
+- `settings.shoppingFromMenu` (padrão `true`): `false` = lista manual — o cardápio não gera itens; só os
+  avulsos (`week.shopping.extras`), cada um com `marketDate` em qualquer dia da semana
+  (`shoppingDates`). A tela de compras mostra "Escrever compras" (um item por linha,
+  `parseShoppingText` entende "2 kg de batata"). O card do display tem `options.day` = `week|today|tomorrow`.
+- Refeição escrita à mão = entrada `kind: 'text'` (já existia). No seletor, aba **Escrever** (lembra a
+  última aba usada) e, na busca de receitas, "Usar “…” escrito à mão".
 
 ## Montessori (decisões já tomadas)
 

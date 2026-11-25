@@ -1,7 +1,10 @@
 // Desenha um layout do display no tamanho exato da tela (pixels reais).
 // Usado no editor (com escala), nas miniaturas e na tela cheia (#/display/tela).
 
+import { Sun, CloudSun, Cloud, CloudFog, CloudDrizzle, CloudRain, CloudRainWind, CloudSnow, CloudLightning, CloudHail, Moon, CloudMoon, Umbrella, Droplets, Wind, Sunrise, Sunset } from 'lucide-preact';
 import { cardType, colorMode, screenSize } from './model.js';
+import { forecastView, formatMm } from './weather.js';
+import { useForecast } from './useWeather.js';
 import { formatDayMonth, weekdayName, weekdayShort, addDays, weekStartOf, formatWeekRange, parseISODate } from '../utils/dates.js';
 import { formatAge, montessoriCategory } from '../models/montessori.js';
 
@@ -18,6 +21,10 @@ export function cardTitle(card) {
       return `Tarefas de ${day}`;
     case 'prep':
       return `Preparos de ${day}`;
+    case 'weather':
+      return card.options?.place?.name ? `Clima · ${card.options.place.name}` : 'Clima';
+    case 'shopping':
+      return card.options?.day === 'today' || card.options?.day === 'tomorrow' ? `Compras de ${day}` : 'Lista de compras';
     default:
       return cardType(card.type)?.label ?? card.type;
   }
@@ -95,6 +102,8 @@ function CardBody({ card, data }) {
       return <Prep o={o} data={data} />;
     case 'summary':
       return <Summary data={data} />;
+    case 'weather':
+      return <Weather o={o} data={data} />;
     case 'montessori':
       return <Montessori o={o} data={data} />;
     case 'note':
@@ -108,7 +117,9 @@ function Clock({ o, data }) {
   const d = parseISODate(data.today);
   const date =
     o.style === 'short' ? `${weekdayShort(data.today)} ${formatDayMonth(data.today)}` : `${weekdayName(data.today)}, ${d.getDate()} de ${MONTHS[d.getMonth()]}`;
-  const time = `${pad(data.now.getHours())}:${pad(data.now.getMinutes())}`;
+  // Hora real em que a imagem foi gerada (não o horário agendado para o qual ela foi feita).
+  const at = data.updatedAt ?? data.now;
+  const time = `${pad(at.getHours())}:${pad(at.getMinutes())}`;
   return (
     <div class="eink-clock">
       <span class="date">{date}</span>
@@ -242,11 +253,12 @@ function Pending({ o, data }) {
 }
 
 function Shopping({ o, data }) {
-  let list = data.shopping();
+  const byDay = o.day === 'today' || o.day === 'tomorrow';
+  let list = byDay ? data.shopping(data.dayOf(o.day), true) : data.shopping();
   if (!o.showChecked) list = list.filter((i) => !i.checked);
   const extra = Math.max(0, list.length - (o.max ?? 30));
   list = list.slice(0, o.max ?? 30);
-  if (!list.length) return <Empty>Nada a comprar. 🎉</Empty>;
+  if (!list.length) return <Empty>{byDay ? `Nada a comprar ${o.day === 'tomorrow' ? 'amanhã' : 'hoje'}.` : 'Nada a comprar.'}</Empty>;
   return (
     <ul class="eink-list" style={{ columnCount: o.columns ?? 2 }}>
       {list.map((i, idx) => (
@@ -337,6 +349,123 @@ function Summary({ data }) {
           <span>{l}</span>
         </div>
       ))}
+    </div>
+  );
+}
+
+// ---------- Clima ----------
+
+const WEATHER_ICONS = {
+  sun: Sun,
+  'sun-cloud': CloudSun,
+  moon: Moon,
+  'moon-cloud': CloudMoon,
+  cloud: Cloud,
+  fog: CloudFog,
+  drizzle: CloudDrizzle,
+  rain: CloudRain,
+  'rain-heavy': CloudRainWind,
+  snow: CloudSnow,
+  storm: CloudLightning,
+  hail: CloudHail,
+};
+const WIcon = ({ name, size = '1.4em' }) => {
+  const I = WEATHER_ICONS[name] ?? Cloud;
+  return <I class="w-ico" size={size} strokeWidth={2.25} aria-hidden="true" />;
+};
+const deg = (n) => (n == null ? '—' : `${n}°`);
+
+function Weather({ o, data }) {
+  const f = useForecast(o.place);
+  const view = f.status === 'ok' ? forecastView(f.value, data.now, data.today, { hours: o.hours, hourStep: o.hourStep, days: o.days }) : null;
+  if (f.status === 'none') return <Empty>Escolha a cidade nas opções do card.</Empty>;
+  if (f.status === 'loading' && !view) return <Empty>Buscando a previsão…</Empty>;
+  if (!view) return <Empty>Previsão indisponível agora.</Empty>;
+  const { current: cur, today, rain } = view;
+  const stamp = f.stale && f.at ? new Date(f.at) : null;
+  return (
+    <div class="eink-weather">
+      {o.showNow !== false && (
+        <div class="w-now">
+          <WIcon name={cur.icon} size="2.4em" />
+          <span class="w-temp">{deg(cur.temp)}</span>
+          <span class="w-now-txt">
+            <b>{cur.desc}</b>
+            <span>
+              {today ? `máx ${deg(today.max)} · mín ${deg(today.min)}` : ''}
+              {cur.feels != null && Math.abs(cur.feels - cur.temp) >= 2 ? ` · sensação ${deg(cur.feels)}` : ''}
+            </span>
+          </span>
+        </div>
+      )}
+      {o.showRain !== false && rain && (
+        <div class={`w-rain ${rain.level}`}>
+          <Umbrella class="w-ico" size="1.15em" strokeWidth={2.25} aria-hidden="true" />
+          <span>{rain.text}</span>
+        </div>
+      )}
+      {o.showDetails && (
+        <div class="w-details">
+          {cur.humidity != null && (
+            <span>
+              <Droplets class="w-ico" size="1em" aria-hidden="true" /> {cur.humidity}%
+            </span>
+          )}
+          {cur.wind != null && (
+            <span>
+              <Wind class="w-ico" size="1em" aria-hidden="true" /> {cur.wind} km/h
+            </span>
+          )}
+          {today?.uv != null && <span>UV {today.uv}</span>}
+          {today?.sunrise && (
+            <span>
+              <Sunrise class="w-ico" size="1em" aria-hidden="true" /> {today.sunrise}
+            </span>
+          )}
+          {today?.sunset && (
+            <span>
+              <Sunset class="w-ico" size="1em" aria-hidden="true" /> {today.sunset}
+            </span>
+          )}
+        </div>
+      )}
+      {view.hours.length > 0 && (
+        <div class="w-hours" style={{ gridTemplateColumns: `repeat(${view.hours.length}, minmax(0, 1fr))` }} aria-label="Chance de chuva por hora">
+          {view.hours.map((h) => (
+            <div key={h.time} class="w-hour">
+              <span class="w-h-pct">{h.prob ?? 0}%</span>
+              <span class="w-bar">
+                <i style={{ height: `${h.prob ?? 0}%` }} />
+              </span>
+              <span class="w-h-lbl">{h.label}</span>
+              <span class="w-h-temp">{deg(h.temp)}</span>
+            </div>
+          ))}
+        </div>
+      )}
+      {view.days.length > 0 && (
+        <div class={`w-days ${o.daysLayout === 'columns' ? 'cols' : 'rows'}`} style={o.daysLayout === 'columns' ? { gridTemplateColumns: `repeat(${view.days.length}, minmax(0, 1fr))` } : undefined}>
+          {view.days.map((d) => (
+            <div key={d.date} class={`w-day ${d.date === data.today ? 'today' : ''}`}>
+              <span class="w-d-name">{o.daysLayout === 'columns' ? d.short : d.label}</span>
+              <WIcon name={d.icon} size="1.3em" />
+              <span class="w-d-temp">
+                <b>{deg(d.max)}</b> / {deg(d.min)}
+              </span>
+              <span class="w-d-rain">
+                <Umbrella class="w-ico" size="0.95em" strokeWidth={2.25} aria-hidden="true" /> {d.prob ?? 0}%
+                {d.mm >= 0.5 && o.daysLayout !== 'columns' ? ` · ${formatMm(d.mm)}` : ''}
+              </span>
+              {o.daysLayout !== 'columns' && <span class="w-d-desc">{d.desc}</span>}
+            </div>
+          ))}
+        </div>
+      )}
+      {stamp && (
+        <span class="w-stale">
+          previsão de {pad(stamp.getHours())}:{pad(stamp.getMinutes())}
+        </span>
+      )}
     </div>
   );
 }

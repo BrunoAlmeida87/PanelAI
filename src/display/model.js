@@ -92,6 +92,32 @@ export const CARD_TYPES = [
     ],
   },
   {
+    id: 'weather',
+    label: 'Clima',
+    description: 'Tempo agora, chance de chuva nas próximas horas e previsão dos próximos dias.',
+    size: { w: 6, h: 4 },
+    options: [
+      { key: 'place', label: 'Cidade', type: 'place', default: null },
+      { key: 'showNow', label: 'Mostrar o tempo agora', type: 'toggle', default: true },
+      { key: 'showRain', label: 'Aviso "vai chover?"', type: 'toggle', default: true },
+      { key: 'hours', label: 'Próximas horas (chance de chuva; 0 = esconder)', type: 'number', default: 6, min: 0, max: 12 },
+      {
+        key: 'hourStep',
+        label: 'De quanto em quanto tempo',
+        type: 'select',
+        default: '1',
+        choices: [
+          { id: '1', label: 'A cada 1 hora' },
+          { id: '2', label: 'A cada 2 horas' },
+          { id: '3', label: 'A cada 3 horas' },
+        ],
+      },
+      { key: 'days', label: 'Dias de previsão (hoje + próximos; 0 = esconder)', type: 'number', default: 3, min: 0, max: 7 },
+      { key: 'daysLayout', label: 'Disposição dos dias', type: 'select', default: 'rows', choices: [{ id: 'rows', label: 'Linhas (um dia por linha)' }, { id: 'columns', label: 'Colunas (dias lado a lado)' }] },
+      { key: 'showDetails', label: 'Detalhes: umidade, vento, UV e sol', type: 'toggle', default: false },
+    ],
+  },
+  {
     id: 'tasksDay',
     label: 'Tarefas do dia',
     description: 'Tarefas da casa de hoje ou de amanhã.',
@@ -129,9 +155,10 @@ export const CARD_TYPES = [
   {
     id: 'shopping',
     label: 'Lista de compras',
-    description: 'O que falta comprar na semana.',
+    description: 'O que falta comprar: da semana, de hoje ou de amanhã.',
     size: { w: 6, h: 3 },
     options: [
+      { key: 'day', label: 'Mostrar', type: 'select', default: 'week', choices: [{ id: 'week', label: 'A semana toda' }, ...DAY_CHOICES.map((d) => ({ ...d, label: `Só ${d.label.toLowerCase()}` }))] },
       { key: 'showQty', label: 'Mostrar quantidade', type: 'toggle', default: true },
       { key: 'showChecked', label: 'Mostrar já comprados', type: 'toggle', default: false },
       { key: 'columns', label: 'Colunas de texto', type: 'number', default: 2, min: 1, max: 4 },
@@ -301,6 +328,18 @@ export const LAYOUT_PRESETS = [
     description: 'Cardápio e tarefas de hoje, lista de compras e pendências.',
     base: { cols: 12, rows: 8 },
     cards: [c('clock', 0, 0, 12, 1), c('menuDay', 0, 1, 6, 4), c('tasksDay', 6, 1, 6, 4), c('shopping', 0, 5, 6, 3), c('pending', 6, 5, 6, 3)],
+  },
+  {
+    id: 'clima',
+    name: 'Cozinha com clima',
+    description: 'Previsão do tempo, cardápio de hoje e compras do dia.',
+    base: { cols: 12, rows: 8 },
+    cards: [
+      c('clock', 0, 0, 12, 1),
+      c('weather', 0, 1, 6, 7),
+      c('menuDay', 6, 1, 6, 4),
+      c('shopping', 6, 5, 6, 3, { options: { day: 'today', columns: 1 } }),
+    ],
   },
   {
     id: 'semana',
