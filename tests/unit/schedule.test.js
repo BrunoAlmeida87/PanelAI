@@ -1,11 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import {
+  CHECK_OPTIONS,
   DEFAULT_DISPLAY_DEVICE,
   MAX_TIMES,
   PUBLISH_CODE_LENGTH,
   buildDeviceConfig,
+  checkWindows,
   describeUpdate,
   formatTimes,
+  inCheckWindow,
   isValidPublishCode,
   newPublishCode,
   nextUpdateTimes,
@@ -14,6 +17,7 @@ import {
   normalizeTimes,
   publishUrl,
   renderMoment,
+  slotImageFile,
   zonedDateISO,
   zonedParts,
   zonedTimeToMs,
@@ -38,10 +42,24 @@ describe('agenda da tela: validação', () => {
   });
 
   it('dados antigos ou inválidos viram o padrão, sem perder o que é válido', () => {
-    expect(normalizeDisplayDevice(undefined)).toEqual({ times: ['06:00'], timeZone: SP, code: null });
-    expect(normalizeDisplayDevice({ times: [], timeZone: 'Lua/Base', code: 'curto' })).toEqual({ times: [], timeZone: SP, code: null });
+    const padrao = { checkMinutes: 10, autoGenerate: true, requestedAt: 0 };
+    expect(normalizeDisplayDevice(undefined)).toEqual({ times: ['06:00'], timeZone: SP, code: null, ...padrao });
+    expect(normalizeDisplayDevice({ times: [], timeZone: 'Lua/Base', code: 'curto' })).toEqual({ times: [], timeZone: SP, code: null, ...padrao });
     const code = 'A'.repeat(PUBLISH_CODE_LENGTH);
-    expect(normalizeDisplayDevice({ times: ['7:15'], timeZone: NY, code })).toEqual({ times: ['07:15'], timeZone: NY, code });
+    expect(normalizeDisplayDevice({ times: ['7:15'], timeZone: NY, code })).toEqual({ times: ['07:15'], timeZone: NY, code, ...padrao });
+  });
+
+  it('conferência de pedidos, geração automática e último pedido', () => {
+    expect(normalizeDisplayDevice({ checkMinutes: 15, autoGenerate: false, requestedAt: 1764000000123.7 })).toMatchObject({
+      checkMinutes: 15,
+      autoGenerate: false,
+      requestedAt: 1764000000123,
+    });
+    expect(normalizeDisplayDevice({ checkMinutes: 0 }).checkMinutes).toBe(0);
+    // Valores fora das opções voltam ao padrão.
+    expect(normalizeDisplayDevice({ checkMinutes: 7, autoGenerate: 'sim', requestedAt: -5 })).toMatchObject({ checkMinutes: 10, autoGenerate: true, requestedAt: 0 });
+    expect(CHECK_OPTIONS).toContain(normalizeDisplayDevice({}).checkMinutes);
+    expect(slotImageFile(1764136800)).toBe('tela-1764136800.png');
   });
 
   it('o padrão é congelado (não muda por engano)', () => {
@@ -123,17 +141,43 @@ describe('agenda da tela: próximas atualizações', () => {
   });
 
   it('monta o config.json do aparelho (contrato com esphome/panelai-tela.yaml)', () => {
-    const cfg = buildDeviceConfig({ device, nowMs: NOW, referenceMs: NOW + 1000, width: 800, height: 480, limit: 3 });
-    expect(cfg).toEqual({
-      versao: 1,
+    const pedido = Date.UTC(2026, 10, 24, 12, 30);
+    const cfg = buildDeviceConfig({ device: { ...device, requestedAt: pedido }, nowMs: NOW, referenceMs: NOW + 1000, width: 800, height: 480, limit: 3 });
+    expect(cfg).toMatchObject({
+      versao: 2,
       gerado: NOW / 1000,
       referencia: NOW / 1000 + 1,
       horarios: ['06:00', '18:00'],
       fuso: SP,
       proximas: [Date.UTC(2026, 10, 24, 21) / 1000, Date.UTC(2026, 10, 25, 9) / 1000, Date.UTC(2026, 10, 25, 21) / 1000],
+      pedido: pedido / 1000,
+      conferir_cada: 600,
       largura: 800,
       altura: 480,
     });
+    // Janelas de conferência: hoje (já começou) e os próximos dias, das 6h às 23h em SP.
+    expect(cfg.conferir.slice(0, 4)).toEqual([Date.UTC(2026, 10, 24, 9) / 1000, Date.UTC(2026, 10, 25, 2) / 1000, Date.UTC(2026, 10, 25, 9) / 1000, Date.UTC(2026, 10, 26, 2) / 1000]);
+    expect(cfg.conferir).toHaveLength(16);
+    // Conferência desligada: sem janelas.
+    const off = buildDeviceConfig({ device: { ...device, checkMinutes: 0 }, nowMs: NOW, width: 800, height: 480 });
+    expect(off.conferir_cada).toBe(0);
+    expect(off.conferir).toEqual([]);
+  });
+
+  it('janelas de conferência pulam o dia que já terminou', () => {
+    // 23:30 em SP: a janela de hoje acabou às 23:00; a primeira é a de amanhã.
+    const tarde = Date.UTC(2026, 10, 25, 2, 30);
+    const w = checkWindows({ checkMinutes: 10, timeZone: SP }, tarde, { days: 2 });
+    expect(w).toEqual([Date.UTC(2026, 10, 25, 9) / 1000, Date.UTC(2026, 10, 26, 2) / 1000]);
+  });
+
+  it('sabe se agora a tela está conferindo pedidos', () => {
+    const dev = { checkMinutes: 10, timeZone: SP };
+    expect(inCheckWindow(dev, NOW)).toBe(true); // 10:00
+    expect(inCheckWindow(dev, Date.UTC(2026, 10, 24, 8, 59))).toBe(false); // 05:59
+    expect(inCheckWindow(dev, Date.UTC(2026, 10, 24, 9, 0))).toBe(true); // 06:00
+    expect(inCheckWindow(dev, Date.UTC(2026, 10, 25, 2, 0))).toBe(false); // 23:00
+    expect(inCheckWindow({ ...dev, checkMinutes: 0 }, NOW)).toBe(false);
   });
 
   it('descreve as próximas para a tela de Configurações', () => {

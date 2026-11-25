@@ -3,14 +3,17 @@
 #
 # Substitui o programa do TRMNL (que depende do serviço pago deles). O aparelho
 # passa quase o tempo todo em sono profundo e acorda:
-#   - nos horários de PanelAI → Configurações → Tela e-ink: baixa a imagem da
-#     tela pela internet, mostra e volta a dormir;
+#   - nos horários de PanelAI → Configurações → Tela e-ink: baixa a imagem
+#     daquele horário pela internet, mostra e volta a dormir;
+#   - para conferir pedidos ("Atualizar a tela agora" no site): a cada poucos
+#     minutos, das 6h às 23h (escolhido no site). Só lê o config.json; se
+#     houver pedido novo, baixa a imagem e redesenha;
 #   - no meio do caminho, a cada no máximo 6 horas, só para acertar o relógio e
 #     reler os horários (a tela não pisca);
 #   - quando alguém aperta o botão (o mesmo que acordava o TRMNL): atualiza na hora.
 #     Segurando o botão por 5 segundos, entra no modo de configuração.
-# A imagem (tela.png) e os horários (config.json) são publicados pelo GitHub no
-# endereço secreto da casa. Passo a passo: docs/DISPLAY.md.
+# As imagens (tela.png e tela-<horário>.png) e os horários (config.json) são
+# publicados pelo GitHub no endereço secreto da casa. Passo a passo: docs/DISPLAY.md.
 #
 # Este arquivo NÃO tem segredos e pode ser compilado por qualquer um:
 #   - o Wi-Fi é informado na instalação pelo navegador (Improv) ou na rede
@@ -35,7 +38,7 @@ esphome:
   min_version: 2026.7.0
   project:
     name: panelai.tela
-    version: "1.4.0"
+    version: "1.5.0"
   includes:
     - panelai_tela.h
   on_boot:
@@ -92,7 +95,7 @@ http_request:
   verify_ssl: true
   timeout: 20s
   follow_redirects: true
-  useragent: PanelAI-Tela/1.4
+  useragent: PanelAI-Tela/1.5
 
 globals:
   # Próximas atualizações (segundos UTC), lidas do config.json. Guardadas para
@@ -104,6 +107,35 @@ globals:
     restore_value: true
     # Tipo explícito: só "{}" fica ambíguo para o compilador.
     initial_value: "std::array<uint32_t, 24>{}"
+  # Janelas de conferência de pedidos (pares início/fim, segundos UTC), do config.json.
+  # (Mesmo tipo que panelai::Janelas.)
+  - id: janelas
+    type: std::array<uint32_t, 16>
+    restore_value: true
+    initial_value: "std::array<uint32_t, 16>{}"
+  # De quanto em quanto tempo conferir pedidos (segundos; 0 = não confere).
+  - id: conferir_cada
+    type: uint32_t
+    restore_value: true
+    initial_value: "0"
+  # Pedido de "Atualizar a tela agora" da última imagem mostrada (segundos UTC).
+  - id: ultimo_pedido
+    type: uint32_t
+    restore_value: true
+    initial_value: "0"
+  # Momento da imagem principal (tela.png) do último config.json lido.
+  - id: referencia
+    type: uint32_t
+    restore_value: true
+    initial_value: "0"
+  # Pedido lido agora no config.json (0 = não leu).
+  - id: pedido_lido
+    type: uint32_t
+    initial_value: "0"
+  # Imagem desta vez: 0 = tela.png; senão, o horário de tela-<horário>.png.
+  - id: imagem_horario
+    type: uint32_t
+    initial_value: "0"
   # Horário que o aparelho estava esperando quando foi dormir (0 = nenhum).
   - id: alvo
     type: uint32_t
@@ -233,6 +265,8 @@ image:
     on_download_finished:
       then:
         - logger.log: "Imagem baixada; desenhando a tela"
+        # O pedido que estava pendente foi atendido.
+        - lambda: "if (id(pedido_lido) != 0) id(ultimo_pedido) = id(pedido_lido);"
         - text_sensor.template.publish:
             id: situacao
             state: "Tela atualizada"
@@ -246,15 +280,27 @@ image:
             falhou: false
     on_error:
       then:
-        - logger.log:
-            level: WARN
-            format: "Não foi possível baixar a imagem"
-        - text_sensor.template.publish:
-            id: situacao
-            state: "Não foi possível baixar a imagem (confira o endereço)"
-        - script.execute:
-            id: dormir
-            falhou: true
+        - if:
+            condition:
+              lambda: "return id(imagem_horario) != 0;"
+            then:
+              # Faltou a imagem do horário: usa a principal (tela.png).
+              - logger.log:
+                  level: WARN
+                  format: "Sem a imagem do horário; baixando a principal"
+              - lambda: "id(imagem_horario) = 0;"
+              - delay: 100ms
+              - script.execute: baixar_imagem
+            else:
+              - logger.log:
+                  level: WARN
+                  format: "Não foi possível baixar a imagem"
+              - text_sensor.template.publish:
+                  id: situacao
+                  state: "Não foi possível baixar a imagem (confira o endereço)"
+              - script.execute:
+                  id: dormir
+                  falhou: true
 
 font:
   # Letras com acento do português (GF_Latin_Core). A Inter não tem um sinal
@@ -443,6 +489,21 @@ script:
                       if (i >= prox.size()) break;
                       prox[i++] = v.as<uint32_t>();
                     }
+                    // Versão 2: pedido, conferência e momento da imagem principal
+                    // (campos que faltam valem 0: sem conferência).
+                    id(referencia) = raiz["referencia"] | 0u;
+                    id(pedido_lido) = raiz["pedido"] | 0u;
+                    id(conferir_cada) = panelai::intervalo_conferencia(raiz["conferir_cada"] | 0u);
+                    auto &jan = id(janelas);
+                    jan.fill(0);
+                    JsonArray conferir = raiz["conferir"].as<JsonArray>();
+                    size_t j = 0;
+                    if (!conferir.isNull()) {
+                      for (JsonVariant v : conferir) {
+                        if (j >= jan.size()) break;
+                        jan[j++] = v.as<uint32_t>();
+                      }
+                    }
                     return true;
                   });
                   if (!ok) ESP_LOGW("panelai", "config.json inválido; seguindo a agenda guardada");
@@ -452,21 +513,37 @@ script:
                   level: WARN
                   format: "Não foi possível baixar o config.json; seguindo a agenda guardada"
       - lambda: |-
+          const uint32_t agora = (uint32_t) ::time(nullptr);
           // Com o relógio certo (internet): chegou a hora da atualização agendada?
-          if (panelai::chegou_a_hora((uint32_t) ::time(nullptr), id(alvo))) id(atualizar_tela) = true;
+          if (panelai::chegou_a_hora(agora, id(alvo))) id(atualizar_tela) = true;
+          // Alguém tocou em "Atualizar a tela agora" no site?
+          if (panelai::pedido_novo(id(pedido_lido), id(ultimo_pedido))) {
+            ESP_LOGI("panelai", "Pedido de atualização pelo site");
+            id(atualizar_tela) = true;
+          }
+          // A imagem do horário que já chegou, se for mais nova que a principal.
+          id(imagem_horario) = panelai::horario_da_imagem(agora, id(referencia), id(proximas));
       - if:
           condition:
             lambda: "return id(atualizar_tela);"
           then:
             # Baixa a imagem; ao terminar (on_download_finished / on_error) desenha e dorme.
-            - online_image.set_url:
-                id: tela_img
-                url: !lambda 'return panelai::limpar_endereco(id(endereco).state) + "/tela.png";'
-                update: true
+            - script.execute: baixar_imagem
           else:
             - script.execute:
                 id: dormir
                 falhou: false
+
+  # Baixa a imagem escolhida (tela-<horário>.png ou tela.png).
+  - id: baixar_imagem
+    then:
+      - online_image.set_url:
+          id: tela_img
+          url: !lambda |-
+            const std::string base = panelai::limpar_endereco(id(endereco).state);
+            if (id(imagem_horario) == 0) return base + "/tela.png";
+            return base + "/tela-" + std::to_string(id(imagem_horario)) + ".png";
+          update: true
 
   # Fica acordado mostrando as instruções na tela (e cria a rede "PanelAI-Tela" se não houver Wi-Fi).
   - id: configurar
@@ -555,10 +632,11 @@ script:
             id(falhas) = 0;
           }
           const uint32_t agora = (uint32_t) ::time(nullptr);
-          const auto s = panelai::calcular_soneca(agora, id(proximas), falhou, id(atualizar_tela), id(falhas));
+          const auto s = panelai::calcular_soneca(agora, id(proximas), falhou, id(atualizar_tela), id(falhas), id(janelas), id(conferir_cada));
           id(alvo) = s.alvo;
           id(soneca_ms) = s.segundos * 1000;
-          ESP_LOGI("panelai", "Dormindo %" PRIu32 " min (próximo horário: %" PRIu32 ", falhas seguidas: %d)", s.segundos / 60, s.alvo, (int) id(falhas));
+          ESP_LOGI("panelai", "Dormindo %" PRIu32 " min (próximo horário: %" PRIu32 ", conferência a cada %" PRIu32 " min, falhas seguidas: %d)",
+                   s.segundos / 60, s.alvo, id(conferir_cada) / 60, (int) id(falhas));
       - deep_sleep.enter:
           id: sono
           sleep_duration: !lambda "return id(soneca_ms);"

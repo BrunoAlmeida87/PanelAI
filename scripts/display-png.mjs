@@ -11,6 +11,8 @@
 // site publicado com a CONTA DE TELA da casa (só leitura), tira a foto e grava,
 // para o aparelho baixar pela internet:
 //   dist/tela/<código>/tela.png      1 bit (preto e branco), no tamanho exato da tela
+//   dist/tela/<código>/tela-<horário>.png  uma imagem pronta para cada próximo horário
+//                                    (com os dados daquele dia; o aparelho baixa a do horário)
 //   dist/tela/<código>/config.json   próximas atualizações (formato: src/display/schedule.js)
 // O código secreto e os horários vêm de Configurações → Tela e-ink. Com a
 // publicação desligada (sem código), não grava nada. E-mail e senha da conta de
@@ -51,6 +53,7 @@ import {
   isValidPublishCode,
   isValidTimeZone,
   renderMoment,
+  slotImageFile,
   zonedParts,
 } from '../src/display/schedule.js';
 
@@ -110,13 +113,25 @@ function screenUrl({ publish = false, moment = null } = {}) {
 
 // ---------- Tela ----------
 
-/** Espera a tela do display aparecer (com os dados da casa já carregados). */
-async function waitForScreen(page, timeout = 90_000) {
-  try {
-    await page.locator(FRAME).first().waitFor({ timeout });
-  } catch {
-    const text = (await page.locator('body').innerText().catch(() => '')).replace(/\s+/g, ' ').slice(0, 300);
-    throw new UserError(`a tela do display não apareceu. Na página: "${text}"`);
+/**
+ * Espera a tela do display aparecer (com os dados da casa já carregados). Se a
+ * primeira sincronização com a nuvem empacar, recarrega uma vez (conexão nova).
+ */
+async function waitForScreen(page, timeout = 60_000) {
+  const bodyText = async () => (await page.locator('body').innerText().catch(() => '')).replace(/\s+/g, ' ').slice(0, 300);
+  for (let tentativa = 1; ; tentativa++) {
+    try {
+      await page.locator(FRAME).first().waitFor({ timeout });
+      break;
+    } catch {
+      const text = await bodyText();
+      if (tentativa === 1 && text.includes('Aguardando a primeira sincronização')) {
+        console.warn('A primeira sincronização com a nuvem demorou; recarregando a página.');
+        await page.reload({ waitUntil: 'load' });
+        continue;
+      }
+      throw new UserError(`a tela do display não apareceu. Na página: "${text}"`);
+    }
   }
   await page.evaluate(() => document.fonts?.ready);
 }
@@ -300,12 +315,34 @@ async function publish(outRoot) {
     const config = buildDeviceConfig({ device, nowMs, referenceMs: refMs, width: size.width, height: size.height });
     const dir = path.join(path.resolve(outRoot), PUBLISH_DIR, device.code);
     await writeAtomic(path.join(dir, IMAGE_FILE), png);
+
+    // Uma imagem pronta para cada próximo horário, com os dados daquele dia: a
+    // tela mostra o dia certo mesmo se o GitHub demorar a gerar de novo.
+    // Se uma falhar, as outras ficam de fora (o aparelho usa a tela.png).
+    let slots = 0;
+    for (const sec of config.proximas) {
+      try {
+        let slotPng = png;
+        if (sec !== moment) {
+          await readScreenInfo(page, screenUrl({ publish: true, moment: sec }), sec * 1000);
+          slotPng = await toOneBit(context, await shoot(page), THRESHOLD);
+        }
+        await writeAtomic(path.join(dir, slotImageFile(sec)), slotPng);
+        slots++;
+      } catch (e) {
+        console.warn(`Aviso: imagem do horário ${hhmm(sec * 1000, device.timeZone)} não gerada (${firstLine(e)}); a tela usa a principal.`);
+        break;
+      }
+    }
+
     await writeAtomic(path.join(dir, CONFIG_FILE), `${JSON.stringify(config)}\n`);
     await setOutput('publicado', 'true');
     console.log(
       `Imagem publicada: layout "${info.layout.name}", ${size.width}×${size.height}, ${png.length} bytes, ` +
         `feita para ${hhmm(refMs, device.timeZone)} (${device.timeZone}). Próximas atualizações: ` +
-        `${config.proximas.slice(0, 3).map((s) => hhmm(s * 1000, device.timeZone)).join(', ') || 'nenhuma (só pelo botão)'}.`,
+        `${config.proximas.slice(0, 3).map((s) => hhmm(s * 1000, device.timeZone)).join(', ') || 'nenhuma (só pelo botão)'}` +
+        ` (${slots} de ${config.proximas.length} com imagem pronta).` +
+        (config.pedido ? ` Último "Atualizar a tela agora": ${hhmm(config.pedido * 1000, device.timeZone)}.` : ''),
     );
     if (info.layout.colorMode !== 'bw') console.warn('Aviso: o layout não está em "Preto e branco"; cores e cinzas viram preto ou branco na tela.');
   } finally {

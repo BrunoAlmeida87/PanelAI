@@ -508,14 +508,14 @@ export function exportData() {
 
 export async function importData(data) {
   const full = { ...data, settings: { ...DEFAULT_SETTINGS, ...data.settings } };
-  await persist(seedOps(full));
+  await persist(seedOps({ ...full, githubToken: getState().githubToken }));
   applyFullData(full);
 }
 
 export async function resetDemo() {
   const { buildSeed } = await import('../data/seed.js');
   const seed = buildSeed();
-  await persist(seedOps(seed));
+  await persist(seedOps({ ...seed, githubToken: getState().githubToken }));
   applyFullData(seed);
 }
 
@@ -535,7 +535,7 @@ export async function startFresh() {
     displayLayouts: s.displayLayouts,
     settings: s.settings,
   };
-  await persist(seedOps(data));
+  await persist(seedOps({ ...data, githubToken: s.githubToken }));
   applyFullData(data);
 }
 

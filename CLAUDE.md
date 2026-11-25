@@ -42,7 +42,9 @@ Publicado em https://brunoalmeida87.github.io/PanelAI/ (GitHub Pages), com dados
 - `src/cloud/` — `cloud.js` (Firebase: login, casa, sync em tempo real, manutenção), `session.js`
   (liga estado ↔ nuvem; cache da casa e do papel no localStorage), `layout.js` (formato no Firestore).
 - `src/display/` — `model.js` (telas, cards, layouts), `data.js` (dados dos cards), `DisplayRender.jsx`,
-  `schedule.js` (agenda da tela física e contrato do `config.json`).
+  `schedule.js` (agenda da tela física e contrato do `config.json`), `github.js` (pedido da imagem ao
+  GitHub e regras da geração automática). `src/components/ScreenAutoUpdate.jsx` pede a imagem sozinho
+  depois de mudanças (montado no `App.jsx`).
 - `src/pages/` — telas; `settings/CloudSection.jsx` (login, pessoas e contas de tela),
   `settings/DisplayDeviceSection.jsx` (Configurações → Tela e-ink).
 - `firestore.rules` — segurança. **Mudou? O dono precisa publicar no console do Firebase**
@@ -87,25 +89,51 @@ Publicado em https://brunoalmeida87.github.io/PanelAI/ (GitHub Pages), com dados
   Tela e-ink** (um ou mais, ex.: 06:00 e 18:00) buscando a imagem **pela internet**.
 - **Programas de fábrica descartados:** SenseCraft HMI (Seeed) e TRMNL só atualizam por intervalo e
   não passam do login do PanelAI; o TRMNL ainda é pago.
-- **Quem gera a imagem:** GitHub Actions (`.github/workflows/display.yml`, a cada 30 min, minutos
-  17 e 47, e depois de cada deploy) roda `node scripts/display-png.mjs --publicar dist`: entra no site
-  publicado com a **conta de tela** (segredos `PANELAI_TELA_EMAIL`/`PANELAI_TELA_SENHA`), abre
+- **Quem gera a imagem:** GitHub Actions (`.github/workflows/display.yml`) roda
+  `node scripts/display-png.mjs --publicar dist`: entra no site publicado com a **conta de tela**
+  (segredos `PANELAI_TELA_EMAIL`/`PANELAI_TELA_SENHA`), abre
   `#/display/tela?exato=1&publicar=1&momento=<epoch>`, tira a foto, converte para 1 bit e grava
-  `dist/tela/<código>/tela.png` + `config.json`; depois republica o **mesmo** site (build da última
-  publicação bem-sucedida da main; o build é determinístico, então o service worker não muda) com a
-  imagem, e apaga o artefato da execução.
+  `dist/tela/<código>/tela.png`, **`tela-<horário>.png` para cada item de `proximas`** (cada uma com o
+  `momento` do seu horário, ou seja, os dados do seu dia) e `config.json`; depois republica o **mesmo**
+  site (build da última publicação bem-sucedida da main; o build é determinístico, então o service
+  worker não muda) com as imagens, e apaga o artefato da execução. Concorrência sem cancelar a que está
+  rodando (só o pedido mais novo fica na fila).
+- **Quando roda (1.5.0):** o agendamento do GitHub (`17,47 * * * *`) é **só reserva**: na prática ele
+  atrasa horas ou é pulado (em 24/11/2026 rodou 1 de ~34 vezes). O caminho principal é o **site pedir**
+  (`workflow_dispatch` via `POST /repos/{repo}/actions/workflows/display.yml/dispatches`, ref `main`)
+  com a **chave do GitHub da casa** (token fine-grained, só "Actions: Read and write" no repositório),
+  guardada em **`meta/github` (`{ token }`)**, fora de `settings` para não ir aos backups
+  (`seedOps` preserva a chave em importar/restaurar demonstração/começar do zero). Pedidos:
+  (1) botão **Atualizar a tela agora** (Configurações → Tela e-ink) grava `displayDevice.requestedAt`,
+  espera a gravação chegar ao servidor (`cloudSaved`: `writeOps` não espera o servidor) e só então
+  dispara; (2) **geração automática** (`src/components/ScreenAutoUpdate.jsx`, `onPersist` do store):
+  depois de gravações deste aparelho que aparecem na tela (`touchesDisplay`), espera 60 s parado e no
+  mínimo 10 min entre pedidos (`nextAutoRequest`); ao esconder o app, pede já com `keepalive`. Regras
+  puras em `src/display/github.js`. Viewer/readOnly nunca pede. Link de criação da chave já
+  preenchido (`tokenCreationUrl`: `name`, `description`, `expires_in=none`, `actions=write`; o
+  repositório não dá para preencher).
 - **Endereço secreto:** `settings.displayDevice.code` (32 caracteres, gerado no app). O script mascara
   o código nos logs (`::add-mask::`). Nunca imprima o código nem o caminho completo.
 - **Momento da imagem:** perto de um horário (≤ 60 min), a imagem é gerada "para" ele
   (`renderMoment`), então meia-noite mostra o dia novo. O fuso da casa vem de `displayDevice.timeZone`
   (o script ajusta o fuso do navegador via CDP).
-- **Contrato `config.json` v1** (`buildDeviceConfig`): `versao, gerado, referencia, horarios, fuso,
-  proximas[] (epoch UTC, até 24), largura, altura`. Mudar campos exige mudar o firmware e subir
-  `DEVICE_CONFIG_VERSION`.
-- **Aparelho:** dorme no máximo 6 h por vez (relógio do ESP32 deriva), última soneca ≤ 1 h antes do
-  horário; nas acordadas intermediárias só relê o `config.json`; no horário/botão/ligado baixa a
-  imagem e redesenha; falhas tentam de novo em 5/10/20/30 min; vigia de 150 s. Essas regras ficam em
+- **Contrato `config.json` v2** (`buildDeviceConfig`): `versao, gerado, referencia, horarios, fuso,
+  proximas[] (epoch UTC, até 24), pedido (requestedAt em s; 0 = nunca), conferir_cada (s; 0 = não
+  confere), conferir[] (pares início/fim das 06:00–23:00 no fuso da casa, 8 dias), largura, altura`.
+  Mudar campos exige mudar o firmware e subir `DEVICE_CONFIG_VERSION`. `displayDevice` ganhou
+  `checkMinutes` (5/10/15/30/0, padrão 10), `autoGenerate` (padrão true) e `requestedAt`.
+- **Aparelho (firmware 1.5.0):** dorme no máximo 6 h por vez (relógio do ESP32 deriva), última
+  soneca ≤ 1 h antes do horário; das 6h às 23h acorda também a cada `conferir_cada` para conferir
+  pedidos (`ate_conferir`; com falha vale só a espera por falhas); nas acordadas intermediárias só
+  relê o `config.json`; no horário/botão/ligado/**pedido novo** (`pedido_novo`: `pedido != 0 &&
+  pedido != ultimo_pedido`, com `!=` por causa de relógio de celular adiantado) baixa a imagem e
+  redesenha; a imagem é `tela-<horário>.png` do horário mais recente já chegado e mais novo que
+  `referencia` (`horario_da_imagem`), senão `tela.png` (e cai para `tela.png` se a do horário faltar);
+  falhas tentam de novo em 5/10/20/30 min; vigia de 150 s. Essas regras ficam em
   `esphome/panelai_tela.h` (C++ puro, testado com g++ no CI) — mude lá, não nos lambdas.
+- **Reinstalar o firmware** (versão nova): pelo instalador; a imagem `factory.bin` começa no endereço
+  0 e cobre a NVS, então o aparelho **normalmente esquece Wi-Fi e endereço** (o instalador pede o Wi-Fi;
+  o dono cola o endereço de novo). O firmware não tem OTA.
 - **Tarefas fixas no display:** `buildDisplayData` inclui ocorrências ainda não criadas
   (`missingRecurring`) sem gravar — a conta de tela não grava.
 - **CI do firmware:** `.github/workflows/esphome.yml` testa as regras (g++), valida e compila com
@@ -117,6 +145,17 @@ Publicado em https://brunoalmeida87.github.io/PanelAI/ (GitHub Pages), com dados
   existindo para outras telas, mas **não** é o caminho da tela da casa.
 
 ## Armadilhas conhecidas
+
+- **Agendamento do GitHub não é confiável** (atrasa horas ou pula): nada de importante pode depender
+  só do `schedule`. Use `workflow_dispatch` pedido pelo site.
+- `cloud.writeOps` resolve antes de o servidor confirmar (offline primeiro). Se outra coisa (ex.: o
+  GitHub) vai ler a gravação logo depois, espere `cloud.pending` zerar (`cloudSaved` em
+  `src/storage/displayActions.js`).
+- Regras do Firestore não são filtros: não dá para esconder um documento (ex.: `meta/github`) de quem
+  lê a coleção inteira (a conta de tela ouve `meta`). Por isso a chave do GitHub é lida também pela
+  conta de tela; ela só tem permissão de Actions.
+- Testes da nuvem (`run-display.mjs`) às vezes demoram na primeira sincronização da conta de tela no
+  emulador; o gerador recarrega a página uma vez se ficar em "Aguardando a primeira sincronização".
 
 - Workflows agendados (`schedule`) só rodam a partir da branch `main`; o GitHub desativa agendamentos
   após 60 dias sem atividade no repositório (o workflow tenta se reativar via API).
