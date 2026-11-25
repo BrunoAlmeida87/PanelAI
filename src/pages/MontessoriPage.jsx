@@ -44,7 +44,10 @@ export function MontessoriPage({ params = {} }) {
   const today = todayISO(now);
   const children = useMemo(() => sortedChildren(s.children), [s.children]);
   const [childPref, setChildPref] = usePref('montessoriChild', null);
-  const child = children.find((c) => c.id === childPref) ?? children[0] ?? null;
+  // Link do card do Cardápio traz a criança (#/montessori?atividade=…&crianca=…): ela vale na hora,
+  // para o detalhe e o registro não irem para outra criança.
+  const linked = params.crianca && children.some((c) => c.id === params.crianca) ? params.crianca : null;
+  const child = children.find((c) => c.id === (linked ?? childPref)) ?? children[0] ?? null;
 
   const childId = child?.id ?? null;
   const allLogs = useMemo(() => Object.values(s.montessoriLogs), [s.montessoriLogs]);
@@ -65,10 +68,13 @@ export function MontessoriPage({ params = {} }) {
   const [about, setAbout] = useState(false);
   const [homeCard, setHomeCard] = usePref('montessoriHomeCard', true);
 
-  // Link vindo do card do Cardápio: #/montessori?atividade=<id>
+  // Link vindo do card do Cardápio: #/montessori?atividade=<id>&crianca=<id>
   useEffect(() => {
     if (params.atividade) setDetailId(params.atividade);
   }, [params.atividade]);
+  useEffect(() => {
+    if (linked && linked !== childPref) setChildPref(linked);
+  }, [linked, childPref, setChildPref]);
 
   const closeDetail = () => {
     setDetailId(null);

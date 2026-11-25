@@ -282,6 +282,28 @@ async function flows(browser, label, opts) {
     return `${items} atividades no card do Cardápio`;
   });
 
+  await step(`[${label}] 11f. Montessori: com duas crianças, o card abre a atividade da criança certa`, async () => {
+    await page.goto(`${BASE}#/montessori`);
+    await page.getByRole('button', { name: /^Mais|Mais ações/ }).click();
+    await page.getByRole('menuitem', { name: 'Cadastrar outra criança' }).click();
+    const dialog = page.getByRole('dialog', { name: 'Cadastrar criança' });
+    await dialog.getByLabel('Nome da criança').fill('Bia');
+    await dialog.getByLabel('Data de nascimento').fill('2026-06-01');
+    await dialog.getByRole('button', { name: 'Salvar' }).click();
+    await page.getByRole('heading', { name: 'Bia' }).waitFor();
+    // Volta a selecionar a Ana e abre, pelo Cardápio, uma atividade da Bia.
+    await page.getByRole('group', { name: 'Criança' }).getByRole('button', { name: /Ana/ }).click();
+    await page.getByRole('heading', { name: 'Ana' }).waitFor();
+    await page.goto(`${BASE}#/cardapio`);
+    const bia = page.locator('.mt-home-kid').filter({ hasText: 'Bia' });
+    await bia.locator('.mt-home-items a').first().click();
+    await page.getByRole('dialog').getByText(/Ainda não apresentada para Bia|Bia fez esta atividade/).waitFor();
+    await page.getByRole('heading', { name: 'Bia', level: 2 }).waitFor();
+    await page.getByRole('dialog').getByRole('button', { name: 'Fechar' }).click();
+    // Fechando o detalhe, a Bia continua selecionada.
+    await page.getByRole('heading', { name: 'Bia', level: 2 }).waitFor();
+  });
+
   let exported = null;
   await step(`[${label}] 12. exportar dados`, async () => {
     await page.goto(`${BASE}#/ajustes`);
@@ -290,7 +312,7 @@ async function flows(browser, label, opts) {
     await download.saveAs(exported);
     const json = JSON.parse(await readFile(exported, 'utf8'));
     assert(json.app === 'PanelAI' && json.data.recipes.some((r) => r.name === RECIPE), 'conteúdo inesperado');
-    assert(json.data.children.length === 1 && json.data.montessoriLogs.length === 1, 'Montessori fora do backup');
+    assert(json.data.children.length === 2 && json.data.montessoriLogs.length === 1, 'Montessori fora do backup');
     return `${json.data.recipes.length} receitas, ${json.data.movements.length} movimentações, ${json.data.montessoriLogs.length} registro Montessori`;
   });
 
@@ -309,6 +331,7 @@ async function flows(browser, label, opts) {
     await page.getByRole('heading', { name: RECIPE }).waitFor();
     // A criança e o histórico continuam lá (restaurar a demonstração não apaga).
     await page.goto(`${BASE}#/montessori`);
+    await page.getByRole('group', { name: 'Criança' }).getByRole('button', { name: /Ana/ }).click();
     await page.getByRole('heading', { name: 'Ana' }).waitFor();
     await page.getByRole('tab', { name: /Histórico 1/ }).waitFor();
   });

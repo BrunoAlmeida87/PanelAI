@@ -37,7 +37,7 @@ export function TodayCard() {
             <ul class="mt-home-items">
               {items.map(({ activity: a, done }) => (
                 <li key={a.id}>
-                  <a href={`#/montessori?atividade=${a.id}`} class={done ? 'done' : ''} aria-label={`${a.nome}${done ? ' (feita hoje)' : ''}`}>
+                  <a href={`#/montessori?atividade=${a.id}&crianca=${child.id}`} class={done ? 'done' : ''} aria-label={`${a.nome}${done ? ' (feita hoje)' : ''}`}>
                     <CategoryIcon id={a.categoria} size={13} />
                     <span class="txt">{a.nome}</span>
                     {done && <Check size={14} strokeWidth={3} class="mt-ok" />}
