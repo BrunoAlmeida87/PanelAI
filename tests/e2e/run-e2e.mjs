@@ -197,6 +197,91 @@ async function flows(browser, label, opts) {
     assert(await page.getByRole('button', { name: 'Finalizar compra' }).isDisabled(), 'deveria esvaziar o carrinho');
   });
 
+  await step(`[${label}] 11b. Montessori: cadastrar criança e ver as sugestões do dia`, async () => {
+    await page.goto(`${BASE}#/montessori`);
+    await page.getByRole('heading', { name: 'Montessori', level: 1 }).waitFor();
+    // Sem cadastro, a biblioteca já pode ser consultada.
+    await page.getByRole('button', { name: /Regar as plantas/ }).waitFor();
+    await page.getByLabel('Nome da criança').fill('Ana');
+    await page.getByLabel('Data de nascimento').fill('2025-07-10');
+    await page.getByRole('button', { name: 'Salvar cadastro' }).click();
+    await page.getByRole('heading', { name: 'Sugestões para hoje' }).waitFor();
+    await page.getByText('12 a 18 meses', { exact: true }).first().waitFor();
+    const n = await page.locator('.mt-today-item').count();
+    assert(n === 3, `${n} sugestões`);
+    await shot('montessori');
+    return `${n} sugestões para 1 ano e 4 meses`;
+  });
+
+  await step(`[${label}] 11c. Montessori: registrar, trocar e novas sugestões (a feita continua)`, async () => {
+    const first = page.locator('.mt-today-item').first();
+    const name = await first.locator('.mt-card-name').innerText();
+    await first.getByRole('button', { name: /^Registrar/ }).click();
+    const dialog = page.getByRole('dialog', { name: 'Registrar atividade' });
+    await dialog.getByRole('button', { name: 'Salvar' }).click();
+    await dialog.getByText('Escolha o interesse.').waitFor(); // obrigatório
+    await dialog.getByRole('button', { name: 'Alto' }).click();
+    await dialog.getByRole('button', { name: 'Realizou sozinha' }).click();
+    await dialog.getByLabel('Observações').fill('Pediu para repetir');
+    await dialog.getByRole('button', { name: 'Salvar' }).click();
+    await page.getByText(`Registrado: ${name} (hoje)`).waitFor();
+    await first.getByText('Feita hoje').waitFor();
+    // Trocar a segunda sugestão.
+    const second = page.locator('.mt-today-item').nth(1);
+    const before = await second.locator('.mt-card-name').innerText();
+    await second.getByRole('button', { name: /^Trocar/ }).click();
+    await page.waitForFunction((b) => document.querySelectorAll('.mt-today-item .mt-card-name')[1]?.textContent !== b, before);
+    // Novas sugestões: a feita hoje fica na lista.
+    await page.getByRole('button', { name: 'Novas sugestões' }).click();
+    await page.getByText('Novas sugestões para hoje').waitFor();
+    const names = await page.locator('.mt-today-item .mt-card-name').allInnerTexts();
+    assert(names.length === 3 && names[0] === name, names.join(' / '));
+    await page.getByRole('button', { name: 'Voltar às sugestões automáticas' }).waitFor();
+    return `feita: ${name}`;
+  });
+
+  await step(`[${label}] 11d. Montessori: biblioteca (filtros, busca e detalhe) e histórico`, async () => {
+    await page.getByRole('button', { name: 'Todas as idades' }).click();
+    await page.getByRole('searchbox', { name: 'Buscar atividades' }).fill('regador');
+    await page.locator('.mt-card').filter({ hasText: 'Regar as plantas' }).click();
+    const dialog = page.getByRole('dialog', { name: 'Regar as plantas' });
+    await dialog.getByText('Como fazer').waitFor();
+    await dialog.getByText('Cuidados de segurança').waitFor();
+    await dialog.getByText(/comigo-ninguém-pode/).waitFor();
+    await shot('montessori-detalhe');
+    const inToday = (await dialog.getByRole('button', { name: 'Tirar das atividades de hoje' }).count()) > 0;
+    if (!inToday) {
+      await dialog.getByRole('button', { name: 'Incluir nas atividades de hoje' }).click();
+      await dialog.getByRole('button', { name: 'Tirar das atividades de hoje' }).waitFor();
+    }
+    await dialog.getByRole('button', { name: 'Fechar' }).click();
+    await page.locator('.mt-today-item').filter({ hasText: 'Regar as plantas' }).waitFor();
+    // Filtro por categoria e status.
+    await page.getByRole('searchbox', { name: 'Buscar atividades' }).fill('');
+    await page.getByRole('group', { name: 'Categoria' }).getByRole('button', { name: /Percepção tátil/ }).click();
+    const cats = await page.locator('.mt-card .mt-card-meta').allInnerTexts();
+    assert(cats.length > 0 && cats.every((t) => t.startsWith('Tato')), cats.join(' / '));
+    await page.getByRole('group', { name: 'Status' }).getByRole('button', { name: 'Preferidas' }).click();
+    // Histórico.
+    await page.getByRole('tab', { name: /Histórico/ }).click();
+    await page.getByText('Interesse alto').waitFor();
+    await page.getByText('Pediu para repetir').waitFor();
+    await shot('montessori-historico');
+    await page.getByRole('tab', { name: /Biblioteca/ }).click();
+  });
+
+  await step(`[${label}] 11e. Montessori: card na página inicial`, async () => {
+    await page.goto(`${BASE}#/cardapio`);
+    const card = page.locator('.mt-home');
+    await card.getByText('Ana').waitFor();
+    const items = await card.locator('.mt-home-items a').count();
+    assert(items >= 3, `${items} atividades no card`);
+    await card.locator('.mt-home-items a').first().click();
+    await page.getByRole('dialog').getByText('Como fazer').waitFor();
+    await page.getByRole('dialog').getByRole('button', { name: 'Fechar' }).click();
+    return `${items} atividades no card do Cardápio`;
+  });
+
   let exported = null;
   await step(`[${label}] 12. exportar dados`, async () => {
     await page.goto(`${BASE}#/ajustes`);
@@ -205,7 +290,8 @@ async function flows(browser, label, opts) {
     await download.saveAs(exported);
     const json = JSON.parse(await readFile(exported, 'utf8'));
     assert(json.app === 'PanelAI' && json.data.recipes.some((r) => r.name === RECIPE), 'conteúdo inesperado');
-    return `${json.data.recipes.length} receitas, ${json.data.movements.length} movimentações`;
+    assert(json.data.children.length === 1 && json.data.montessoriLogs.length === 1, 'Montessori fora do backup');
+    return `${json.data.recipes.length} receitas, ${json.data.movements.length} movimentações, ${json.data.montessoriLogs.length} registro Montessori`;
   });
 
   await step(`[${label}] 13. importar dados (inválido é recusado; válido restaura)`, async () => {
@@ -221,6 +307,10 @@ async function flows(browser, label, opts) {
     await page.goto(`${BASE}#/receitas`);
     await page.getByRole('searchbox', { name: 'Buscar receitas' }).fill('teste E2E');
     await page.getByRole('heading', { name: RECIPE }).waitFor();
+    // A criança e o histórico continuam lá (restaurar a demonstração não apaga).
+    await page.goto(`${BASE}#/montessori`);
+    await page.getByRole('heading', { name: 'Ana' }).waitFor();
+    await page.getByRole('tab', { name: /Histórico 1/ }).waitFor();
   });
 
   await step(`[${label}] 14. persistência após recarregar`, async () => {
@@ -335,6 +425,8 @@ async function flows(browser, label, opts) {
       await page.locator('body').click({ position: { x: 5, y: 300 } });
       await page.keyboard.press('2');
       await page.getByRole('heading', { name: 'Lista da semana' }).waitFor();
+      await page.keyboard.press('6');
+      await page.getByRole('heading', { name: 'Montessori', level: 1 }).waitFor();
       await page.keyboard.press('4');
       await page.getByRole('heading', { name: 'Receitas', level: 1 }).waitFor();
       await page.keyboard.press('/');
@@ -362,8 +454,8 @@ async function flows(browser, label, opts) {
 }
 
 async function responsive(browser) {
-  const widths = [360, 390, 430, 768, 1024, 1440];
-  const routes = ['cardapio', 'compras', 'despensa/estoque', 'despensa/contagem', 'despensa/mercado', 'receitas', 'receitas/strogonoff-frango', 'receitas/nova', 'ajustes', 'historico'];
+  const widths = [360, 390, 430, 768, 960, 1024, 1200, 1440];
+  const routes = ['cardapio', 'compras', 'despensa/estoque', 'despensa/contagem', 'despensa/mercado', 'receitas', 'receitas/strogonoff-frango', 'receitas/nova', 'ajustes', 'historico', 'montessori'];
   for (const w of widths) {
     const touch = w < 900;
     const ctx = await browser.newContext({ viewport: { width: w, height: w < 600 ? 800 : 900 }, hasTouch: touch, isMobile: w < 600 });
@@ -374,7 +466,7 @@ async function responsive(browser) {
       await page.waitForTimeout(350);
       const ov = await overflowX(page);
       if (ov > 0) bad.push(`${r}:+${ov}px`);
-      if (['cardapio', 'compras', 'despensa/estoque', 'receitas'].includes(r)) {
+      if (['cardapio', 'compras', 'despensa/estoque', 'receitas', 'montessori'].includes(r)) {
         await page.screenshot({ path: path.join(outDir, `w${w}-${r.replace('/', '-')}.png`) });
       }
     }

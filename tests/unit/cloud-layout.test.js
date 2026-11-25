@@ -211,6 +211,10 @@ describe('nuvem: arquivo mensal', () => {
     expect(isArchivable('tasks', { id: 't', date: '2026-08-01', status: 'done' }, '2026-11-17')).toBe(true);
     expect(isArchivable('marmitas', { id: 'm', prepDate: '2026-08-01', status: 'armazenada' }, '2026-11-17')).toBe(false);
     expect(isArchivable('recipes', { id: 'r' }, '2026-11-17')).toBe(false);
+    // Registros Montessori antigos vão para o arquivo mensal (a coleção tem nome simples: as regras não mudam).
+    expect(isArchivable('montessoriLogs', { id: 'l', date: '2026-08-01' }, '2026-11-17')).toBe(true);
+    expect(isArchivable('montessoriLogs', { id: 'l', date: '2026-11-01' }, '2026-11-17')).toBe(false);
+    expect(archiveColl('montessoriLogs')).toMatch(/^[A-Za-z]{1,40}$/);
     expect(nextBundleId('2026-08', [])).toBe('2026-08');
     expect(nextBundleId('2026-08', ['2026-08'])).toBe('2026-08~2');
     expect(nextBundleId('2026-08', ['2026-08', '2026-08~2'])).toBe('2026-08~3');

@@ -117,6 +117,10 @@ que aparece na tela para colar o endereço da imagem.
   (no máximo a cada 6 horas), então a mudança vale a partir da próxima vez que ele acordar. Para valer
   na hora, aperte o **botão** do aparelho.
 - **Mudar o que aparece**: aba **Display**. O layout marcado "no display" é o que vai para a tela.
+- **Atividades Montessori do dia**: na aba Display, **Adicionar card → Montessori de hoje** (ou o layout
+  sugerido **Família**). Mostra o nome e a idade da criança e as atividades do dia, com as já
+  registradas marcadas. A lista é a mesma da aba Montessori: muda quando alguém toca em
+  "Novas sugestões", "Trocar" ou "Incluir", e as marcações aparecem na próxima atualização da tela.
 - **Atualizar agora**: aperte o **botão** do aparelho (o mesmo que acordava o TRMNL; na placa é o D4 /
   GPIO5). A imagem tem no máximo ~30 minutos.
 - **Modo de configuração** (trocar o endereço ou o Wi-Fi): **segure o botão por 5 segundos**. A tela
