@@ -1,7 +1,7 @@
 import { Modal } from './ui.jsx';
 
 const SHORTCUTS = [
-  ['1 – 5', 'Ir para Cardápio, Lista, Mercado, Receitas e Tarefas'],
+  ['1 – 6', 'Ir para Cardápio, Lista, Mercado, Receitas, Tarefas e Montessori'],
   ['← / →', 'Semana anterior / próxima'],
   ['T', 'Voltar para a semana atual'],
   ['/', 'Buscar na tela atual'],

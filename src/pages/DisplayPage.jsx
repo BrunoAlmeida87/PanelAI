@@ -51,7 +51,7 @@ function useDisplayData(fixedNow = null) {
   const at = now.getTime();
   return useMemo(
     () => buildDisplayData(s, now),
-    [s.weeks, s.tasks, s.taskTemplates, s.recipes, s.marmitas, s.pantry, s.ingredients, s.settings, at],
+    [s.weeks, s.tasks, s.taskTemplates, s.recipes, s.marmitas, s.pantry, s.ingredients, s.settings, s.children, s.montessoriLogs, at],
   );
 }
 

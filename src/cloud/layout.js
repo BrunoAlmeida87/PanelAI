@@ -13,7 +13,7 @@
 //    não apagam mais as marcações uma da outra. Depois de alguns dias sem
 //    mudanças, as marcações são incorporadas ao registro ("fold").
 //  - <coleção>Archive/{AAAA-MM}: registros antigos (histórico de estoque,
-//    compras, tarefas concluídas, semanas e marmitas antigas) agrupados por
+//    compras, tarefas concluídas, semanas, marmitas e registros Montessori antigos) agrupados por
 //    mês. Abrir o app lê um documento por mês em vez de um por registro.
 //  - recipeImages/{receita}: a imagem da receita, separada para que favoritar
 //    ou editar a receita não reenvie a imagem.
@@ -40,6 +40,7 @@ export const ARCHIVES = {
   tasks: { days: 45, date: (r) => r.date, ok: (t) => !!t.deleted || t.status === 'done' || t.status === 'postponed' },
   weeks: { days: 120, date: (r) => r.id, ok: () => true },
   marmitas: { days: 60, date: (r) => r.prepDate, ok: (m) => m.status === 'consumida' },
+  montessoriLogs: { days: 60, date: (r) => r.date, ok: () => true },
 };
 export const archiveColl = (store) => `${store}Archive`;
 const ARCHIVE_COLLS = new Map(Object.keys(ARCHIVES).map((s) => [archiveColl(s), s]));

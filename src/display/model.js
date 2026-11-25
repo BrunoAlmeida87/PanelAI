@@ -170,6 +170,17 @@ export const CARD_TYPES = [
     options: [],
   },
   {
+    id: 'montessori',
+    label: 'Montessori de hoje',
+    description: 'Atividades do dia para a criança (aba Montessori), com as já feitas marcadas.',
+    size: { w: 6, h: 3 },
+    options: [
+      { key: 'showChild', label: 'Mostrar nome e idade', type: 'toggle', default: true },
+      { key: 'showCategory', label: 'Mostrar categoria', type: 'toggle', default: false },
+      { key: 'showDone', label: 'Mostrar feitas', type: 'toggle', default: true },
+    ],
+  },
+  {
     id: 'note',
     label: 'Recado',
     description: 'Texto livre fixo (aviso, lembrete, frase do dia).',
@@ -311,6 +322,13 @@ export const LAYOUT_PRESETS = [
     description: 'Lista de compras grande, despensa e marmitas.',
     base: { cols: 12, rows: 8 },
     cards: [c('clock', 0, 0, 12, 1), c('shopping', 0, 1, 7, 7), c('pantryLow', 7, 1, 5, 4), c('marmitas', 7, 5, 5, 3)],
+  },
+  {
+    id: 'familia',
+    name: 'Família',
+    description: 'Cardápio e tarefas de hoje, atividades Montessori da criança e compras.',
+    base: { cols: 12, rows: 8 },
+    cards: [c('clock', 0, 0, 12, 1), c('menuDay', 0, 1, 6, 4), c('montessori', 6, 1, 6, 4), c('tasksDay', 0, 5, 6, 3), c('shopping', 6, 5, 6, 3)],
   },
   {
     id: 'minimalista',

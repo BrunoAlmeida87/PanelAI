@@ -9,6 +9,7 @@ import './styles/shopping.css';
 import './styles/pantry.css';
 import './styles/recipes.css';
 import './styles/tasks.css';
+import './styles/montessori.css';
 import './styles/display.css';
 import './styles/print.css';
 import { App } from './App.jsx';

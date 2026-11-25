@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'preact/hooks';
 import { Suspense } from 'preact/compat';
-import { BookOpen, CalendarDays, Check, ListChecks, MonitorSmartphone, CloudCheck, CloudOff, CloudUpload, Loader2, Package, Settings, ShoppingCart, TriangleAlert, WifiOff, FlaskConical, LogIn } from 'lucide-preact';
+import { BookOpen, CalendarDays, Check, ListChecks, MonitorSmartphone, CloudCheck, CloudOff, CloudUpload, Loader2, Package, Settings, ShoppingCart, Sprout, TriangleAlert, WifiOff, FlaskConical, LogIn } from 'lucide-preact';
 import { exitDemo, useStore } from './storage/store.js';
 import { canGenerateRecurring, ensureRecurringAround } from './storage/taskActions.js';
 import { useRoute, navigate } from './utils/router.js';
@@ -24,6 +24,7 @@ const SettingsPage = lazyPage(() => import('./pages/SettingsPage.jsx'), 'Setting
 const HistoryPage = lazyPage(() => import('./pages/HistoryPage.jsx'), 'HistoryPage');
 const TasksPage = lazyPage(() => import('./pages/TasksPage.jsx'), 'TasksPage');
 const DisplayPage = lazyPage(() => import('./pages/DisplayPage.jsx'), 'DisplayPage');
+const MontessoriPage = lazyPage(() => import('./pages/MontessoriPage.jsx'), 'MontessoriPage');
 const DisplayScreen = lazyPage(() => import('./pages/DisplayPage.jsx'), 'DisplayScreen');
 const LoginGate = lazyPage(() => import('./pages/LoginGate.jsx'), 'LoginGate');
 const ViewerNotice = lazyPage(() => import('./pages/ViewerNotice.jsx'), 'ViewerNotice');
@@ -34,6 +35,7 @@ const NAV = [
   { id: 'despensa', path: '/despensa', long: 'Mercado do mês', short: 'Despensa', icon: Package },
   { id: 'receitas', path: '/receitas', long: 'Receitas', short: 'Receitas', icon: BookOpen },
   { id: 'tarefas', path: '/tarefas', long: 'Tarefas', short: 'Tarefas', icon: ListChecks },
+  { id: 'montessori', path: '/montessori', long: 'Montessori', short: 'Montessori', icon: Sprout },
 ];
 
 function navSection(routeName) {
@@ -150,7 +152,7 @@ export function App() {
           </a>
           <nav class="top-nav" aria-label="Módulos">
             {NAV.map((n) => (
-              <a key={n.id} href={`#${n.path}`} aria-current={section === n.id ? 'page' : undefined}>
+              <a key={n.id} href={`#${n.path}`} aria-current={section === n.id ? 'page' : undefined} title={n.long}>
                 <n.icon size={18} />
                 <span class="nav-long">{n.long}</span>
                 <span class="nav-short">{n.short}</span>
@@ -317,6 +319,8 @@ function Route({ route, weekId }) {
       return <HistoryPage />;
     case 'tarefas':
       return <TasksPage />;
+    case 'montessori':
+      return <MontessoriPage params={route.params} />;
     case 'display':
       return <DisplayPage />;
     default:

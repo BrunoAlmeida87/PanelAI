@@ -102,12 +102,39 @@
     border: 1px solid var(--border);
   }
 }
-@media (min-width: 900px) and (max-width: 1099px) {
+/* Seis módulos no menu: nomes longos só a partir de 1280 px. Abaixo disso,
+   nomes curtos e, até 1023 px, só os ícones (o nome continua para leitores de
+   tela e aparece na dica ao parar o mouse). */
+@media (min-width: 900px) and (max-width: 1279px) {
+  .top-nav {
+    gap: 2px;
+    margin-left: 8px;
+  }
+  .top-nav a {
+    padding: 0 10px;
+    gap: 6px;
+  }
   .top-nav a .nav-long {
     display: none;
   }
+  .header-inner:has(.week-selector) .brand-name {
+    display: none;
+  }
 }
-@media (min-width: 1100px) {
+@media (min-width: 900px) and (max-width: 1023px) {
+  .top-nav a {
+    padding: 0 11px;
+  }
+  .top-nav a .nav-short {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+  }
+}
+@media (min-width: 1280px) {
   .top-nav a .nav-short {
     display: none;
   }
@@ -196,7 +223,7 @@
   bottom: 0;
   z-index: 30;
   display: grid;
-  grid-template-columns: repeat(5, 1fr);
+  grid-template-columns: repeat(6, minmax(0, 1fr));
   height: calc(var(--bottom-nav-h) + var(--safe-bottom));
   padding: 0 var(--safe-right) var(--safe-bottom) var(--safe-left);
   background: rgba(255, 255, 255, 0.96);
@@ -220,13 +247,20 @@
 .bottom-nav a .pill {
   display: grid;
   place-items: center;
-  width: 56px;
+  width: min(56px, 100%);
   height: 30px;
   border-radius: 999px;
   transition: background 0.2s var(--ease);
 }
 .bottom-nav a[aria-current='page'] {
   color: var(--green-dark);
+}
+/* Seis módulos: em telas estreitas a legenda encolhe um pouco para caber. */
+@media (max-width: 389px) {
+  .bottom-nav a {
+    font-size: 0.625rem;
+    letter-spacing: 0;
+  }
 }
 .bottom-nav a[aria-current='page'] .pill {
   background: var(--green-light);
