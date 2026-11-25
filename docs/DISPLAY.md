@@ -184,7 +184,9 @@ atualiza nos horários e no botão do aparelho.
   bem mais; sem conferir, vários meses. Ligada no cabo USB, tanto faz.
 - **Modo de configuração** (trocar o endereço ou o Wi-Fi): **segure o KEY3 por 5 segundos**. A tela
   mostra as instruções e o aparelho fica acordado por até 15 minutos.
-- **Bateria fraca**: aparece um ícone de bateria no canto de baixo, à direita. Carregue pelo USB-C.
+- **Bateria**: o canto de baixo, à direita, mostra um ícone pequeno e o percentual (ex.: 87%),
+  medido na hora em que a tela atualizou. É uma estimativa pela tensão da bateria; ligada no USB, marca
+  100%. Carregue pelo USB-C quando estiver baixa. (A partir do programa 1.7.1.)
 - **Trocar o endereço** (se vazou): Configurações → Tela e-ink → **Trocar endereço**. O endereço antigo
   para de funcionar na próxima publicação. Depois, segure o KEY3 por 5 segundos e cole o
   novo endereço na página dele.

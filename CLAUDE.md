@@ -129,7 +129,9 @@ Publicado em https://brunoalmeida87.github.io/PanelAI/ (GitHub Pages), com dados
   confere), conferir[] (pares início/fim das 06:00–23:00 no fuso da casa, 8 dias), largura, altura`.
   Mudar campos exige mudar o firmware e subir `DEVICE_CONFIG_VERSION`. `displayDevice` ganhou
   `checkMinutes` (5/10/15/30/0, padrão 10), `autoGenerate` (padrão true) e `requestedAt`.
-- **Aparelho (firmware 1.7.0):** dorme no máximo 6 h por vez (relógio do ESP32 deriva), última
+- **Aparelho (firmware 1.7.1):** canto de baixo à direita mostra ícone + percentual da bateria
+  (`percentual_bateria`: curva LiPo 3,30 V = 0% … 4,20 V = 100%, -1 = não desenha; fonte
+  `fonte_bateria` só com números e "%"; mediana de 3 leituras no sensor). Além disso: dorme no máximo 6 h por vez (relógio do ESP32 deriva), última
   soneca ≤ 1 h antes do horário; das 6h às 23h acorda também a cada `conferir_cada` para conferir
   pedidos (`ate_conferir`; com falha vale só a espera por falhas); nas acordadas intermediárias só
   relê o `config.json`; no horário/botão/ligado/**pedido novo** (`pedido_novo`: `pedido != 0 &&

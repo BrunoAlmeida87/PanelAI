@@ -5,6 +5,7 @@
 
 #include <algorithm>
 #include <array>
+#include <cmath>
 #include <cstdint>
 #include <string>
 
@@ -140,6 +141,30 @@ inline Soneca calcular_soneca(uint32_t agora, const Agenda &agenda, bool falhou,
   }
   s.segundos = std::max(s.segundos, SONECA_MIN);
   return s;
+}
+
+/**
+ * Carga da bateria (0 a 100%) pela tensão, para o canto da tela. Curva típica
+ * de bateria de lítio (LiPo de 1 célula) em repouso; é uma estimativa (com o
+ * Wi-Fi ligado a tensão cai um pouco). -1 = leitura inválida (não desenha).
+ */
+inline int percentual_bateria(float volts) {
+  if (std::isnan(volts) || volts < 2.5f || volts > 5.5f) return -1;
+  // (tensão, %) do mais cheio ao mais vazio.
+  static constexpr float curva[][2] = {
+      {4.20f, 100}, {4.10f, 90}, {4.00f, 80}, {3.92f, 70}, {3.87f, 60}, {3.82f, 50},
+      {3.79f, 40},  {3.77f, 30}, {3.74f, 20}, {3.68f, 10}, {3.45f, 5},  {3.30f, 0},
+  };
+  constexpr int n = sizeof(curva) / sizeof(curva[0]);
+  if (volts >= curva[0][0]) return 100;  // cheia ou carregando pelo USB
+  if (volts <= curva[n - 1][0]) return 0;
+  for (int i = 1; i < n; i++) {
+    if (volts >= curva[i][0]) {
+      const float v0 = curva[i][0], v1 = curva[i - 1][0], p0 = curva[i][1], p1 = curva[i - 1][1];
+      return (int) std::lround(p0 + (volts - v0) / (v1 - v0) * (p1 - p0));
+    }
+  }
+  return 0;
 }
 
 /** Endereço colado na página do aparelho, sem espaços nem barra no fim. */

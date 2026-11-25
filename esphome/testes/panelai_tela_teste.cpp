@@ -3,6 +3,7 @@
 
 #include "panelai_tela.h"
 
+#include <cmath>
 #include <cstdio>
 #include <cstdlib>
 
@@ -143,6 +144,26 @@ int main() {
     // Gerada "para" as 06:00 (perto do horário): a principal já é a das 06:00
     CONFERE(horario_da_imagem(hoje_6h + 30, hoje_6h, ag) == 0);
     CONFERE(horario_da_imagem(0, ontem_22h, ag) == 0);
+  }
+
+  // ---------- Bateria (percentual no canto da tela) ----------
+  CONFERE(percentual_bateria(4.20f) == 100);
+  CONFERE(percentual_bateria(4.35f) == 100);  // carregando pelo USB
+  CONFERE(percentual_bateria(3.82f) == 50);
+  CONFERE(percentual_bateria(3.845f) == 55);  // entre dois pontos da curva
+  CONFERE(percentual_bateria(3.30f) == 0);
+  CONFERE(percentual_bateria(3.00f) == 0);
+  CONFERE(percentual_bateria(NAN) == -1);     // sem leitura: não desenha
+  CONFERE(percentual_bateria(0.10f) == -1);   // sem bateria / leitura errada
+  CONFERE(percentual_bateria(7.00f) == -1);
+  {
+    // Quanto mais tensão, mais carga (nunca volta para trás).
+    int antes = 0;
+    for (float v = 3.0f; v <= 4.3f; v += 0.01f) {
+      const int p = percentual_bateria(v);
+      CONFERE(p >= antes && p >= 0 && p <= 100);
+      antes = p;
+    }
   }
 
   // Endereço colado na página do aparelho

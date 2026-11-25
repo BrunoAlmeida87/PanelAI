@@ -38,7 +38,7 @@ esphome:
   min_version: 2026.7.0
   project:
     name: panelai.tela
-    version: "1.7.0"
+    version: "1.7.1"
   includes:
     - panelai_tela.h
   on_boot:
@@ -215,6 +215,11 @@ sensor:
     accuracy_decimals: 2
     filters:
       - multiply: 2.0 # divisor de tensão da placa
+      # Mediana das últimas leituras: tira os picos (o Wi-Fi puxa corrente em rajadas).
+      - median:
+          window_size: 3
+          send_every: 1
+          send_first_at: 1
 
 binary_sensor:
   # Botão KEY3 da lateral da placa (D4 / GPIO5, o que acordava o TRMNL). Segurar 5 s: modo de configuração.
@@ -315,6 +320,11 @@ font:
     size: 23
     glyphsets: [GF_Latin_Core]
     ignore_missing_glyphs: true
+  # Percentual da bateria no canto da tela: só números e "%".
+  - file: "gfonts://Inter@600"
+    id: fonte_bateria
+    size: 14
+    glyphs: ["0123456789%"]
 
 display:
   # Tela de 7,5" (UC8179, igual à Waveshare 7,5" V2), ligada na placa XIAO ePaper.
@@ -361,15 +371,20 @@ display:
         return;
       }
       it.image(0, 0, id(tela_img));
-      // Bateria fraca (abaixo de ~20%): ícone pequeno no canto de baixo, à direita.
-      const float v = id(bateria).state;
-      if (!std::isnan(v) && v > 2.5f && v < 3.5f) {
-        const int x = it.get_width() - 46, y = it.get_height() - 24;
-        it.filled_rectangle(x - 4, y - 4, 48, 24, Color::WHITE);
-        it.rectangle(x, y, 34, 16, Color::BLACK);
-        it.filled_rectangle(x + 34, y + 5, 3, 6, Color::BLACK);
-        const int nivel = std::max(1, (int) ((v - 3.27f) / (3.5f - 3.27f) * 6));
-        it.filled_rectangle(x + 2, y + 2, nivel, 12, Color::BLACK);
+      // Bateria: ícone pequeno e percentual (ex.: 87%) no canto de baixo, à direita,
+      // sobre um fundo branco. Sem leitura válida, não desenha nada.
+      const int carga = panelai::percentual_bateria(id(bateria).state);
+      if (carga >= 0) {
+        const int largura = 62, altura = 18;
+        const int x0 = it.get_width() - largura, y0 = it.get_height() - altura;
+        it.filled_rectangle(x0, y0, largura, altura, Color::WHITE);
+        // Pilha de 16 × 9 com o "nível" preenchido.
+        const int bx = x0 + 3, by = y0 + 5;
+        it.rectangle(bx, by, 16, 9, Color::BLACK);
+        it.filled_rectangle(bx + 16, by + 3, 2, 3, Color::BLACK);
+        const int nivel = (carga * 12 + 50) / 100;
+        if (nivel > 0) it.filled_rectangle(bx + 2, by + 2, nivel, 5, Color::BLACK);
+        it.printf(it.get_width() - 3, it.get_height() - 2, id(fonte_bateria), Color::BLACK, TextAlign::BOTTOM_RIGHT, "%d%%", carga);
       }
 
 script:
