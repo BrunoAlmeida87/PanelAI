@@ -4,7 +4,7 @@
 
 # PanelAI
 
-Organização alimentar e doméstica em um só lugar: **cardápio da semana, receitas, lista de compras, despensa e mercado do mês** — integrados. Ao escolher uma receita, o PanelAI ajusta as porções, soma os ingredientes repetidos, compara com o estoque e atualiza a lista de compras automaticamente.
+Organização alimentar e doméstica em um só lugar: **cardápio da semana, receitas, lista de compras, despensa e mercado do mês** — integrados — além das **tarefas da casa**, de um **guia Montessori de atividades para a criança (0 a 3 anos)** e da **tela e-ink** da cozinha. Ao escolher uma receita, o PanelAI ajusta as porções, soma os ingredientes repetidos, compara com o estoque e atualiza a lista de compras automaticamente.
 
 **Site publicado:** https://brunoalmeida87.github.io/PanelAI/
 
@@ -20,7 +20,8 @@ Funciona no computador e no celular (layouts diferentes para cada um), pode ser 
 | **Lista da semana** | Dois jeitos (chave **Puxar ingredientes do cardápio**): **manual** — você escreve o que quer comprar, um item por linha, e escolhe o dia ("2 kg de batata" já entende a quantidade); ou **automática** — gerada do cardápio: ingredientes somados, convertidos e comparados com o estoque. Agrupada por dia de mercado e categoria. Marcação com um toque, itens avulsos, ajuste manual de quantidade, "já tenho em casa", rastreio de quais receitas geraram cada item, registro da compra no estoque, WhatsApp e impressão. |
 | **Mercado do mês** | **Estoque** (quantidade, mínimo, desejado, última atualização), **Contagem** (inventário da despensa com rascunho salvo) e **No mercado** (compras recorrentes com reposição calculada e finalização única). |
 | **Tarefas** | Tarefas da casa por dia da semana: marcar como feita, registrar pendência com recado, adiar para outra data (a nova data mostra de onde veio e a antiga mostra para onde foi), recados e histórico completo de quem fez cada alteração. Toda tarefa fica salva para usar de novo; tarefas fixas se repetem sozinhas (semanal, quinzenal ou mensal). Filtros por situação e pessoa, cópia da semana anterior e envio pelo WhatsApp. |
-| **Display e-ink** | Editor visual do que aparece na tela e-ink: modelo e posição da tela, cores, grade, cards arrastáveis e redimensionáveis (data, **clima** — tempo agora, "vai chover?", chance de chuva hora a hora e previsão de 1 a 7 dias, pelo Open-Meteo, grátis e sem cadastro —, cardápio do dia/semana, tarefas, pendências, lista de compras da semana ou só de hoje/amanhã, despensa, marmitas, preparos, resumo, recado), tamanho do texto, borda e destaque por card, layouts sugeridos e vários layouts salvos. A tela pronta fica em `#/display/tela`. A tela física da casa (**kit TRMNL 7,5" DIY da Seeed, com o programa do PanelAI**, sem o serviço pago do TRMNL) se atualiza sozinha pela internet nos horários de Configurações → Tela e-ink, sem computador ligado: o GitHub gera a imagem a cada 30 minutos com uma conta de tela só de leitura e publica num endereço secreto; o programa do aparelho é instalado pelo navegador ([como funciona e como configurar](docs/DISPLAY.md)). |
+| **Montessori** | Guia de atividades de 0 a 3 anos personalizado pela idade da criança (calculada pela data de nascimento, com idade corrigida para prematuros até os 2 anos). Mostra a fase atual (0–3, 3–6, 6–9, 9–12, 12–18, 18–24 e 24–36 meses), **três sugestões por dia** (variando as categorias, com pelo menos uma da rotina da casa, preferindo as ainda não apresentadas e as feitas há mais tempo, e levando em conta o interesse), botões "Novas sugestões", "Trocar" e "Incluir nas de hoje", biblioteca com busca e filtros por faixa, categoria e status, detalhe completo de cada atividade (materiais, passo a passo, duração, segurança e referências), registro simples (data, interesse, autonomia e observações) e histórico. Sem notas, metas nem comparações: as sugestões são convites. Um card "Montessori hoje" aparece no Cardápio e o card "Montessori de hoje" pode ir para a tela e-ink. A biblioteca fica em `src/data/montessori_activities.json`. |
+| **Display e-ink** | Editor visual do que aparece na tela e-ink: modelo e posição da tela, cores, grade, cards arrastáveis e redimensionáveis (data, **clima** — tempo agora, "vai chover?", chance de chuva hora a hora e previsão de 1 a 7 dias, pelo Open-Meteo, grátis e sem cadastro —, cardápio do dia/semana, tarefas, pendências, lista de compras da semana ou só de hoje/amanhã, despensa, marmitas, preparos, resumo, Montessori de hoje, recado), tamanho do texto, borda e destaque por card, layouts sugeridos e vários layouts salvos. A tela pronta fica em `#/display/tela`. A tela física da casa (**kit TRMNL 7,5" DIY da Seeed, com o programa do PanelAI**, sem o serviço pago do TRMNL) se atualiza sozinha pela internet nos horários de Configurações → Tela e-ink, sem computador ligado: o GitHub gera a imagem a cada 30 minutos com uma conta de tela só de leitura e publica num endereço secreto; o programa do aparelho é instalado pelo navegador ([como funciona e como configurar](docs/DISPLAY.md)). |
 | **Receitas** | Pratos e lanches com ingredientes estruturados, porções, tempo, dificuldade, proteína, composição, modo de preparo, marmita, congelamento, preparo antecipado e imagem opcional. Busca, filtros, favoritas, duplicar, excluir e **"Com o que tenho"** (sugestões pelo estoque). |
 | **Configurações e histórico** | Pessoas na casa, dias de mercado, exportar/importar JSON, restaurar demonstração, compras concluídas, movimentações de estoque e semanas anteriores. |
 
@@ -37,8 +38,8 @@ Funciona no computador e no celular (layouts diferentes para cada um), pode ser 
 
 ## Celular e computador
 
-- **Computador (≥ 900 px):** navegação superior, calendário com 7 colunas (4 em telas médias), indicadores lado a lado, lista em colunas por categoria, despensa em tabela editável, filtros laterais nas receitas, modais centralizados e atalhos de teclado (`1`–`4` módulos, `←`/`→` semanas, `T` semana atual, `/` buscar, `N` nova receita, `?` ajuda).
-- **Celular (< 600 px):** barra inferior fixa (Cardápio, Compras, Despensa, Receitas) respeitando áreas seguras, cardápio **um dia por vez** com seletor de dias e gesto de deslizar (ou resumo da semana), seletores em tela cheia com rodapé fixo, lista de compras com linhas grandes (tocar marca), categorias recolhíveis, contagem de restantes fixa no topo, estoque em cartões com botões − / +, filtros em painel.
+- **Computador (≥ 900 px):** navegação superior, calendário com 7 colunas (4 em telas médias), indicadores lado a lado, lista em colunas por categoria, despensa em tabela editável, filtros laterais nas receitas, modais centralizados e atalhos de teclado (`1`–`6` módulos, `←`/`→` semanas, `T` semana atual, `/` buscar, `N` nova receita, `?` ajuda).
+- **Celular (< 600 px):** barra inferior fixa (Cardápio, Compras, Despensa, Receitas, Tarefas, Montessori) respeitando áreas seguras, cardápio **um dia por vez** com seletor de dias e gesto de deslizar (ou resumo da semana), seletores em tela cheia com rodapé fixo, lista de compras com linhas grandes (tocar marca), categorias recolhíveis, contagem de restantes fixa no topo, estoque em cartões com botões − / +, filtros em painel.
 - **Tablet (600–899 px):** barra inferior e calendário em 2 colunas.
 - Alvos de toque ≥ 44 px, foco visível, rótulos acessíveis, respeito a "reduzir movimento", retrato e paisagem.
 
@@ -48,7 +49,7 @@ Funciona no computador e no celular (layouts diferentes para cada um), pode ser 
 - **Exportar:** Configurações → *Exportar (JSON)*. **Importar:** Configurações → *Importar*. O arquivo é validado antes de qualquer alteração; arquivos inválidos são recusados sem mexer nos dados.
 - **Sincronização na nuvem (opcional):** com o Firebase configurado em `src/cloud/firebase-config.js`, as pessoas da casa entram com Google ou e-mail e senha e compartilham os mesmos dados no Firestore, com atualização em tempo real e funcionamento offline (as alterações são enviadas quando a conexão volta). Regras de segurança em `firestore.rules`. Configuração completa em [docs/FIREBASE.md](docs/FIREBASE.md).
   - Duas pessoas marcando a lista (ou contando a despensa, ou no mercado do mês) ao mesmo tempo não apagam as marcações uma da outra: cada item vale pela alteração mais recente.
-  - Registros antigos (histórico, compras, tarefas concluídas, semanas passadas) são agrupados por mês na nuvem, para a abertura do app não ficar mais cara com o tempo.
+  - Registros antigos (histórico, compras, tarefas concluídas, semanas passadas, registros Montessori) são agrupados por mês na nuvem, para a abertura do app não ficar mais cara com o tempo.
   - Num aparelho novo sem internet, o app espera os dados da casa em vez de abrir vazio.
   - **Login obrigatório:** sem login aparece só a tela de entrar (também em `#/display/tela`). Nela, **"Experimentar sem conta"** abre o **modo de teste**: qualquer pessoa com o link conhece o app com os dados de exemplo, guardados só naquele navegador (banco separado, sem Firebase e sem nada na nuvem). Uma faixa no topo lembra que é teste e tem o botão "Entrar na conta". Cada alteração fica registrada com o e-mail de quem a fez. Importar, restaurar demonstração e começar do zero ficam só com o responsável pela casa, e as regras do Firestore bloqueiam a criação de casas novas.
 - Sem Firebase configurado, não há sincronização entre aparelhos: exporte e importe para levar os dados.
@@ -128,13 +129,13 @@ PanelAI/
 ├── src/
 │   ├── main.jsx, App.jsx     # entrada, cabeçalho, navegação, atalhos
 │   ├── components/           # modal/bottom sheet, toasts, confirmação, stepper, seletor de semana
-│   ├── pages/                # Cardápio, Lista, Mercado do mês, Receitas, Configurações, Histórico
+│   ├── pages/                # Cardápio, Lista, Mercado do mês, Receitas, Tarefas, Montessori, Display, Configurações, Histórico
 │   ├── services/             # regras: demanda, lista, estoque, indicadores, sugestões, backup
-│   ├── models/               # constantes, unidades e conversões, validação de receitas
+│   ├── models/               # constantes, unidades e conversões, receitas, tarefas, Montessori (idade, sugestões)
 │   ├── storage/              # IndexedDB, estado global, ações
 │   ├── cloud/                # Firebase: configuração, login, casa, sincronização e formato na nuvem (layout.js)
 │   ├── display/              # display e-ink: modelos, cards, layouts, renderização e agenda da tela (schedule.js)
-│   ├── data/                 # catálogo de ingredientes, receitas e dados de demonstração
+│   ├── data/                 # catálogo de ingredientes, receitas, demonstração e biblioteca Montessori (montessori_activities.json)
 │   ├── utils/                # datas, roteador, hooks
 │   └── styles/               # tokens, componentes, layout e telas
 ├── tests/unit/               # Vitest
@@ -159,6 +160,7 @@ Panela minimalista verde-sálvia (`#789582`) sobre fundo verde muito claro (`#E7
 - Sem Firebase, os dados ficam no navegador: limpar os dados do site apaga o PanelAI. Faça backups.
 - Na nuvem, marcações da lista, contagem e mercado do mês se somam item a item; já o cardápio da semana, as receitas e os itens da despensa são gravados inteiros: se duas pessoas alterarem o mesmo registro no mesmo instante, vale a última gravação.
 - Sugestões usam regras locais (sem IA externa).
+- Montessori: o conteúdo do livro de referência (Maria Stampfer, *Montessori – O guia para bebês e crianças de 0 a 3 anos*) não estava disponível para consulta, então nenhuma atividade foi atribuída a ele: as 78 atividades são complementares, baseadas na metodologia Montessori e nas referências citadas em cada uma. As idades são aproximadas. Atividades do livro podem ser acrescentadas ao JSON com `"origem": "livro"` e a página.
 - Conversões entre massa, volume e unidades dependem dos dados do ingrediente; sem eles, as quantidades aparecem separadas na lista.
 - Imagens de receitas são reduzidas e guardadas localmente; muitas imagens aumentam o tamanho do backup.
 - A tela e-ink mostra a imagem gerada até ~30 minutos antes do horário de atualização; quem tiver o endereço secreto vê a imagem (não o sistema). Detalhes em [docs/DISPLAY.md](docs/DISPLAY.md).

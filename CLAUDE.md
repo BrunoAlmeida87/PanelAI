@@ -1,7 +1,8 @@
 # CLAUDE.md — contexto do PanelAI para sessões futuras
 
 PanelAI é o app de organização da casa do dono do repositório: cardápio da semana, receitas, lista de compras,
-despensa/mercado do mês, tarefas da casa e um **display e-ink** (tela física na cozinha).
+despensa/mercado do mês, tarefas da casa, guia **Montessori** (atividades para a criança de 0 a 3 anos) e um
+**display e-ink** (tela física na cozinha).
 Publicado em https://brunoalmeida87.github.io/PanelAI/ (GitHub Pages), com dados na nuvem
 (Firebase Auth + Firestore, projeto `house-management-2c5a9`). Repositório **público**.
 
@@ -41,6 +42,10 @@ Publicado em https://brunoalmeida87.github.io/PanelAI/ (GitHub Pages), com dados
 - `src/storage/store.js` — estado, persistência (`persist`), modos `local | cloud | gate | demo`.
 - `src/cloud/` — `cloud.js` (Firebase: login, casa, sync em tempo real, manutenção), `session.js`
   (liga estado ↔ nuvem; cache da casa e do papel no localStorage), `layout.js` (formato no Firestore).
+- `src/models/montessori.js` — faixas, categorias, idade (corrigida p/ prematuros), registros e sugestões do
+  dia (funções puras, `tests/unit/montessori.test.js`); biblioteca em `src/data/montessori_activities.json`
+  (lida por `src/data/montessoriLibrary.js`); ações em `src/storage/montessoriActions.js`; tela em
+  `src/pages/MontessoriPage.jsx` + `src/pages/montessori/`.
 - `src/display/` — `model.js` (telas, cards, layouts), `data.js` (dados dos cards), `DisplayRender.jsx`,
   `schedule.js` (agenda da tela física e contrato do `config.json`).
 - `src/pages/` — telas; `settings/CloudSection.jsx` (login, pessoas e contas de tela),
@@ -134,6 +139,28 @@ Publicado em https://brunoalmeida87.github.io/PanelAI/ (GitHub Pages), com dados
 - Refeição escrita à mão = entrada `kind: 'text'` (já existia). No seletor, aba **Escrever** (lembra a
   última aba usada) e, na busca de receitas, "Usar “…” escrito à mão".
 
+## Montessori (decisões já tomadas)
+
+- **Livro de referência** (Maria Stampfer, *Montessori – O guia para bebês e crianças de 0 a 3 anos*,
+  Caminho Suave, 2024): o conteúdo não estava acessível. **Nenhuma atividade, idade ou página é
+  atribuída ao livro**; todas as 78 são `"origem": "complementar"` com referências verificáveis
+  (Montessori, Lillard & Jessen, Davies & Uzodike, Davies, OMS 2019, CDC 2022, SBP). Atividade do livro
+  só com `"origem": "livro"` e `"pagina"` (o teste exige a página). Não invente referências.
+- Dados: coleção `children` (`{ id, name, birthDate, gestationWeeks, plan: { date, ids, round } }`) e
+  `montessoriLogs` (`{ id, childId, activityId, date, interest: baixo|medio|alto,
+  autonomy: observou|ajuda|sozinha, notes }`), separadas do catálogo (atividade que sai do JSON continua
+  no histórico pelo id). Registros antigos vão para `montessoriLogsArchive` (arquivo mensal).
+- **Sugestões do dia** são determinísticas (criança + data + registros **anteriores** ao dia): todos os
+  aparelhos e a tela e-ink veem a mesma lista sem gravar nada. Só "Novas sugestões"/"Trocar"/"Incluir"
+  gravam `child.plan` para o dia. Registrar hoje não muda a lista de hoje; "Novas sugestões" mantém as
+  já feitas hoje.
+- Sem pontuação, metas, gráficos ou comparação entre crianças (pedido do dono). Interesse baixo só
+  afasta a atividade por 14 dias.
+- "Restaurar demonstração", "Começar do zero" e importar backup antigo (sem as coleções) **mantêm** a
+  criança e o histórico.
+- Card "Montessori hoje" no Cardápio (preferência por aparelho `panelai.montessoriHomeCard`) e card
+  `montessori` no display (layout sugerido "Família").
+
 ## Armadilhas conhecidas
 
 - Workflows agendados (`schedule`) só rodam a partir da branch `main`; o GitHub desativa agendamentos
@@ -147,5 +174,7 @@ Publicado em https://brunoalmeida87.github.io/PanelAI/ (GitHub Pages), com dados
 - Em JSX/Preact, hooks antes de qualquer `return` condicional (há um caso em `DisplayScreen`).
 - O service worker do PWA não pode tratar `/tela/…` e `/instalar-tela.html` como telas do app
   (`navigateFallbackDenylist` no `vite.config.js`), senão o link da imagem abre o app.
+- Menu superior com 6 módulos: só ícones de 900 a 1023 px, nomes curtos até 1279 px (`layout.css`). Ao criar
+  outro módulo, confira o teste de responsividade (960, 1024 e 1200 px).
 - `__APP_VERSION__` vem do `package.json` (definido no `vite.config.js`); ao lançar versão, suba o
   `version` do `package.json` (e do `package-lock.json`).

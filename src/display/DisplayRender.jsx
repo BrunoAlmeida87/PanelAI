@@ -6,6 +6,7 @@ import { cardType, colorMode, screenSize } from './model.js';
 import { forecastView, formatMm } from './weather.js';
 import { useForecast } from './useWeather.js';
 import { formatDayMonth, weekdayName, weekdayShort, addDays, weekStartOf, formatWeekRange, parseISODate } from '../utils/dates.js';
+import { formatAge, montessoriCategory } from '../models/montessori.js';
 
 const MONTHS = ['janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho', 'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'];
 const pad = (n) => String(n).padStart(2, '0');
@@ -103,6 +104,8 @@ function CardBody({ card, data }) {
       return <Summary data={data} />;
     case 'weather':
       return <Weather o={o} data={data} />;
+    case 'montessori':
+      return <Montessori o={o} data={data} />;
     case 'note':
       return <p class="eink-note" style={{ textAlign: o.align ?? 'center' }}>{o.text}</p>;
     default:
@@ -463,6 +466,43 @@ function Weather({ o, data }) {
           previsão de {pad(stamp.getHours())}:{pad(stamp.getMinutes())}
         </span>
       )}
+    </div>
+  );
+}
+
+function Montessori({ o, data }) {
+  const kids = data.montessori?.() ?? [];
+  if (!kids.length) return <Empty>Cadastre a criança na aba Montessori.</Empty>;
+  return (
+    <div class="eink-montessori">
+      {kids.map(({ child, age, items }) => {
+        const list = o.showDone === false ? items.filter((i) => !i.done) : items;
+        return (
+          <div key={child.id} class="kid">
+            {o.showChild !== false && (
+              <div class="kid-name">
+                {child.name}
+                {age ? <span class="who"> · {formatAge(age)}</span> : null}
+              </div>
+            )}
+            {list.length ? (
+              <ul class="eink-list">
+                {list.map(({ activity: a, done }) => (
+                  <li key={a.id} class={done ? 'done' : ''}>
+                    <Box on={done} />
+                    <span class="txt">
+                      {a.nome}
+                      {o.showCategory ? <span class="who"> · {montessoriCategory(a.categoria)?.short}</span> : null}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <Empty>{items.length ? 'Tudo feito hoje. 👏' : 'Nenhuma atividade escolhida.'}</Empty>
+            )}
+          </div>
+        );
+      })}
     </div>
   );
 }

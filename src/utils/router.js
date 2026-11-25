@@ -13,6 +13,7 @@ const ROUTES = [
   ['ajustes', /^\/ajustes$/],
   ['historico', /^\/historico$/],
   ['tarefas', /^\/tarefas$/],
+  ['montessori', /^\/montessori$/],
   ['display', /^\/display$/],
   ['display-tela', /^\/display\/tela$/],
 ];

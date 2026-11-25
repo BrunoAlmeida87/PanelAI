@@ -220,6 +220,15 @@
   border-width: 3px;
 }
 
+.eink-montessori {
+  display: grid;
+  gap: 0.5em;
+}
+.eink-montessori .kid-name {
+  font-weight: 800;
+  margin-bottom: 0.2em;
+}
+
 .eink-summary {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));

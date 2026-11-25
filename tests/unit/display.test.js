@@ -128,3 +128,34 @@ describe('display: dados dos cards', () => {
     expect(buildDisplayData(seed, real).updatedAt).toBe(real); // sem horário agendado: o mesmo instante
   });
 });
+
+describe('display: Montessori de hoje', () => {
+  it('mostra as atividades do dia da criança, com as feitas marcadas, sem gravar nada', () => {
+    const now = new Date('2026-11-24T06:00:00');
+    const child = { id: 'crianca_ana', name: 'Ana', birthDate: '2025-07-10', gestationWeeks: null, plan: null };
+    const s = { ...buildSeed(now), children: { [child.id]: child }, montessoriLogs: {} };
+    const [kid] = buildDisplayData(s, now).montessori();
+    expect(kid.child.name).toBe('Ana');
+    expect(kid.band.id).toBe('12-18');
+    expect(kid.items).toHaveLength(3);
+    expect(kid.items.every((i) => !i.done)).toBe(true);
+
+    // Registrada hoje: aparece marcada; a lista do dia não muda.
+    const first = kid.items[0].activity.id;
+    const log = { id: 'mreg_1', childId: child.id, activityId: first, date: '2026-11-24', interest: 'alto', autonomy: 'ajuda', notes: '' };
+    const [after] = buildDisplayData({ ...s, montessoriLogs: { [log.id]: log } }, now).montessori();
+    expect(after.items.map((i) => i.activity.id)).toEqual(kid.items.map((i) => i.activity.id));
+    expect(after.items[0].done).toBe(true);
+
+    // Lista escolhida à mão para o dia vale também na tela.
+    const planned = { ...child, plan: { date: '2026-11-24', ids: ['regar-as-plantas'] } };
+    const [p] = buildDisplayData({ ...s, children: { [child.id]: planned } }, now).montessori();
+    expect(p.items.map((i) => i.activity.id)).toEqual(['regar-as-plantas']);
+    expect(s.children[child.id].plan).toBeNull();
+  });
+
+  it('sem criança cadastrada, o card fica vazio', () => {
+    const now = new Date('2026-11-24T06:00:00');
+    expect(buildDisplayData(buildSeed(now), now).montessori()).toEqual([]);
+  });
+});

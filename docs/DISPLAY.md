@@ -125,6 +125,10 @@ que aparece na tela para colar o endereço da imagem.
 - **Compras do dia na tela**: no card **Lista de compras**, opção **Mostrar → Só hoje** (ou só amanhã).
   Com a lista manual (Lista da semana → desligar "Puxar ingredientes do cardápio"), aparece exatamente
   o que você escreveu para aquele dia.
+- **Atividades Montessori do dia**: na aba Display, **Adicionar card → Montessori de hoje** (ou o layout
+  sugerido **Família**). Mostra o nome e a idade da criança e as atividades do dia, com as já
+  registradas marcadas. A lista é a mesma da aba Montessori: muda quando alguém toca em
+  "Novas sugestões", "Trocar" ou "Incluir", e as marcações aparecem na próxima atualização da tela.
 - **Atualizar agora**: aperte o **botão** do aparelho (o mesmo que acordava o TRMNL; na placa é o D4 /
   GPIO5). A imagem tem no máximo ~30 minutos.
 - **Modo de configuração** (trocar o endereço ou o Wi-Fi): **segure o botão por 5 segundos**. A tela

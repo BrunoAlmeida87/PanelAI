@@ -9,6 +9,7 @@ import { isBelowMin } from '../services/pantry.js';
 import { entryLabel } from '../services/share.js';
 import { missingRecurring, overdueTasks, tasksOn, weekSummary } from '../models/tasks.js';
 import { addDays, todayISO, weekDates, weekStartOf } from '../utils/dates.js';
+import { montessoriToday } from '../data/montessoriLibrary.js';
 
 /**
  * Tarefas da semana atual e da próxima, incluindo as tarefas fixas que ainda
@@ -99,6 +100,10 @@ export function buildDisplayData(s, now = new Date(), updatedAt = now) {
     return { tasksDone: t.done, tasksTotal: t.total, pending: t.pending, planned, plannedTotal: 14, toBuy: shop.filter((i) => !i.checked).length };
   };
 
+  // Atividades Montessori do dia: calculadas sem gravar (a conta da tela só lê).
+  let montessori = null;
+  const getMontessori = () => (montessori ??= montessoriToday(s, today));
+
   return {
     now,
     updatedAt,
@@ -120,5 +125,6 @@ export function buildDisplayData(s, now = new Date(), updatedAt = now) {
     marmitas,
     prep,
     summary,
+    montessori: getMontessori,
   };
 }

@@ -56,7 +56,7 @@ function useDisplayData(fixedNow = null) {
   const real = ticking.getTime();
   return useMemo(
     () => buildDisplayData(s, now, ticking),
-    [s.weeks, s.tasks, s.taskTemplates, s.recipes, s.marmitas, s.pantry, s.ingredients, s.settings, at, real],
+    [s.weeks, s.tasks, s.taskTemplates, s.recipes, s.marmitas, s.pantry, s.ingredients, s.settings, s.children, s.montessoriLogs, at, real],
   );
 }
 

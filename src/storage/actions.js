@@ -520,20 +520,31 @@ export function exportData() {
   return buildBackup(getState());
 }
 
+/** Dados da aba Montessori atuais (mantidos ao restaurar a demonstração ou começar do zero). */
+const montessoriData = (s = getState()) => ({ children: s.children, montessoriLogs: s.montessoriLogs });
+
 export async function importData(data) {
-  const full = { ...data, settings: { ...DEFAULT_SETTINGS, ...data.settings } };
+  const s = getState();
+  const full = {
+    ...data,
+    // Backup de versão anterior (sem a aba Montessori): mantém o que já existe.
+    children: data.children ?? s.children,
+    montessoriLogs: data.montessoriLogs ?? s.montessoriLogs,
+    settings: { ...DEFAULT_SETTINGS, ...data.settings },
+  };
   await persist(seedOps(full));
   applyFullData(full);
 }
 
+/** Volta aos dados de exemplo. A criança e o histórico Montessori são dados reais: ficam como estão. */
 export async function resetDemo() {
   const { buildSeed } = await import('../data/seed.js');
-  const seed = buildSeed();
+  const seed = { ...buildSeed(), ...montessoriData() };
   await persist(seedOps(seed));
   applyFullData(seed);
 }
 
-/** Apaga cardápios, estoque, tarefas e histórico, mantendo receitas, catálogo, tarefas salvas e layouts. */
+/** Apaga cardápios, estoque, tarefas e histórico, mantendo receitas, catálogo, tarefas salvas, layouts e a aba Montessori. */
 export async function startFresh() {
   const s = getState();
   const data = {
@@ -547,6 +558,7 @@ export async function startFresh() {
     tasks: {},
     taskTemplates: s.taskTemplates,
     displayLayouts: s.displayLayouts,
+    ...montessoriData(s),
     settings: s.settings,
   };
   await persist(seedOps(data));
