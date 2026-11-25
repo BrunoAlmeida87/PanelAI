@@ -236,6 +236,163 @@
   font-size: 0.7em;
 }
 
+/* Clima */
+.eink-weather {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4em;
+  height: 100%;
+  min-height: 0;
+}
+.eink-weather .w-ico {
+  flex: none;
+  display: inline-block;
+  vertical-align: -0.15em;
+}
+.w-now {
+  display: flex;
+  align-items: center;
+  gap: 0.45em;
+  flex: none;
+}
+.w-temp {
+  font-size: 2.3em;
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: -0.02em;
+}
+.w-now-txt {
+  display: grid;
+  min-width: 0;
+  line-height: 1.2;
+}
+.w-now-txt b {
+  font-weight: 750;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.w-now-txt span {
+  font-size: 0.78em;
+}
+.w-rain {
+  display: flex;
+  align-items: center;
+  gap: 0.35em;
+  flex: none;
+  font-size: 0.9em;
+  font-weight: 650;
+  line-height: 1.2;
+}
+.w-rain.yes {
+  padding: 0.2em 0.45em;
+  border-radius: 0.3em;
+  background: var(--accent);
+  color: #fff;
+  font-weight: 800;
+}
+.eink-card.invert .w-rain.yes {
+  background: #fff;
+  color: #000;
+}
+.w-details {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.15em 0.8em;
+  font-size: 0.75em;
+  flex: none;
+}
+.w-hours {
+  display: grid;
+  gap: 0.25em;
+  flex: 1 1 4.2em;
+  min-height: 3.6em;
+  max-height: 7em;
+}
+.w-hour {
+  display: grid;
+  grid-template-rows: auto 1fr auto auto;
+  justify-items: center;
+  min-width: 0;
+  min-height: 0;
+  font-size: 0.72em;
+  line-height: 1.15;
+}
+.w-h-pct {
+  font-weight: 800;
+}
+.w-bar {
+  position: relative;
+  width: 60%;
+  max-width: 1.6em;
+  min-height: 0.6em;
+  border: 1.5px solid currentColor;
+  border-radius: 0.15em;
+  margin: 0.1em 0;
+}
+.w-bar i {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: currentColor;
+}
+.w-h-lbl {
+  font-weight: 700;
+}
+.w-days {
+  display: grid;
+  gap: 0.15em 0.4em;
+  flex: none;
+}
+.w-days.rows .w-day {
+  display: grid;
+  grid-template-columns: 4.6em 1.4em 5.2em auto minmax(0, 1fr);
+  align-items: center;
+  gap: 0.35em;
+  border-top: 1px solid currentColor;
+  padding-top: 0.15em;
+  font-size: 0.85em;
+  white-space: nowrap;
+}
+.w-days.cols .w-day {
+  display: grid;
+  justify-items: center;
+  gap: 0.1em;
+  font-size: 0.8em;
+  min-width: 0;
+}
+.w-days.cols .w-day + .w-day {
+  border-left: 1px solid currentColor;
+}
+.w-d-name {
+  font-weight: 800;
+  text-transform: uppercase;
+  font-size: 0.85em;
+}
+.w-day.today .w-d-name {
+  color: var(--accent);
+}
+.eink-card.invert .w-day.today .w-d-name {
+  color: inherit;
+}
+.w-d-temp b {
+  font-weight: 800;
+}
+.w-d-rain {
+  white-space: nowrap;
+}
+.w-d-desc {
+  font-size: 0.85em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.w-stale {
+  margin-top: auto;
+  font-size: 0.65em;
+  font-style: italic;
+}
+
 /* ---------- Editor ---------- */
 .display-editor {
   display: grid;
@@ -437,4 +594,30 @@
   .display-fullscreen .fs-hint {
     display: none;
   }
+}
+
+/* Cidade do card de clima (painel de propriedades) */
+.place-current {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border: 1px solid var(--border, #ddd);
+  border-radius: 10px;
+}
+.place-current .grow {
+  flex: 1;
+  min-width: 0;
+}
+.place-results {
+  display: grid;
+  gap: 2px;
+  margin-top: 6px;
+}
+.place-results .btn {
+  justify-content: flex-start;
+  text-align: left;
+  height: auto;
+  min-height: 34px;
+  white-space: normal;
 }

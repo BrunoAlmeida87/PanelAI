@@ -1,8 +1,8 @@
-// Seletor de refeição: Receita | Marmita | Fora / Texto.
+// Seletor de refeição: Receita | Escrever (texto livre) | Marmita | Fora de casa.
 // Desktop: modal centralizado. Celular: tela cheia (bottom sheet alto), com rodapé fixo.
 
 import { useMemo, useState } from 'preact/hooks';
-import { Search, Star, Check, ChevronDown, ChevronUp, Box, Utensils, MapPin, SlidersHorizontal } from 'lucide-preact';
+import { Search, Star, Check, ChevronDown, ChevronUp, Box, Utensils, MapPin, SlidersHorizontal, PencilLine } from 'lucide-preact';
 import { Modal, Stepper, Chip, Segmented, toast } from '../../components/ui.jsx';
 import { useStore } from '../../storage/store.js';
 import { addMeals, replaceMeal, createMarmita, marmitaUsage } from '../../storage/actions.js';
@@ -11,21 +11,48 @@ import { scaleIngredients, recipeSpeed } from '../../models/recipe.js';
 import { formatQty } from '../../models/units.js';
 import { addDays, formatDayMonth, weekDates, weekdayName, weekdayShort } from '../../utils/dates.js';
 import { normalizeText } from '../../utils/id.js';
-import { useIsPhone } from '../../utils/hooks.js';
+import { useIsPhone, usePref } from '../../utils/hooks.js';
 import { recipeSubtitle, speedBadge } from './common.js';
 
 const TABS = [
   { id: 'recipe', label: 'Receita', icon: Utensils },
+  { id: 'text', label: 'Escrever', icon: PencilLine },
   { id: 'marmita', label: 'Marmita', icon: Box },
-  { id: 'text', label: 'Fora / Texto', icon: MapPin },
+  { id: 'out', label: 'Fora', icon: MapPin },
 ];
+const TAB_IDS = TABS.map((t) => t.id);
+
+/** Refeições já escritas à mão (as mais usadas primeiro), para tocar e repetir. */
+function writtenMeals(weeks, max = 12) {
+  const count = new Map();
+  for (const w of Object.values(weeks ?? {})) {
+    for (const day of Object.values(w.meals ?? {})) {
+      for (const list of Object.values(day ?? {})) {
+        for (const e of list ?? []) {
+          const t = e.kind === 'text' ? (e.text ?? '').trim() : '';
+          if (t) count.set(t, (count.get(t) ?? 0) + 1);
+        }
+      }
+    }
+  }
+  return [...count.entries()]
+    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], 'pt-BR'))
+    .slice(0, max)
+    .map(([t]) => t);
+}
 
 export function MealPicker({ weekId, date, slot, replaceEntryId = null, onClose }) {
   const s = useStore();
   const isPhone = useIsPhone();
   const people = s.settings.people;
   const slotInfo = MEAL_SLOTS.find((x) => x.id === slot);
-  const [tab, setTab] = useState('recipe');
+  // Lembra a última aba usada (quem escreve à mão não precisa trocar toda vez).
+  const [savedTab, setSavedTab] = usePref('pickerTab', 'recipe');
+  const [tab, setTabState] = useState(TAB_IDS.includes(savedTab) ? savedTab : 'recipe');
+  const setTab = (t) => {
+    setTabState(t);
+    setSavedTab(t);
+  };
   const [repeat, setRepeat] = useState([]); // outras datas
 
   // --- Receita
@@ -47,10 +74,11 @@ export function MealPicker({ weekId, date, slot, replaceEntryId = null, onClose 
   const [newPrep, setNewPrep] = useState(addDays(date, -1) < weekId ? date : addDays(date, -1));
   const [newStorage, setNewStorage] = useState('geladeira');
 
-  // --- Texto
-  const [textKind, setTextKind] = useState('out');
+  // --- Texto (Escrever / Fora)
   const [text, setText] = useState('');
   const [note, setNote] = useState('');
+  const weeks = s.weeks;
+  const written = useMemo(() => (tab === 'text' ? writtenMeals(weeks) : []), [tab, weeks]);
 
   const recipes = useMemo(() => {
     const q = normalizeText(query);
@@ -117,9 +145,15 @@ export function MealPicker({ weekId, date, slot, replaceEntryId = null, onClose 
         save([{ kind: 'marmita', marmitaId: m.id, servings: each, note: '' }]);
       }
     } else {
-      if (textKind === 'text' && !text.trim()) return toast('Descreva a refeição', { type: 'error' });
-      save([{ kind: textKind, text: text.trim(), note: note.trim() }]);
+      if (tab === 'text' && !text.trim()) return toast('Escreva o que vai ter na refeição', { type: 'error' });
+      save([{ kind: tab, text: text.trim(), note: note.trim() }]);
     }
+  }
+
+  /** Busca sem receita certa: usa o próprio texto digitado como refeição. */
+  function saveQueryAsText() {
+    const t = query.trim();
+    if (t) save([{ kind: 'text', text: t.slice(0, 120), note: '' }]);
   }
 
   const dates = weekDates(weekId);
@@ -268,7 +302,18 @@ export function MealPicker({ weekId, date, slot, replaceEntryId = null, onClose 
                 </div>
               );
             })}
-            {!recipes.length && <p class="muted small" style="padding:16px;text-align:center">Nenhuma receita encontrada.</p>}
+            {!recipes.length && <p class="muted small" style="padding:16px 16px 4px;text-align:center">Nenhuma receita encontrada.</p>}
+            {query.trim() && !selected.length && (
+              <div class="picker-row">
+                <button type="button" onClick={saveQueryAsText}>
+                  <PencilLine size={18} aria-hidden="true" />
+                  <span class="p-main">
+                    <span class="p-name">Usar “{query.trim()}” escrito à mão</span>
+                    <span class="p-sub">Sem receita: aparece no cardápio e na tela como você escreveu</span>
+                  </span>
+                </button>
+              </div>
+            )}
           </div>
         </>
       )}
@@ -374,31 +419,54 @@ export function MealPicker({ weekId, date, slot, replaceEntryId = null, onClose 
 
       {tab === 'text' && (
         <div class="form-grid" style="margin-top:4px">
-          <Segmented
-            options={[
-              { id: 'out', label: 'Fora de casa' },
-              { id: 'text', label: 'Texto livre' },
-            ]}
-            value={textKind}
-            onChange={setTextKind}
-            label="Tipo"
-            block
-          />
           <label class="field">
-            <span class="label">{textKind === 'out' ? 'Onde? (opcional)' : 'Refeição'}</span>
+            <span class="label">O que vai ter?</span>
             <input
               class="input"
               value={text}
               maxLength={120}
-              placeholder={textKind === 'out' ? 'Ex.: restaurante, casa da vó' : 'Ex.: sobras do almoço, frutas'}
+              autoFocus={!isPhone}
+              placeholder="Ex.: arroz, feijão e bife acebolado"
               onInput={(e) => setText(e.currentTarget.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  confirm();
+                }
+              }}
             />
+          </label>
+          {written.length > 0 && (
+            <div class="field">
+              <span class="label">Já escritos antes</span>
+              <div class="chip-row" role="group" aria-label="Refeições já escritas">
+                {written.map((t) => (
+                  <Chip key={t} pressed={text.trim() === t} onClick={() => setText(t)}>
+                    {t}
+                  </Chip>
+                ))}
+              </div>
+            </div>
+          )}
+          <label class="field">
+            <span class="label">Observação (opcional)</span>
+            <input class="input" value={note} maxLength={200} onInput={(e) => setNote(e.currentTarget.value)} />
+          </label>
+          <p class="small muted">Comida escrita à mão aparece no cardápio e na tela e-ink do jeito que você escreveu. Não gera itens na lista de compras.</p>
+        </div>
+      )}
+
+      {tab === 'out' && (
+        <div class="form-grid" style="margin-top:4px">
+          <label class="field">
+            <span class="label">Onde? (opcional)</span>
+            <input class="input" value={text} maxLength={120} placeholder="Ex.: restaurante, casa da vó" onInput={(e) => setText(e.currentTarget.value)} />
           </label>
           <label class="field">
             <span class="label">Observação</span>
             <input class="input" value={note} maxLength={200} onInput={(e) => setNote(e.currentTarget.value)} />
           </label>
-          <p class="small muted">Refeições fora de casa e em texto livre não geram itens na lista de compras.</p>
+          <p class="small muted">Refeições fora de casa não geram itens na lista de compras.</p>
         </div>
       )}
     </Modal>

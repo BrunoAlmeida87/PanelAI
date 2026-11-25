@@ -29,7 +29,12 @@ function displayTasks(s, today, weekId, now) {
   return planned.length ? [...stored, ...planned] : stored;
 }
 
-export function buildDisplayData(s, now = new Date()) {
+/**
+ * @param now       instante "da tela" (dia de hoje, horas do clima…). Perto de um horário
+ *                  agendado, a imagem é feita para ele (ex.: 00:00, para já mostrar o dia novo).
+ * @param updatedAt quando a imagem foi realmente gerada ("Atualizado às" do card de data).
+ */
+export function buildDisplayData(s, now = new Date(), updatedAt = now) {
   const today = todayISO(now);
   const tomorrow = addDays(today, 1);
   const weekId = weekStartOf(today);
@@ -49,18 +54,22 @@ export function buildDisplayData(s, now = new Date()) {
       })),
     }));
 
-  let shopping = null;
-  const getShopping = () => {
-    if (shopping) return shopping;
-    const week = weekOf(today);
-    const demand = computeDemand({ weekId, week, recipesById: s.recipes, ingredientsById: s.ingredients, marmitas: Object.values(s.marmitas) });
-    const list = buildShoppingList({ weekId, week, demand, pantry: s.pantry, ingredientsById: s.ingredients, settings: s.settings });
-    shopping = [
-      ...list.buyItems.map((i) => ({ name: i.name, qty: formatQty(i.toBuy, i.unit), checked: i.checked, category: i.category })),
-      ...list.extras.map((e) => ({ name: e.name, qty: e.qty ? formatQty(e.qty, e.unit) : '', checked: e.checked, category: e.category ?? 'outros' })),
-      ...list.toCheck.filter((t) => t.missing).map((t) => ({ name: t.name, qty: '', checked: t.checked, category: t.category })),
-    ];
-    return shopping;
+  const shoppingCache = new Map();
+  /** Lista de compras da semana de `date` (padrão: hoje). Com `onlyDay`, só o que é para aquele dia. */
+  const getShopping = (date = today, onlyDay = false) => {
+    const wid = weekStartOf(date);
+    if (!shoppingCache.has(wid)) {
+      const week = weekOf(date);
+      const demand = computeDemand({ weekId: wid, week, recipesById: s.recipes, ingredientsById: s.ingredients, marmitas: Object.values(s.marmitas) });
+      const list = buildShoppingList({ weekId: wid, week, demand, pantry: s.pantry, ingredientsById: s.ingredients, settings: s.settings });
+      shoppingCache.set(wid, [
+        ...list.buyItems.map((i) => ({ name: i.name, qty: formatQty(i.toBuy, i.unit), checked: i.checked, category: i.category, date: i.marketDate })),
+        ...list.extras.map((e) => ({ name: e.name, qty: e.qty ? formatQty(e.qty, e.unit) : '', checked: e.checked, category: e.category ?? 'outros', date: e.marketDate })),
+        ...list.toCheck.filter((t) => t.missing).map((t) => ({ name: t.name, qty: '', checked: t.checked, category: t.category, date: t.marketDate })),
+      ]);
+    }
+    const all = shoppingCache.get(wid);
+    return onlyDay ? all.filter((i) => i.date === date) : all;
   };
 
   const pantryLow = () =>
@@ -92,6 +101,7 @@ export function buildDisplayData(s, now = new Date()) {
 
   return {
     now,
+    updatedAt,
     today,
     tomorrow,
     weekId,
@@ -105,6 +115,7 @@ export function buildDisplayData(s, now = new Date()) {
       return [...list, ...late].sort((a, b) => a.date.localeCompare(b.date));
     },
     shopping: getShopping,
+    shoppingFromMenu: s.settings?.shoppingFromMenu !== false,
     pantryLow,
     marmitas,
     prep,

@@ -106,6 +106,9 @@ export const DEFAULT_SETTINGS = {
   people: 2,
   // Dias da semana em que a família costuma ir ao mercado (0 = domingo).
   marketDays: [0, 3],
+  // Lista de compras: true = gerada pelo cardápio (ingredientes das receitas);
+  // false = só o que a pessoa escreve, dia a dia (ver services/shopping.js).
+  shoppingFromMenu: true,
   // Se os lanches contam como pendência quando estão vazios.
   trackSnacks: false,
   // Layout do display e-ink em uso.

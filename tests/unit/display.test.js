@@ -89,4 +89,42 @@ describe('display: dados dos cards', () => {
     // Nada foi gravado no estado.
     expect(s.tasks).toEqual({});
   });
+
+  it('compras do dia: lista manual mostra só o que foi escrito para hoje', () => {
+    const now = new Date('2026-11-16T09:00:00');
+    const base = buildSeed(now);
+    const week = base.weeks['2026-11-16'];
+    const extras = [
+      { id: 'a1', name: 'Pão', qty: null, unit: 'un', checked: false, marketDate: '2026-11-16' },
+      { id: 'a2', name: 'Detergente', qty: 1, unit: 'un', checked: false, marketDate: '2026-11-17' },
+    ];
+    const s = {
+      ...base,
+      settings: { ...base.settings, shoppingFromMenu: false },
+      weeks: { ...base.weeks, '2026-11-16': { ...week, shopping: { ...week.shopping, extras } } },
+    };
+    const d = buildDisplayData(s, now);
+    expect(d.shoppingFromMenu).toBe(false);
+    expect(d.shopping().map((i) => i.name)).toEqual(['Pão', 'Detergente']);
+    expect(d.shopping(d.dayOf('today'), true).map((i) => i.name)).toEqual(['Pão']);
+    expect(d.shopping(d.dayOf('tomorrow'), true).map((i) => i.name)).toEqual(['Detergente']);
+  });
+
+  it('card de clima: começa sem cidade e tem opções de horas e dias', () => {
+    const t = CARD_TYPES.find((c) => c.id === 'weather');
+    expect(t).toBeTruthy();
+    const keys = t.options.map((o) => o.key);
+    expect(keys).toEqual(expect.arrayContaining(['place', 'hours', 'hourStep', 'days', 'showRain']));
+    expect(t.options.find((o) => o.key === 'place').default).toBeNull();
+  });
+
+  it('"Atualizado às" usa a hora real da geração, não o horário agendado', () => {
+    const seed = buildSeed(new Date('2026-11-16T09:00:00'));
+    const agendado = new Date('2026-11-17T00:00:00');
+    const real = new Date('2026-11-16T23:17:00');
+    const d = buildDisplayData(seed, agendado, real);
+    expect(d.today).toBe('2026-11-17'); // a imagem já mostra o dia novo
+    expect(d.updatedAt).toBe(real);
+    expect(buildDisplayData(seed, real).updatedAt).toBe(real); // sem horário agendado: o mesmo instante
+  });
 });

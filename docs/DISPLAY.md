@@ -117,6 +117,14 @@ que aparece na tela para colar o endereço da imagem.
   (no máximo a cada 6 horas), então a mudança vale a partir da próxima vez que ele acordar. Para valer
   na hora, aperte o **botão** do aparelho.
 - **Mudar o que aparece**: aba **Display**. O layout marcado "no display" é o que vai para a tela.
+- **Clima na tela**: aba **Display** → **Adicionar card** → **Clima** (ou o layout sugerido "Cozinha
+  com clima"). Nas opções do card, busque a cidade e escolha quantas horas de chance de chuva (de 1 em 1,
+  2 em 2 ou 3 em 3 horas) e quantos dias de previsão mostrar. A previsão vem do **Open-Meteo** (grátis,
+  sem cadastro) no momento em que a imagem é gerada; se o serviço falhar, a tela mostra a última
+  previsão guardada (com o horário dela) ou "Previsão indisponível agora".
+- **Compras do dia na tela**: no card **Lista de compras**, opção **Mostrar → Só hoje** (ou só amanhã).
+  Com a lista manual (Lista da semana → desligar "Puxar ingredientes do cardápio"), aparece exatamente
+  o que você escreveu para aquele dia.
 - **Atualizar agora**: aperte o **botão** do aparelho (o mesmo que acordava o TRMNL; na placa é o D4 /
   GPIO5). A imagem tem no máximo ~30 minutos.
 - **Modo de configuração** (trocar o endereço ou o Wi-Fi): **segure o botão por 5 segundos**. A tela
@@ -151,6 +159,7 @@ horas de uma vez (regras em `esphome/panelai_tela.h`, testadas no CI):
 | Dados da casa | Login e regras do Firestore. A conta de tela só lê: não grava, não apaga e não mexe na casa (testado em `npm run test:cloud`). |
 | Senha da conta de tela | Só nos segredos do GitHub (cifrados; o GitHub esconde o valor nos logs). Não vai para o código nem para o aparelho. |
 | Endereço da imagem | Código aleatório de ~190 bits, guardado nas configurações da casa e na memória do aparelho. O script esconde o código dos logs do GitHub e o artefato com a imagem é apagado logo depois da publicação. |
+| Clima | O navegador que gera a imagem pede a previsão ao Open-Meteo só com a latitude/longitude da cidade escolhida (sem nome, e-mail ou dados da casa). |
 | Programa do aparelho | Público e sem segredos (Wi-Fi e endereço ficam só na memória do aparelho). Publicado pelo CI no branch `firmware`. |
 
 Riscos que continuam existindo, e o que fazer:

@@ -444,12 +444,26 @@ export function addExtra(weekId, extra) {
   updateShopping(weekId, (sh) => ({ ...sh, extras: [...sh.extras, { id: uid('avulso'), checked: false, registered: false, ...extra }] }));
 }
 
+/** Vários avulsos de uma vez (ex.: a lista escrita à mão), numa gravação só. */
+export function addExtras(weekId, list) {
+  if (!list.length) return;
+  updateShopping(weekId, (sh) => ({
+    ...sh,
+    extras: [...sh.extras, ...list.map((extra) => ({ id: uid('avulso'), checked: false, registered: false, ...extra }))],
+  }));
+}
+
 export function updateExtra(weekId, id, patch) {
   updateShopping(weekId, (sh) => ({ ...sh, extras: sh.extras.map((e) => (e.id === id ? { ...e, ...patch } : e)) }));
 }
 
 export function removeExtra(weekId, id) {
   updateShopping(weekId, (sh) => ({ ...sh, extras: sh.extras.filter((e) => e.id !== id) }));
+}
+
+/** Apaga os avulsos já comprados (marcados) da semana. */
+export function removeCheckedExtras(weekId) {
+  updateShopping(weekId, (sh) => ({ ...sh, extras: sh.extras.filter((e) => !e.checked) }));
 }
 
 export function clearChecked(weekId) {

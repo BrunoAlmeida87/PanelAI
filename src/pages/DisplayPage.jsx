@@ -14,6 +14,9 @@ import {
   Trash2,
   Undo2,
   CheckCircle2,
+  MapPin,
+  Search,
+  LocateFixed,
 } from 'lucide-preact';
 import { useStore } from '../storage/store.js';
 import { createLayout, deleteLayout, duplicateLayout, saveLayout, setActiveLayout } from '../storage/displayActions.js';
@@ -38,6 +41,7 @@ import {
 import { buildDisplayData } from '../display/data.js';
 import { formatTimes, normalizeDisplayDevice } from '../display/schedule.js';
 import { DisplayRender, cardTitle } from '../display/DisplayRender.jsx';
+import { searchPlaces, useForecastsReady } from '../display/useWeather.js';
 import { Chip, Menu, Modal, Segmented, Stepper, confirmDialog, toast } from '../components/ui.jsx';
 import { formatDateTime } from '../utils/dates.js';
 import { uid } from '../utils/id.js';
@@ -49,9 +53,10 @@ function useDisplayData(fixedNow = null) {
   const ticking = useNow();
   const now = fixedNow ?? ticking;
   const at = now.getTime();
+  const real = ticking.getTime();
   return useMemo(
-    () => buildDisplayData(s, now),
-    [s.weeks, s.tasks, s.taskTemplates, s.recipes, s.marmitas, s.pantry, s.ingredients, s.settings, at],
+    () => buildDisplayData(s, now, ticking),
+    [s.weeks, s.tasks, s.taskTemplates, s.recipes, s.marmitas, s.pantry, s.ingredients, s.settings, at, real],
   );
 }
 
@@ -592,8 +597,107 @@ function CardInspector({ card, grid, onChange, onRemove, onDuplicate, onOrder, o
   );
 }
 
+/** Cidade do card de clima: busca pelo nome (Open-Meteo) ou usa a localização do aparelho. */
+function PlaceField({ def, value, onChange }) {
+  const [query, setQuery] = useState('');
+  const [results, setResults] = useState(null);
+  const [busy, setBusy] = useState(false);
+  const [editing, setEditing] = useState(!value);
+
+  const search = async (e) => {
+    e?.preventDefault();
+    if (!query.trim()) return;
+    setBusy(true);
+    try {
+      setResults(await searchPlaces(query));
+    } catch {
+      toast('Não foi possível buscar agora. Confira a internet.', { type: 'error' });
+    } finally {
+      setBusy(false);
+    }
+  };
+  const pick = (place) => {
+    onChange(place);
+    setResults(null);
+    setQuery('');
+    setEditing(false);
+  };
+  const locate = () => {
+    if (!navigator.geolocation) return toast('Este aparelho não informa a localização', { type: 'error' });
+    setBusy(true);
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        setBusy(false);
+        const lat = Math.round(pos.coords.latitude * 10000) / 10000;
+        const lon = Math.round(pos.coords.longitude * 10000) / 10000;
+        pick({ name: 'Minha localização', label: `Minha localização (${lat.toFixed(2)}, ${lon.toFixed(2)})`, lat, lon });
+      },
+      () => {
+        setBusy(false);
+        toast('Localização não permitida. Busque a cidade pelo nome.', { type: 'error' });
+      },
+      { timeout: 15000 },
+    );
+  };
+
+  if (value && !editing) {
+    return (
+      <div class="field">
+        <span class="label">{def.label}</span>
+        <div class="place-current">
+          <MapPin size={16} aria-hidden="true" />
+          <span class="grow">{value.label ?? value.name}</span>
+          <button type="button" class="btn btn-ghost btn-sm" onClick={() => setEditing(true)}>
+            Trocar
+          </button>
+        </div>
+      </div>
+    );
+  }
+  return (
+    <div class="field">
+      <span class="label">{def.label}</span>
+      <div class="input-group">
+        <input
+          class="input"
+          type="search"
+          value={query}
+          placeholder="Ex.: Campinas"
+          aria-label="Buscar cidade"
+          onInput={(e) => setQuery(e.currentTarget.value)}
+          onKeyDown={(e) => e.key === 'Enter' && search(e)}
+        />
+        <button type="button" class="icon-btn bordered" aria-label="Buscar cidade" disabled={busy} onClick={search}>
+          <Search size={18} />
+        </button>
+        <button type="button" class="icon-btn bordered" aria-label="Usar minha localização" title="Usar minha localização" disabled={busy} onClick={locate}>
+          <LocateFixed size={18} />
+        </button>
+      </div>
+      {results && !results.length && <span class="hint">Nenhuma cidade encontrada.</span>}
+      {results?.length > 0 && (
+        <div class="place-results" role="listbox" aria-label="Cidades encontradas">
+          {results.map((r) => (
+            <button key={`${r.lat},${r.lon}`} type="button" role="option" aria-selected="false" class="btn btn-ghost btn-sm" onClick={() => pick(r)}>
+              <MapPin size={14} aria-hidden="true" /> {r.label}
+            </button>
+          ))}
+        </div>
+      )}
+      {value && (
+        <button type="button" class="btn btn-ghost btn-sm" style="justify-self:start" onClick={() => setEditing(false)}>
+          Manter {value.name}
+        </button>
+      )}
+      <span class="hint">Previsão do Open-Meteo (gratuita, sem cadastro).</span>
+    </div>
+  );
+}
+
 function OptionField({ def, value, onChange }) {
   switch (def.type) {
+    case 'place':
+      return <PlaceField def={def} value={value} onChange={onChange} />;
     case 'toggle':
       return (
         <label class="switch">
@@ -687,8 +791,11 @@ export function DisplayScreen({ params }) {
   }, []);
   const { w, h } = screenSize(layout);
   const scale = exact ? 1 : Math.min(win.w / w, win.h / h);
+  // Para a foto: só se declara pronta depois que a previsão do tempo chegou (ou desistiu).
+  const places = layout.cards.filter((c) => c.type === 'weather' && c.options?.place).map((c) => c.options.place);
+  const weatherReady = useForecastsReady(places);
   const publish =
-    params.publicar === '1'
+    params.publicar === '1' && weatherReady
       ? JSON.stringify({
           device: normalizeDisplayDevice(s.settings.displayDevice),
           layout: { id: layout.id, name: layout.name, width: w, height: h, colorMode: layout.colorMode },
