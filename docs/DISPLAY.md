@@ -148,7 +148,7 @@ que aparece na tela para colar o endereço da imagem.
 Mesmo caminho do passo 8: **Instalar o programa na tela**, com o cabo USB. **Não precisa** marcar
 **Apagar o aparelho**. Ao reinstalar, o aparelho normalmente esquece o Wi-Fi e o endereço da imagem: o
 instalador pede o Wi-Fi de novo e depois é só colar o endereço (Configurações → Tela e-ink → **Copiar
-endereço**) na página do aparelho. A versão 1.5 do programa (a que confere os pedidos do botão
+endereço**) na página do aparelho. A versão 1.7 do programa (a que confere os pedidos do botão
 **Atualizar a tela agora**) precisa dessa reinstalação; a versão 1.4 continua funcionando, mas só
 atualiza nos horários e no botão do aparelho.
 
@@ -166,6 +166,18 @@ atualiza nos horários e no botão do aparelho.
 - **Mudar o que aparece**: aba **Display**. O layout marcado "no display" é o que vai para a tela. Com
   a geração automática ligada (padrão), as imagens de cada horário são refeitas logo depois; a tela
   muda no próximo horário.
+- **Clima na tela**: aba **Display** → **Adicionar card** → **Clima** (ou o layout sugerido "Cozinha
+  com clima"). Nas opções do card, busque a cidade e escolha quantas horas de chance de chuva (de 1 em 1,
+  2 em 2 ou 3 em 3 horas) e quantos dias de previsão mostrar. A previsão vem do **Open-Meteo** (grátis,
+  sem cadastro) no momento em que a imagem é gerada; se o serviço falhar, a tela mostra a última
+  previsão guardada (com o horário dela) ou "Previsão indisponível agora".
+- **Compras do dia na tela**: no card **Lista de compras**, opção **Mostrar → Só hoje** (ou só amanhã).
+  Com a lista manual (Lista da semana → desligar "Puxar ingredientes do cardápio"), aparece exatamente
+  o que você escreveu para aquele dia.
+- **Atividades Montessori do dia**: na aba Display, **Adicionar card → Montessori de hoje** (ou o layout
+  sugerido **Família**). Mostra o nome e a idade da criança e as atividades do dia, com as já
+  registradas marcadas. A lista é a mesma da aba Montessori: muda quando alguém toca em
+  "Novas sugestões", "Trocar" ou "Incluir", e as marcações aparecem na próxima atualização da tela.
 - **Conferência de pedidos e bateria**: Configurações → Tela e-ink → **A tela confere se houve
   pedido** (a cada 5, 10, 15 ou 30 minutos, ou não confere). Cada conferência deixa a tela acordada por
   alguns segundos. Estimativas com a bateria de 2000 mAh: a cada 10 minutos, 1 a 2 meses; a cada 30,
@@ -206,6 +218,7 @@ horas de uma vez (regras em `esphome/panelai_tela.h`, testadas no CI):
 | Senha da conta de tela | Só nos segredos do GitHub (cifrados; o GitHub esconde o valor nos logs). Não vai para o código nem para o aparelho. |
 | Endereço da imagem | Código aleatório de ~190 bits, guardado nas configurações da casa e na memória do aparelho. O script esconde o código dos logs do GitHub e o artefato com a imagem é apagado logo depois da publicação. |
 | Chave do GitHub | Só a permissão "Actions: Read and write", só no repositório PanelAI: roda e vê as execuções do GitHub Actions, sem acesso ao código, aos segredos nem aos dados da casa. Fica nos dados da casa (pessoas da casa e conta de tela leem), aparece só mascarada (`github_pat_…abcd`) e não vai para os backups. Vazou? Apague em GitHub → Settings → Developer settings → Personal access tokens e crie outra. |
+| Clima | O navegador que gera a imagem pede a previsão ao Open-Meteo só com a latitude/longitude da cidade escolhida (sem nome, e-mail ou dados da casa). |
 | Programa do aparelho | Público e sem segredos (Wi-Fi e endereço ficam só na memória do aparelho). Publicado pelo CI no branch `firmware`. |
 
 Riscos que continuam existindo, e o que fazer:

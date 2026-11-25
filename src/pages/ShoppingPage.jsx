@@ -1,4 +1,5 @@
-// Lista da semana: gerada a partir do cardápio, comparada com o estoque.
+// Lista da semana: gerada a partir do cardápio, comparada com o estoque —
+// ou, no modo manual, só com o que a pessoa escreve para cada dia.
 // No celular, cada linha é um alvo grande: tocar marca/desmarca; o botão "⋯" abre os detalhes.
 
 import { useMemo, useState } from 'preact/hooks';
@@ -19,6 +20,7 @@ import {
   Package,
   CircleCheck,
   CalendarDays,
+  PencilLine,
 } from 'lucide-preact';
 import { useStore } from '../storage/store.js';
 import { useWeekShopping } from './useWeekData.js';
@@ -27,7 +29,9 @@ import {
   setOverride,
   setMissing,
   addExtra,
+  addExtras,
   updateExtra,
+  removeCheckedExtras,
   removeExtra,
   clearChecked,
   registerPurchase,
@@ -35,7 +39,7 @@ import {
 } from '../storage/actions.js';
 import { categoryColor, categoryLabel, slotLabel } from '../models/constants.js';
 import { formatQty, unitLabel, factorToBase, roundForPurchase, convert } from '../models/units.js';
-import { purchasableLines } from '../services/shopping.js';
+import { parseShoppingText, purchasableLines } from '../services/shopping.js';
 import { shoppingToText, whatsappUrl, copyText } from '../services/share.js';
 import { formatDayMonth, formatWeekRange, weekdayName, weekdayShort, WEEKDAY_SHORT, todayISO } from '../utils/dates.js';
 import { normalizeText } from '../utils/id.js';
@@ -49,7 +53,8 @@ const MARKET_ORDER = [1, 2, 3, 4, 5, 6, 0];
 function marketTitle(date, weekId) {
   if (!date) return 'Para a semana';
   const before = date < weekId;
-  return `${weekdayName(date)} ${formatDayMonth(date)}${before ? ' (antes da semana)' : ''}`;
+  const today = date === todayISO() ? ' · hoje' : '';
+  return `${weekdayName(date)} ${formatDayMonth(date)}${before ? ' (antes da semana)' : ''}${today}`;
 }
 
 function sourcesSummary(sources) {
@@ -72,7 +77,7 @@ export function ShoppingPage({ weekId }) {
   const [registerOpen, setRegisterOpen] = useState(false);
 
   if (!list) return null;
-  const { summary } = list;
+  const { summary, fromMenu } = list;
   const purchasable = purchasableLines(list);
   const shownGroups = groups.filter((g) => filter === 'all' || (g.marketDate ?? 'none') === filter);
 
@@ -94,6 +99,15 @@ export function ShoppingPage({ weekId }) {
       const ok = await confirmDialog({ title: 'Desmarcar tudo', message: 'Desmarcar todos os itens da lista desta semana?', confirmLabel: 'Desmarcar' });
       if (ok) clearChecked(weekId);
     },
+    removeBought: async () => {
+      const n = list.extras.filter((e) => e.checked).length;
+      if (!n) return toast('Nenhum item escrito foi marcado como comprado');
+      const ok = await confirmDialog({ title: 'Apagar comprados', message: `Apagar da lista ${n === 1 ? 'o item escrito que já foi comprado' : `os ${n} itens escritos que já foram comprados`}?`, confirmLabel: 'Apagar' });
+      if (ok) {
+        removeCheckedExtras(weekId);
+        toast(n === 1 ? 'Item apagado' : `${n} itens apagados`);
+      }
+    },
   };
 
   const detailItem = detail ? [...list.items, ...list.monthly].find((i) => i.key === detail) : null;
@@ -103,7 +117,7 @@ export function ShoppingPage({ weekId }) {
       <div class="page-head">
         <div class="grow">
           <h1>Lista da semana</h1>
-          <p class="sub">{formatWeekRange(weekId)} · gerada a partir do cardápio e do estoque</p>
+          <p class="sub">{formatWeekRange(weekId)} · {fromMenu ? 'gerada a partir do cardápio e do estoque' : 'escrita por você, dia a dia'}</p>
         </div>
         <div class="toolbar">
           <button type="button" class="btn btn-secondary hide-mobile" onClick={share.copy}>
@@ -117,6 +131,7 @@ export function ShoppingPage({ weekId }) {
             <button type="button" role="menuitem" onClick={share.print}><Printer size={16} /> Imprimir</button>
             <hr />
             <button type="button" role="menuitem" onClick={share.uncheckAll}><RotateCcw size={16} /> Desmarcar tudo</button>
+            <button type="button" role="menuitem" onClick={share.removeBought}><Trash2 size={16} /> Apagar escritos já comprados</button>
           </Menu>
         </div>
       </div>
@@ -143,8 +158,14 @@ export function ShoppingPage({ weekId }) {
           <input type="checkbox" checked={hideChecked} onChange={(e) => setHideChecked(e.currentTarget.checked)} />
           Ocultar comprados
         </label>
-        <MarketDaysEditor settings={s.settings} />
+        <label class="switch small" title="Desligado: a lista tem só o que você escrever, dia a dia">
+          <input type="checkbox" checked={fromMenu} onChange={(e) => updateSettings({ shoppingFromMenu: e.currentTarget.checked })} />
+          Puxar ingredientes do cardápio
+        </label>
+        {fromMenu && <MarketDaysEditor settings={s.settings} />}
       </div>
+
+      {!fromMenu && <WriteList weekId={weekId} dates={list.marketDates} />}
 
       {list.marketDates.length > 1 && (
         <div class="chip-row scroll" role="group" aria-label="Filtrar por dia de mercado" style="margin-top:12px">
@@ -157,7 +178,7 @@ export function ShoppingPage({ weekId }) {
         </div>
       )}
 
-      {summary.total === 0 && (
+      {summary.total === 0 && fromMenu && (
         <div class="card" style="margin-top:16px">
           <EmptyState
             icon={ShoppingCart}
@@ -199,6 +220,7 @@ export function ShoppingPage({ weekId }) {
                       <ShopRow
                         key={e.key}
                         entry={e}
+                        manual={!fromMenu}
                         onToggle={() => toggle(e)}
                         onMore={() => (e.type === 'extra' ? setExtraEdit(e.id) : e.type === 'item' ? setDetail(e.key) : setMissing(weekId, e.key, false))}
                       />
@@ -211,7 +233,7 @@ export function ShoppingPage({ weekId }) {
         );
       })}
 
-      <ExtraForm weekId={weekId} marketDates={list.marketDates} />
+      {fromMenu && <ExtraForm weekId={weekId} marketDates={list.marketDates} />}
 
       {list.toCheck.length > 0 && (
         <section class="section">
@@ -302,10 +324,11 @@ export function ShoppingPage({ weekId }) {
   );
 }
 
-function ShopRow({ entry: e, onToggle, onMore }) {
+function ShopRow({ entry: e, manual = false, onToggle, onMore }) {
   const qty =
     e.type === 'item' ? formatQty(e.toBuy, e.unit) : e.type === 'extra' ? (e.qty ? formatQty(e.qty, e.unit) : '') : 'conferir';
-  const from = e.type === 'item' ? sourcesSummary(e.sources) : e.type === 'extra' ? (e.registered ? 'Avulso · registrado no estoque' : 'Avulso') : 'Faltando na despensa';
+  const kind = manual ? 'Escrito por você' : 'Avulso';
+  const from = e.type === 'item' ? sourcesSummary(e.sources) : e.type === 'extra' ? (e.registered ? `${kind} · registrado no estoque` : kind) : 'Faltando na despensa';
   return (
     <div class={`shop-item ${e.checked ? 'checked' : ''}`}>
       <button type="button" class="toggle" role="checkbox" aria-checked={e.checked ? 'true' : 'false'} onClick={onToggle}>
@@ -351,6 +374,71 @@ function MarketDaysEditor({ settings }) {
         </div>
       )}
     </div>
+  );
+}
+
+/**
+ * Modo manual: a pessoa escreve o que quer comprar (um item por linha) e
+ * escolhe o dia. Cada linha vira um item da lista ("2 kg de batata" entende
+ * a quantidade; nomes do catálogo ganham a categoria certa).
+ */
+function WriteList({ weekId, dates }) {
+  const s = useStore();
+  const today = todayISO();
+  const [day, setDay] = useState(dates.includes(today) ? today : dates[0]);
+  const [text, setText] = useState('');
+  const chosen = dates.includes(day) ? day : dates[0];
+
+  const submit = (e) => {
+    e.preventDefault();
+    const lines = parseShoppingText(text);
+    if (!lines.length) return toast('Escreva pelo menos um item', { type: 'error' });
+    const byName = new Map(Object.values(s.ingredients).map((i) => [normalizeText(i.name), i]));
+    addExtras(
+      weekId,
+      lines.map((l) => {
+        const ing = byName.get(normalizeText(l.name));
+        const linked = ing && l.qty && factorToBase(l.unit, ing) != null ? ing.id : null;
+        return { name: ing?.name ?? l.name, qty: l.qty, unit: l.unit, category: ing?.category ?? 'outros', ingredientId: linked, marketDate: chosen };
+      }),
+    );
+    setText('');
+    toast(lines.length === 1 ? 'Item na lista' : `${lines.length} itens na lista`);
+  };
+
+  return (
+    <section class="section card card-pad" aria-labelledby="escrever-title">
+      <h2 class="section-title" id="escrever-title" style="margin-bottom:4px">
+        <PencilLine size={18} /> Escrever compras
+      </h2>
+      <p class="small muted" style="margin-bottom:12px">Um item por linha. Pode pôr a quantidade na frente: “2 kg de batata”, “6 ovos”.</p>
+      <form class="write-list" onSubmit={submit}>
+        <div class="chip-row scroll" role="group" aria-label="Dia da compra">
+          {dates.map((d) => (
+            <Chip key={d} pressed={d === chosen} onClick={() => setDay(d)} aria-label={`Comprar ${weekdayName(d)}`}>
+              {d === today ? 'Hoje' : weekdayShort(d)} {formatDayMonth(d)}
+            </Chip>
+          ))}
+        </div>
+        <label class="field">
+          <span class="label">O que comprar ({chosen === today ? 'hoje' : `${weekdayName(chosen)} ${formatDayMonth(chosen)}`})</span>
+          <textarea
+            class="input"
+            rows={4}
+            maxLength={2000}
+            value={text}
+            placeholder={'Pão\n2 kg de batata\nDetergente'}
+            onInput={(e) => setText(e.currentTarget.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) submit(e);
+            }}
+          />
+        </label>
+        <button type="submit" class="btn btn-primary">
+          <Plus size={16} /> Pôr na lista
+        </button>
+      </form>
+    </section>
   );
 }
 
@@ -504,8 +592,23 @@ function ItemDetail({ weekId, item, onClose }) {
 }
 
 function ExtraDetail({ weekId, extra, onClose }) {
+  const s = useStore();
   const [qty, setQty] = useState(extra?.qty ?? 1);
+  const [name, setName] = useState(extra?.name ?? '');
   if (!extra) return null;
+  const save = () => {
+    const n = name.trim() || extra.name;
+    const patch = { qty, name: n };
+    if (normalizeText(n) !== normalizeText(extra.name)) {
+      // Outro produto: refaz a ligação com o catálogo (senão a compra entraria no estoque do produto antigo).
+      const ing = Object.values(s.ingredients).find((i) => normalizeText(i.name) === normalizeText(n));
+      patch.name = ing?.name ?? n;
+      patch.category = ing?.category ?? 'outros';
+      patch.ingredientId = ing && factorToBase(extra.unit, ing) != null ? ing.id : null;
+    }
+    updateExtra(weekId, extra.id, patch);
+    onClose();
+  };
   return (
     <Modal
       open
@@ -519,12 +622,16 @@ function ExtraDetail({ weekId, extra, onClose }) {
             <Trash2 size={16} /> Remover
           </button>
           <span class="spacer hide-mobile" />
-          <button type="button" class="btn btn-primary" onClick={() => { updateExtra(weekId, extra.id, { qty }); onClose(); }}>
+          <button type="button" class="btn btn-primary" onClick={save}>
             Salvar
           </button>
         </>
       }
     >
+      <label class="field" style="margin-bottom:12px">
+        <span class="label">Item</span>
+        <input class="input" value={name} maxLength={80} onInput={(e) => setName(e.currentTarget.value)} />
+      </label>
       <div class="field">
         <span class="label">Quantidade</span>
         <Stepper value={qty} min={0} unit={unitLabel(extra.unit)} label="Quantidade" onChange={setQty} />

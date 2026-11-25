@@ -1,6 +1,7 @@
 // Cardápio semanal: desktop em colunas; celular com um dia por vez ou resumo da semana.
 
 import { useMemo, useRef, useState } from 'preact/hooks';
+import { Suspense } from 'preact/compat';
 import {
   Box,
   CalendarDays,
@@ -56,6 +57,10 @@ import { useIsPhone, usePref } from '../utils/hooks.js';
 import { Modal, Menu, Progress, Segmented, toast, confirmDialog, EmptyState } from '../components/ui.jsx';
 import { MealPicker } from './menu/MealPicker.jsx';
 import { EntryDetail } from './menu/EntryDetail.jsx';
+import { lazyPage } from '../utils/lazy.js';
+
+// Card da aba Montessori: baixado só quando há criança cadastrada.
+const MontessoriTodayCard = lazyPage(() => import('./montessori/TodayCard.jsx'), 'TodayCard');
 
 const ENTRY_ICON = { marmita: Box, out: MapPin, text: ClipboardList };
 
@@ -194,6 +199,8 @@ export function MenuPage({ weekId }) {
         </div>
       )}
 
+      <MontessoriSlot />
+
       {isPhone ? (
         mobileView === 'day' ? (
           <DayView
@@ -263,6 +270,18 @@ export function MenuPage({ weekId }) {
         </Modal>
       )}
     </div>
+  );
+}
+
+/** Sugestões Montessori do dia (se houver criança cadastrada e o card não foi escondido na aba Montessori). */
+function MontessoriSlot() {
+  const s = useStore();
+  const [show] = usePref('montessoriHomeCard', true);
+  if (!show || !Object.keys(s.children).length) return null;
+  return (
+    <Suspense fallback={null}>
+      <MontessoriTodayCard />
+    </Suspense>
   );
 }
 

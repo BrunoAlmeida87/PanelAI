@@ -195,7 +195,7 @@ export function SettingsPage() {
                 onClick={async () => {
                   const ok = await confirmDialog({
                     title: 'Restaurar demonstração',
-                    message: `Substitui todos os dados ${whose} pelas receitas, despensa e cardápio de exemplo.`,
+                    message: `Substitui todos os dados ${whose} pelas receitas, despensa e cardápio de exemplo. A criança e o histórico da aba Montessori são mantidos.`,
                     confirmLabel: 'Restaurar',
                     danger: true,
                   });
@@ -213,7 +213,7 @@ export function SettingsPage() {
                 onClick={async () => {
                   const ok = await confirmDialog({
                     title: 'Começar do zero',
-                    message: `Apaga cardápios, despensa, marmitas, tarefas e histórico ${whose}. Receitas, catálogo de ingredientes, tarefas salvas e layouts do display são mantidos.`,
+                    message: `Apaga cardápios, despensa, marmitas, tarefas e histórico ${whose}. Receitas, catálogo de ingredientes, tarefas salvas, layouts do display e a aba Montessori são mantidos.`,
                     confirmLabel: 'Apagar',
                     danger: true,
                   });

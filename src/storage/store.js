@@ -31,6 +31,9 @@ let state = {
   tasks: {},
   taskTemplates: {},
   displayLayouts: {},
+  // Aba Montessori: crianças (com as atividades escolhidas para o dia) e registros.
+  children: {},
+  montessoriLogs: {},
   // Chave do GitHub da casa (meta/github) para pedir a imagem da tela agora.
   // Fica fora das configurações para não entrar nos backups (src/display/github.js).
   githubToken: null,
@@ -149,7 +152,7 @@ const byKey = (list, key) => Object.fromEntries(list.map((x) => [x[key], x]));
 
 export function seedOps(seed) {
   const ops = [];
-  for (const s of ['ingredients', 'recipes', 'pantry', 'weeks', 'marmitas', 'tasks', 'taskTemplates', 'displayLayouts']) {
+  for (const s of ['ingredients', 'recipes', 'pantry', 'weeks', 'marmitas', 'tasks', 'taskTemplates', 'displayLayouts', 'children', 'montessoriLogs']) {
     ops.push({ store: s, type: 'clear' });
     for (const v of Object.values(seed[s] ?? {})) ops.push({ store: s, type: 'put', value: v });
   }
@@ -180,6 +183,8 @@ export function applyFullData(data) {
     tasks: data.tasks ?? {},
     taskTemplates: data.taskTemplates ?? {},
     displayLayouts: data.displayLayouts ?? {},
+    children: data.children ?? {},
+    montessoriLogs: data.montessoriLogs ?? {},
   });
 }
 
@@ -237,6 +242,8 @@ export function loadFromChanges(initial) {
     tasks: {},
     taskTemplates: {},
     displayLayouts: {},
+    children: {},
+    montessoriLogs: {},
     githubToken: null,
   };
   for (const [store, changes] of Object.entries(initial)) s = { ...s, ...reduceChanges(s, store, changes) };
@@ -323,6 +330,8 @@ export async function readLocalData() {
       tasks: byKey(all.tasks, 'id'),
       taskTemplates: byKey(all.taskTemplates, 'id'),
       displayLayouts: byKey(all.displayLayouts, 'id'),
+      children: byKey(all.children, 'id'),
+      montessoriLogs: byKey(all.montessoriLogs, 'id'),
       settings: { ...DEFAULT_SETTINGS, ...(meta.settings?.value ?? {}) },
       monthlySession: meta.monthlySession?.value ?? EMPTY_SESSION,
       countDraft: meta.countDraft?.value ?? {},
@@ -360,6 +369,8 @@ async function bootstrapLocal({ demo = false } = {}) {
         tasks: byKey(all.tasks, 'id'),
         taskTemplates: byKey(all.taskTemplates, 'id'),
         displayLayouts: byKey(all.displayLayouts, 'id'),
+        children: byKey(all.children, 'id'),
+        montessoriLogs: byKey(all.montessoriLogs, 'id'),
         githubToken: meta.github?.value?.token ?? null,
       });
     }

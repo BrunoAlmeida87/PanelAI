@@ -1,0 +1,436 @@
+/* ---------- Montessori ---------- */
+
+/* Ícone da categoria: círculo com a cor da categoria bem suave. */
+.mt-cat-icon {
+  flex: none;
+  display: inline-grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 999px;
+  color: var(--cat, var(--text-2));
+  background: color-mix(in srgb, var(--cat, #747874) 13%, #fff);
+}
+.chip .mt-cat-icon {
+  width: 20px;
+  height: 20px;
+  margin-left: -4px;
+}
+.chip[aria-pressed='true'] .mt-cat-icon {
+  background: rgba(255, 255, 255, 0.92);
+}
+.mt-log-list .mt-cat-icon,
+.mt-home-items .mt-cat-icon {
+  width: 24px;
+  height: 24px;
+}
+.mt-cat-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 26px;
+  padding: 0 10px 0 2px;
+  border-radius: 999px;
+  font-size: var(--fs-xs);
+  font-weight: 650;
+  color: var(--cat);
+  background: color-mix(in srgb, var(--cat) 10%, #fff);
+}
+.mt-cat-pill .mt-cat-icon {
+  width: 22px;
+  height: 22px;
+  background: #fff;
+}
+.mt-ok {
+  color: var(--green-dark);
+  vertical-align: -3px;
+}
+
+/* Criança */
+.mt-child {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+.mt-child > .grow {
+  flex: 1;
+}
+.mt-avatar {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  border-radius: 999px;
+  background: var(--green-light);
+  color: var(--green-dark);
+}
+.mt-child-name {
+  font-size: var(--fs-lg);
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+.mt-child-age {
+  margin: 2px 0 0;
+  color: var(--text);
+  font-size: var(--fs-md);
+}
+.mt-phase {
+  display: grid;
+  gap: 2px;
+  padding: 6px 12px;
+  border-radius: var(--r-md);
+  background: var(--green-xlight);
+  border: 1px solid var(--green-light);
+}
+.mt-phase strong {
+  color: var(--green-dark);
+  font-size: var(--fs-md);
+}
+@media (max-width: 599px) {
+  .mt-phase {
+    order: 3;
+    flex: 1 1 100%;
+    grid-auto-flow: column;
+    justify-content: start;
+    align-items: baseline;
+    gap: 8px;
+  }
+}
+.mt-optional summary {
+  cursor: pointer;
+  font-size: var(--fs-sm);
+  color: var(--green-dark);
+  min-height: 32px;
+  display: flex;
+  align-items: center;
+}
+
+/* Hoje */
+.mt-section-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  margin-bottom: 4px;
+}
+.mt-today-hint {
+  margin: 0 0 12px;
+}
+.mt-today-grid {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: minmax(0, 1fr);
+}
+@media (min-width: 900px) {
+  .mt-today-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+.mt-today-item {
+  display: flex;
+  flex-direction: column;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-top: 3px solid var(--cat, var(--green));
+  border-radius: var(--r-lg);
+  box-shadow: var(--shadow-sm);
+  overflow: hidden;
+}
+.mt-today-item.done {
+  background: var(--green-xlight);
+}
+.mt-today-main {
+  flex: 1;
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  padding: 14px 14px 8px;
+  border: 0;
+  background: transparent;
+  text-align: left;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+}
+.mt-today-foot {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px 10px 14px;
+}
+.mt-today-foot .grow {
+  flex: 1;
+}
+
+/* Cards da biblioteca */
+.mt-tabs {
+  margin-bottom: 12px;
+}
+.mt-filters {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 4px;
+  min-width: 0;
+}
+.mt-group {
+  margin-bottom: 20px;
+}
+.mt-group-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: var(--fs-md);
+  margin: 0 0 10px;
+}
+.mt-grid {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: minmax(0, 1fr);
+}
+@media (min-width: 600px) {
+  .mt-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (min-width: 1100px) {
+  .mt-grid {
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  }
+}
+.mt-card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px 14px;
+  text-align: left;
+  font: inherit;
+  color: inherit;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--cat, var(--green));
+  border-radius: var(--r-md);
+  cursor: pointer;
+  transition: box-shadow 0.15s, border-color 0.15s;
+}
+.mt-card:hover {
+  box-shadow: var(--shadow-md);
+}
+.mt-card.current {
+  background: var(--green-xlight);
+}
+.mt-card-head {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+}
+.mt-card-title {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+.mt-card-name {
+  font-weight: 650;
+  line-height: 1.3;
+  overflow-wrap: anywhere;
+}
+.mt-card-meta {
+  font-size: var(--fs-xs);
+  color: var(--text-2);
+}
+.mt-card-desc {
+  font-size: var(--fs-sm);
+  color: var(--text-2);
+  line-height: 1.45;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.mt-today-main .mt-card-desc {
+  -webkit-line-clamp: 3;
+  margin-top: 4px;
+}
+.mt-card-foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 8px;
+  margin-top: auto;
+}
+.mt-card-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: var(--fs-xs);
+  color: var(--text-2);
+}
+.mt-card-status.done {
+  color: var(--green-dark);
+}
+
+/* Detalhe */
+.mt-detail {
+  gap: 14px;
+}
+.mt-h3 {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--fs-sm);
+  font-weight: 700;
+  margin: 0 0 6px;
+}
+.mt-list {
+  margin: 0;
+  padding-left: 20px;
+  display: grid;
+  gap: 4px;
+  line-height: 1.5;
+}
+.mt-steps li::marker {
+  font-weight: 700;
+  color: var(--green-dark);
+}
+.mt-skill {
+  text-transform: none;
+  letter-spacing: 0;
+  font-weight: 560;
+  font-size: var(--fs-xs);
+  height: auto;
+  min-height: 22px;
+  padding: 2px 8px;
+}
+.mt-safety {
+  align-items: flex-start;
+}
+.mt-safety .mt-list {
+  padding-left: 18px;
+}
+.mt-detail-child p svg {
+  vertical-align: -3px;
+}
+
+/* Histórico */
+.mt-history-day {
+  padding: 12px 14px;
+  margin-bottom: 10px;
+}
+.mt-history-date {
+  font-size: var(--fs-sm);
+  font-weight: 700;
+  margin: 0 0 6px;
+  color: var(--text-2);
+}
+.mt-log-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 2px;
+}
+.mt-log-list li {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  padding: 8px 0;
+  border-top: 1px dashed var(--border);
+}
+.mt-log-list li:first-child {
+  border-top: 0;
+}
+.mt-log-name {
+  text-align: left;
+  font-weight: 600;
+  text-decoration: none;
+  color: var(--text);
+}
+.mt-log-name:hover {
+  text-decoration: underline;
+}
+.mt-log-badges {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 6px;
+  margin-top: 4px;
+}
+.mt-log-badges .badge {
+  text-transform: none;
+  letter-spacing: 0;
+}
+.mt-log-notes {
+  margin: 4px 0 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+/* Card na página inicial (Cardápio) */
+.mt-home {
+  margin-bottom: 16px;
+  display: grid;
+  gap: 8px;
+}
+@media (min-width: 900px) {
+  .mt-home {
+    margin-bottom: 20px;
+  }
+}
+.mt-home-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.mt-home-kid {
+  display: grid;
+  gap: 6px;
+}
+.mt-home-name {
+  font-size: var(--fs-sm);
+  font-weight: 650;
+}
+.mt-home-items {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.mt-home-items a {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 36px;
+  padding: 4px 12px 4px 6px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  font-size: var(--fs-sm);
+  text-decoration: none;
+}
+.mt-home-items a:hover {
+  background: var(--muted-surface);
+}
+.mt-home-items a.done {
+  background: var(--green-xlight);
+  border-color: var(--green-light);
+}
+.mt-home-items a.done .txt {
+  color: var(--text-2);
+}
+@media (max-width: 599px) {
+  .mt-home-items {
+    display: grid;
+  }
+}
+
+@media print {
+  .mt-home {
+    display: none;
+  }
+}

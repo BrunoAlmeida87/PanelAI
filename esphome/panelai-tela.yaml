@@ -38,7 +38,7 @@ esphome:
   min_version: 2026.7.0
   project:
     name: panelai.tela
-    version: "1.5.0"
+    version: "1.7.0"
   includes:
     - panelai_tela.h
   on_boot:
@@ -95,7 +95,7 @@ http_request:
   verify_ssl: true
   timeout: 20s
   follow_redirects: true
-  useragent: PanelAI-Tela/1.5
+  useragent: PanelAI-Tela/1.7
 
 globals:
   # Próximas atualizações (segundos UTC), lidas do config.json. Guardadas para

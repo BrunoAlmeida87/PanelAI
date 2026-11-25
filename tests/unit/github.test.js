@@ -83,6 +83,7 @@ describe('geração automática quando algo muda', () => {
     expect(touchesDisplay([{ store: 'weeks', type: 'put', value: { id: 'x' } }])).toBe(true);
     expect(touchesDisplay([{ store: 'meta', type: 'put', value: { key: 'settings', value: {} } }])).toBe(true);
     expect(touchesDisplay([{ store: 'meta', type: 'put', value: { key: 'github', value: {} } }])).toBe(false);
+    expect(touchesDisplay([{ store: 'children', type: 'put', value: { id: 'c' } }])).toBe(true);
     expect(touchesDisplay([{ store: 'movements', type: 'put', value: {} }])).toBe(false);
   });
 });

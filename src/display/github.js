@@ -98,7 +98,19 @@ export function nextAutoRequest({ lastChange, lastRequest, debounceMs = AUTO_DEB
 }
 
 /** Coleções cujas mudanças alteram o que aparece na tela (as outras não pedem imagem nova). */
-export const DISPLAY_STORES = new Set(['weeks', 'tasks', 'taskTemplates', 'recipes', 'marmitas', 'pantry', 'ingredients', 'displayLayouts', 'meta']);
+export const DISPLAY_STORES = new Set([
+  'weeks',
+  'tasks',
+  'taskTemplates',
+  'recipes',
+  'marmitas',
+  'pantry',
+  'ingredients',
+  'displayLayouts',
+  'children', // card Montessori (atividades do dia)
+  'montessoriLogs',
+  'meta',
+]);
 
 /** Alguma operação de gravação mexe no que aparece na tela? (meta: só as configurações.) */
 export function touchesDisplay(ops) {

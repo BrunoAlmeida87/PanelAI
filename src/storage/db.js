@@ -5,7 +5,7 @@
 const DB_NAME = 'panelai';
 /** Banco separado do modo de teste (dados de exemplo), para não misturar com dados reais. */
 export const DEMO_DB_NAME = 'panelai-demo';
-const DB_VERSION = 2; // v2: tarefas, modelos de tarefa e layouts do display
+const DB_VERSION = 3; // v2: tarefas, modelos de tarefa e layouts do display; v3: crianças e registros Montessori
 
 export const STORES = {
   ingredients: 'id',
@@ -19,6 +19,8 @@ export const STORES = {
   tasks: 'id',
   taskTemplates: 'id',
   displayLayouts: 'id',
+  children: 'id',
+  montessoriLogs: 'id',
 };
 
 let dbPromise = null;

@@ -236,6 +236,8 @@ export async function createHouseholdFromThisDevice(name) {
     tasks: s.tasks,
     taskTemplates: s.taskTemplates,
     displayLayouts: s.displayLayouts,
+    children: s.children,
+    montessoriLogs: s.montessoriLogs,
     settings: s.settings,
   });
   ops.push({ store: 'meta', type: 'put', value: { key: 'monthlySession', value: s.monthlySession ?? { id: null, checked: {}, qty: {} } } });

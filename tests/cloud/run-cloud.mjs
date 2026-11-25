@@ -254,6 +254,25 @@ await step('marcações antigas são incorporadas à semana sem mudar nada', asy
   }
 });
 
+await step('Montessori: criança e registros chegam ao outro aparelho; os antigos vão para o arquivo mensal', async () => {
+  const child = { id: 'crianca_ana', name: 'Ana', birthDate: '2025-07-10', gestationWeeks: null, plan: { date: todayISO(), ids: ['regar-as-plantas'] } };
+  const log = (id, date) => ({ id, childId: child.id, activityId: 'regar-as-plantas', date, interest: 'alto', autonomy: 'ajuda', notes: '' });
+  await alice.write([
+    { store: 'children', type: 'put', value: child },
+    { store: 'montessoriLogs', type: 'put', value: log('mreg_antigo', addDays(todayISO(), -90)) },
+    { store: 'montessoriLogs', type: 'put', value: log('mreg_hoje', todayISO()) },
+  ]);
+  await waitFor(() => bob.state.children?.crianca_ana && Object.keys(bob.state.montessoriLogs ?? {}).length === 2, 'criança e registros no Bob');
+  assert(bob.state.children.crianca_ana.plan.ids[0] === 'regar-as-plantas', 'atividades escolhidas para o dia chegam ao Bob');
+  await waitFor(async () => (await adminList(`households/${hid}/montessoriLogs`)).length === 2, 'gravação no servidor');
+  const r = await alice.cloud.runMaintenance();
+  assert(r.archived >= 1, `esperado arquivar o registro antigo, arquivou ${r.archived}`);
+  assert((await adminList(`households/${hid}/montessoriLogsArchive`)).length === 1, 'deveria haver 1 pacote mensal');
+  assert((await adminList(`households/${hid}/montessoriLogs`)).length === 1, 'só o registro recente fica avulso');
+  await new Promise((res) => setTimeout(res, 500));
+  for (const d of [alice, bob]) assert(Object.keys(d.state.montessoriLogs).length === 2, 'o app continua vendo os 2 registros');
+});
+
 await step('regras: quem não é da casa não lê nem grava', async () => {
   const { getFirestore, doc, getDoc, setDoc, serverTimestamp } = await import('firebase/firestore');
   const { getApp } = await import('firebase/app');
@@ -328,6 +347,8 @@ await step('conta de tela: não grava, não apaga e não mexe na casa', async ()
   const db = getFirestore(getApp('tela'));
   await expectDenied(setDoc(doc(db, 'households', hid, 'recipes', 'x'), { v: '{}', t: serverTimestamp(), by: 'tela@exemplo.com' }), 'gravar receita');
   await expectDenied(deleteDoc(doc(db, 'households', hid, 'recipes', 'bolo-teste')), 'apagar receita');
+  await expectDenied(setDoc(doc(db, 'households', hid, 'montessoriLogs', 'x'), { v: '{}', t: serverTimestamp(), by: 'tela@exemplo.com' }), 'registrar atividade Montessori');
+  await expectDenied(deleteDoc(doc(db, 'households', hid, 'children', 'crianca_ana')), 'apagar a criança');
   await expectDenied(updateDoc(doc(db, 'households', hid), { name: 'Hackeada' }), 'renomear a casa');
   await expectDenied(updateDoc(doc(db, 'households', hid), { viewerEmails: arrayRemove('tela@exemplo.com') }), 'tirar-se da lista');
   await expectDenied(updateDoc(doc(db, 'households', hid), { memberEmails: ['alice@exemplo.com', 'bob@exemplo.com', 'tela@exemplo.com'] }), 'virar pessoa da casa');

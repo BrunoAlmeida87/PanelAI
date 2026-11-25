@@ -5,6 +5,8 @@ import {
   buildShoppingList,
   groupByMarketAndCategory,
   marketDatesForWeek,
+  parseShoppingLine,
+  parseShoppingText,
   purchasableLines,
 } from '../../src/services/shopping.js';
 import { applyStockDelta, monthlyList, newPantryItem } from '../../src/services/pantry.js';
@@ -250,5 +252,50 @@ describe('conciliação semanal × mensal', () => {
     };
     const m = monthlyList({ pantry, ingredientsById, demand: new Map() });
     expect(m[0].suggested).toBe(0);
+  });
+});
+
+describe('lista manual (sem puxar do cardápio)', () => {
+  const manual = { marketDays: [0, 3], shoppingFromMenu: false };
+  const week = weekWith([['2026-11-09', 'almoco', { kind: 'recipe', recipeId: 'r300', servings: 2 }]]);
+
+  it('o cardápio não gera itens; só o que foi escrito, no dia escolhido', () => {
+    week.shopping = { checked: {}, overrides: {}, missing: {}, extras: [{ id: 'a1', name: 'Pão', qty: null, unit: 'un', checked: false, marketDate: '2026-11-12' }] };
+    const demand = computeDemand({ weekId: WEEK, week, recipesById: recipes, ingredientsById, marmitas: [] });
+    const list = buildShoppingList({ weekId: WEEK, week, demand, pantry: {}, ingredientsById, settings: manual });
+    expect(list.fromMenu).toBe(false);
+    expect(list.items).toHaveLength(0);
+    expect(list.toCheck).toHaveLength(0);
+    expect(list.marketDates).toHaveLength(7); // qualquer dia da semana
+    expect(list.extras[0].marketDate).toBe('2026-11-12'); // quinta, não é dia de mercado: fica assim mesmo
+    expect(list.summary.total).toBe(1);
+  });
+
+  it('com o padrão, continua puxando do cardápio', () => {
+    const { list } = listFor(weekWith([['2026-11-09', 'almoco', { kind: 'recipe', recipeId: 'r300', servings: 2 }]]));
+    expect(list.fromMenu).toBe(true);
+    expect(chicken(list).need).toBe(300);
+  });
+});
+
+describe('texto da lista escrita à mão', () => {
+  it('entende quantidade e unidade no começo da linha', () => {
+    expect(parseShoppingLine('2 kg de batata')).toEqual({ name: 'batata', qty: 2, unit: 'kg' });
+    expect(parseShoppingLine('500g queijo')).toEqual({ name: 'queijo', qty: 500, unit: 'g' });
+    expect(parseShoppingLine('1,5 litros de leite')).toEqual({ name: 'leite', qty: 1.5, unit: 'l' });
+    expect(parseShoppingLine('6 ovos')).toEqual({ name: 'ovos', qty: 6, unit: 'un' });
+    expect(parseShoppingLine('1 dúzia de ovos')).toEqual({ name: 'ovos', qty: 12, unit: 'un' });
+    expect(parseShoppingLine('2 pacotes de café')).toEqual({ name: 'café', qty: 2, unit: 'pacote' });
+  });
+
+  it('sem número, fica só o nome; tira marcadores de lista', () => {
+    expect(parseShoppingLine('- Detergente')).toEqual({ name: 'Detergente', qty: null, unit: 'un' });
+    expect(parseShoppingLine('• Pão francês')).toEqual({ name: 'Pão francês', qty: null, unit: 'un' });
+    expect(parseShoppingLine('3. Arroz')).toEqual({ name: 'Arroz', qty: null, unit: 'un' });
+    expect(parseShoppingLine('   ')).toBeNull();
+  });
+
+  it('um item por linha, ignorando linhas vazias', () => {
+    expect(parseShoppingText('Pão\n\n2 kg de batata\r\nDetergente').map((i) => i.name)).toEqual(['Pão', 'batata', 'Detergente']);
   });
 });

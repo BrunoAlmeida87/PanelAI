@@ -1,7 +1,8 @@
 # CLAUDE.md — contexto do PanelAI para sessões futuras
 
 PanelAI é o app de organização da casa do dono do repositório: cardápio da semana, receitas, lista de compras,
-despensa/mercado do mês, tarefas da casa e um **display e-ink** (tela física na cozinha).
+despensa/mercado do mês, tarefas da casa, guia **Montessori** (atividades para a criança de 0 a 3 anos) e um
+**display e-ink** (tela física na cozinha).
 Publicado em https://brunoalmeida87.github.io/PanelAI/ (GitHub Pages), com dados na nuvem
 (Firebase Auth + Firestore, projeto `house-management-2c5a9`). Repositório **público**.
 
@@ -41,6 +42,10 @@ Publicado em https://brunoalmeida87.github.io/PanelAI/ (GitHub Pages), com dados
 - `src/storage/store.js` — estado, persistência (`persist`), modos `local | cloud | gate | demo`.
 - `src/cloud/` — `cloud.js` (Firebase: login, casa, sync em tempo real, manutenção), `session.js`
   (liga estado ↔ nuvem; cache da casa e do papel no localStorage), `layout.js` (formato no Firestore).
+- `src/models/montessori.js` — faixas, categorias, idade (corrigida p/ prematuros), registros e sugestões do
+  dia (funções puras, `tests/unit/montessori.test.js`); biblioteca em `src/data/montessori_activities.json`
+  (lida por `src/data/montessoriLibrary.js`); ações em `src/storage/montessoriActions.js`; tela em
+  `src/pages/MontessoriPage.jsx` + `src/pages/montessori/`.
 - `src/display/` — `model.js` (telas, cards, layouts), `data.js` (dados dos cards), `DisplayRender.jsx`,
   `schedule.js` (agenda da tela física e contrato do `config.json`), `github.js` (pedido da imagem ao
   GitHub e regras da geração automática). `src/components/ScreenAutoUpdate.jsx` pede a imagem sozinho
@@ -98,7 +103,7 @@ Publicado em https://brunoalmeida87.github.io/PanelAI/ (GitHub Pages), com dados
   site (build da última publicação bem-sucedida da main; o build é determinístico, então o service
   worker não muda) com as imagens, e apaga o artefato da execução. Concorrência sem cancelar a que está
   rodando (só o pedido mais novo fica na fila).
-- **Quando roda (1.5.0):** o agendamento do GitHub (`17,47 * * * *`) é **só reserva**: na prática ele
+- **Quando roda (1.7.0):** o agendamento do GitHub (`17,47 * * * *`) é **só reserva**: na prática ele
   atrasa horas ou é pulado (em 24/11/2026 rodou 1 de ~34 vezes). O caminho principal é o **site pedir**
   (`workflow_dispatch` via `POST /repos/{repo}/actions/workflows/display.yml/dispatches`, ref `main`)
   com a **chave do GitHub da casa** (token fine-grained, só "Actions: Read and write" no repositório),
@@ -117,12 +122,14 @@ Publicado em https://brunoalmeida87.github.io/PanelAI/ (GitHub Pages), com dados
 - **Momento da imagem:** perto de um horário (≤ 60 min), a imagem é gerada "para" ele
   (`renderMoment`), então meia-noite mostra o dia novo. O fuso da casa vem de `displayDevice.timeZone`
   (o script ajusta o fuso do navegador via CDP).
+  O "Atualizado às" do card de data usa a hora **real** da geração (`data.updatedAt`, terceiro
+  argumento de `buildDisplayData`), não o momento — antes mostrava sempre o horário agendado (ex.: 00:00).
 - **Contrato `config.json` v2** (`buildDeviceConfig`): `versao, gerado, referencia, horarios, fuso,
   proximas[] (epoch UTC, até 24), pedido (requestedAt em s; 0 = nunca), conferir_cada (s; 0 = não
   confere), conferir[] (pares início/fim das 06:00–23:00 no fuso da casa, 8 dias), largura, altura`.
   Mudar campos exige mudar o firmware e subir `DEVICE_CONFIG_VERSION`. `displayDevice` ganhou
   `checkMinutes` (5/10/15/30/0, padrão 10), `autoGenerate` (padrão true) e `requestedAt`.
-- **Aparelho (firmware 1.5.0):** dorme no máximo 6 h por vez (relógio do ESP32 deriva), última
+- **Aparelho (firmware 1.7.0):** dorme no máximo 6 h por vez (relógio do ESP32 deriva), última
   soneca ≤ 1 h antes do horário; das 6h às 23h acorda também a cada `conferir_cada` para conferir
   pedidos (`ate_conferir`; com falha vale só a espera por falhas); nas acordadas intermediárias só
   relê o `config.json`; no horário/botão/ligado/**pedido novo** (`pedido_novo`: `pedido != 0 &&
@@ -134,6 +141,13 @@ Publicado em https://brunoalmeida87.github.io/PanelAI/ (GitHub Pages), com dados
 - **Reinstalar o firmware** (versão nova): pelo instalador; a imagem `factory.bin` começa no endereço
   0 e cobre a NVS, então o aparelho **normalmente esquece Wi-Fi e endereço** (o instalador pede o Wi-Fi;
   o dono cola o endereço de novo). O firmware não tem OTA.
+- **Card de clima** (`weather`): previsão do **Open-Meteo** (grátis, sem chave, CORS liberado), pedida
+  pelo navegador com o fuso do navegador. Regras puras em `src/display/weather.js` (testes
+  `tests/unit/weather.test.js`); busca e cache (memória + localStorage até 12 h) em
+  `src/display/useWeather.js`. A cidade fica nas opções do card (`options.place = { name, label, lat, lon }`,
+  campo `type: 'place'` no editor). `#/display/tela?publicar=1` só expõe `#panelai-publicacao` depois que
+  a previsão chegou (ou após 20 s), para a foto não sair sem o clima. Aqui no ambiente do Claude os hosts
+  do Open-Meteo costumam estar bloqueados: teste com `page.route` (Playwright) simulando a resposta.
 - **Tarefas fixas no display:** `buildDisplayData` inclui ocorrências ainda não criadas
   (`missingRecurring`) sem gravar — a conta de tela não grava.
 - **CI do firmware:** `.github/workflows/esphome.yml` testa as regras (g++), valida e compila com
@@ -143,6 +157,37 @@ Publicado em https://brunoalmeida87.github.io/PanelAI/ (GitHub Pages), com dados
   de C++ que a validação não pega).
 - **Modo local antigo** (`npm run display:png -- --servir 8080`, Raspberry Pi na rede de casa) continua
   existindo para outras telas, mas **não** é o caminho da tela da casa.
+
+## Compras e cardápio escritos à mão
+
+- `settings.shoppingFromMenu` (padrão `true`): `false` = lista manual — o cardápio não gera itens; só os
+  avulsos (`week.shopping.extras`), cada um com `marketDate` em qualquer dia da semana
+  (`shoppingDates`). A tela de compras mostra "Escrever compras" (um item por linha,
+  `parseShoppingText` entende "2 kg de batata"). O card do display tem `options.day` = `week|today|tomorrow`.
+- Refeição escrita à mão = entrada `kind: 'text'` (já existia). No seletor, aba **Escrever** (lembra a
+  última aba usada) e, na busca de receitas, "Usar “…” escrito à mão".
+
+## Montessori (decisões já tomadas)
+
+- **Livro de referência** (Maria Stampfer, *Montessori – O guia para bebês e crianças de 0 a 3 anos*,
+  Caminho Suave, 2024): o conteúdo não estava acessível. **Nenhuma atividade, idade ou página é
+  atribuída ao livro**; todas as 78 são `"origem": "complementar"` com referências verificáveis
+  (Montessori, Lillard & Jessen, Davies & Uzodike, Davies, OMS 2019, CDC 2022, SBP). Atividade do livro
+  só com `"origem": "livro"` e `"pagina"` (o teste exige a página). Não invente referências.
+- Dados: coleção `children` (`{ id, name, birthDate, gestationWeeks, plan: { date, ids, round } }`) e
+  `montessoriLogs` (`{ id, childId, activityId, date, interest: baixo|medio|alto,
+  autonomy: observou|ajuda|sozinha, notes }`), separadas do catálogo (atividade que sai do JSON continua
+  no histórico pelo id). Registros antigos vão para `montessoriLogsArchive` (arquivo mensal).
+- **Sugestões do dia** são determinísticas (criança + data + registros **anteriores** ao dia): todos os
+  aparelhos e a tela e-ink veem a mesma lista sem gravar nada. Só "Novas sugestões"/"Trocar"/"Incluir"
+  gravam `child.plan` para o dia. Registrar hoje não muda a lista de hoje; "Novas sugestões" mantém as
+  já feitas hoje.
+- Sem pontuação, metas, gráficos ou comparação entre crianças (pedido do dono). Interesse baixo só
+  afasta a atividade por 14 dias.
+- "Restaurar demonstração", "Começar do zero" e importar backup antigo (sem as coleções) **mantêm** a
+  criança e o histórico.
+- Card "Montessori hoje" no Cardápio (preferência por aparelho `panelai.montessoriHomeCard`) e card
+  `montessori` no display (layout sugerido "Família").
 
 ## Armadilhas conhecidas
 
@@ -168,5 +213,7 @@ Publicado em https://brunoalmeida87.github.io/PanelAI/ (GitHub Pages), com dados
 - Em JSX/Preact, hooks antes de qualquer `return` condicional (há um caso em `DisplayScreen`).
 - O service worker do PWA não pode tratar `/tela/…` e `/instalar-tela.html` como telas do app
   (`navigateFallbackDenylist` no `vite.config.js`), senão o link da imagem abre o app.
+- Menu superior com 6 módulos: só ícones de 900 a 1023 px, nomes curtos até 1279 px (`layout.css`). Ao criar
+  outro módulo, confira o teste de responsividade (960, 1024 e 1200 px).
 - `__APP_VERSION__` vem do `package.json` (definido no `vite.config.js`); ao lançar versão, suba o
   `version` do `package.json` (e do `package-lock.json`).

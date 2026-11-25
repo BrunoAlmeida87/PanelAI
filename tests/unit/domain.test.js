@@ -226,6 +226,26 @@ describe('exportação e importação', () => {
     expect(r.data.settings.people).toBe(3);
   });
 
+  it('leva a criança e os registros Montessori; backup antigo (sem eles) não apaga nada', () => {
+    const child = { id: 'crianca_1', name: 'Ana', birthDate: '2025-07-10' };
+    const log = { id: 'mreg_1', childId: 'crianca_1', activityId: 'regar-as-plantas', date: '2026-11-20', interest: 'alto', autonomy: 'ajuda' };
+    const r = validateBackup(JSON.stringify(buildBackup({ ...data(), children: { [child.id]: child }, montessoriLogs: { [log.id]: log } })));
+    expect(r.ok).toBe(true);
+    expect(r.data.children.crianca_1).toMatchObject({ name: 'Ana', plan: null, gestationWeeks: null });
+    expect(r.data.montessoriLogs.mreg_1).toMatchObject({ interest: 'alto', notes: '' });
+
+    const old = buildBackup(data());
+    delete old.data.children;
+    delete old.data.montessoriLogs;
+    const r2 = validateBackup(old);
+    expect(r2.ok).toBe(true);
+    expect(r2.data.children).toBeUndefined();
+    expect(r2.data.montessoriLogs).toBeUndefined();
+
+    const bad = buildBackup({ ...data(), montessoriLogs: { x: { ...log, interest: 'enorme' } } });
+    expect(validateBackup(bad).ok).toBe(false);
+  });
+
   it('rejeita arquivos inválidos sem aplicar nada', () => {
     expect(validateBackup('não é json').ok).toBe(false);
     expect(validateBackup({ app: 'Outro', version: 1, data: {} }).ok).toBe(false);

@@ -77,6 +77,10 @@ por `allow create: if canCreateHousehold(casa);`, publique, crie a casa no app (
 > **Versão 1.4:** publique as regras de novo para ativar as **contas de tela** (só leitura), usadas
 > pela tela e-ink ([DISPLAY.md](DISPLAY.md)). Sem isso o resto continua igual; só "Adicionar tela"
 > mostra "Sem permissão no Firestore".
+>
+> **Versão 1.5 (aba Montessori):** **não precisa** publicar as regras. A criança e os registros
+> ficam nas coleções novas `children`, `montessoriLogs` e `montessoriLogsArchive`, já aceitas pelas
+> regras da versão 1.4 (a conta de tela só lê).
 
 ### 6. Colocar a configuração no PanelAI
 

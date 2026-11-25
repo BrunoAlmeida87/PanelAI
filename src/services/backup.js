@@ -4,12 +4,16 @@ import { CATEGORY_IDS, MARMITA_STATUS, MEAL_SLOT_IDS } from '../models/constants
 import { validateRecipe } from '../models/recipe.js';
 import { isUnit } from '../models/units.js';
 import { isValidISODate, weekStartOf } from '../utils/dates.js';
+import { AUTONOMY_LEVELS, INTEREST_LEVELS } from '../models/montessori.js';
 
 export const BACKUP_APP = 'PanelAI';
 export const BACKUP_VERSION = 1;
 export const COLLECTIONS = ['ingredients', 'recipes', 'pantry', 'weeks', 'marmitas', 'movements', 'purchases'];
 // Coleções novas: opcionais, para aceitar backups de versões anteriores.
-export const OPTIONAL_COLLECTIONS = ['tasks', 'taskTemplates', 'displayLayouts'];
+export const OPTIONAL_COLLECTIONS = ['tasks', 'taskTemplates', 'displayLayouts', 'children', 'montessoriLogs'];
+// Coleções que ficam como estão quando o arquivo não as tem (backup de versão
+// anterior): importar um backup antigo não apaga o histórico da criança.
+export const KEEP_WHEN_MISSING = ['children', 'montessoriLogs'];
 
 export function buildBackup(data, now = new Date()) {
   return {
@@ -27,6 +31,8 @@ export function buildBackup(data, now = new Date()) {
       tasks: Object.values(data.tasks ?? {}),
       taskTemplates: Object.values(data.taskTemplates ?? {}),
       displayLayouts: Object.values(data.displayLayouts ?? {}),
+      children: Object.values(data.children ?? {}),
+      montessoriLogs: Object.values(data.montessoriLogs ?? {}),
       settings: data.settings ?? {},
     },
   };
@@ -171,6 +177,42 @@ export function validateBackup(raw) {
     displayLayouts[l.id] = l;
   });
 
+  // Montessori: ausente no arquivo → undefined (os dados atuais são mantidos).
+  let children;
+  if (d.children) {
+    children = {};
+    d.children.forEach((c, idx) => {
+      if (!isObj(c) || !isStr(c.id) || !isStr(c.name) || !isValidISODate(c.birthDate)) {
+        errors.push(`Criança #${idx + 1}: id, nome e data de nascimento são obrigatórios.`);
+        return;
+      }
+      children[c.id] = { gestationWeeks: null, plan: null, ...c };
+    });
+  }
+  let montessoriLogs;
+  if (d.montessoriLogs) {
+    montessoriLogs = {};
+    d.montessoriLogs.forEach((l, idx) => {
+      const ok =
+        isObj(l) &&
+        isStr(l.id) &&
+        isStr(l.childId) &&
+        isStr(l.activityId) &&
+        isValidISODate(l.date) &&
+        INTEREST_LEVELS.some((x) => x.id === l.interest) &&
+        AUTONOMY_LEVELS.some((x) => x.id === l.autonomy);
+      if (!ok) {
+        errors.push(`Registro Montessori #${idx + 1}: dados inválidos.`);
+        return;
+      }
+      montessoriLogs[l.id] = { notes: '', ...l };
+    });
+  }
+
   if (errors.length) return { ok: false, errors: errors.slice(0, 20) };
-  return { ok: true, errors: [], data: { ingredients, recipes, pantry, weeks, marmitas, movements, purchases, settings, tasks, taskTemplates, displayLayouts } };
+  return {
+    ok: true,
+    errors: [],
+    data: { ingredients, recipes, pantry, weeks, marmitas, movements, purchases, settings, tasks, taskTemplates, displayLayouts, children, montessoriLogs },
+  };
 }
