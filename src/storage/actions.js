@@ -532,7 +532,8 @@ export async function importData(data) {
     montessoriLogs: data.montessoriLogs ?? s.montessoriLogs,
     settings: { ...DEFAULT_SETTINGS, ...data.settings },
   };
-  await persist(seedOps(full));
+  // A chave do GitHub não vem de backups: continua a que já estava.
+  await persist(seedOps({ ...full, githubToken: s.githubToken }));
   applyFullData(full);
 }
 
@@ -540,7 +541,7 @@ export async function importData(data) {
 export async function resetDemo() {
   const { buildSeed } = await import('../data/seed.js');
   const seed = { ...buildSeed(), ...montessoriData() };
-  await persist(seedOps(seed));
+  await persist(seedOps({ ...seed, githubToken: getState().githubToken }));
   applyFullData(seed);
 }
 
@@ -561,7 +562,7 @@ export async function startFresh() {
     ...montessoriData(s),
     settings: s.settings,
   };
-  await persist(seedOps(data));
+  await persist(seedOps({ ...data, githubToken: s.githubToken }));
   applyFullData(data);
 }
 

@@ -1,17 +1,21 @@
 // Configurações → Tela e-ink: horários em que o aparelho (kit TRMNL 7,5" DIY da Seeed, com o programa do PanelAI)
-// atualiza e o endereço secreto da imagem que o GitHub publica para ele.
-// Como tudo funciona: docs/DISPLAY.md.
+// atualiza, o botão "Atualizar a tela agora" (com a chave do GitHub) e o endereço secreto da imagem que o
+// GitHub publica para ele. Como tudo funciona: docs/DISPLAY.md.
 
 import { useEffect, useState } from 'preact/hooks';
-import { Clock, Copy, Download, ExternalLink, KeyRound, MonitorSmartphone, Plus, Power, X } from 'lucide-preact';
+import { Clock, Copy, Download, ExternalLink, KeyRound, Loader2, MonitorSmartphone, Plus, Power, RefreshCw, Timer, Trash2, X } from 'lucide-preact';
 import { useStore } from '../../storage/store.js';
-import { updateDisplayDevice } from '../../storage/displayActions.js';
+import { requestScreenUpdate, setGithubToken, updateDisplayDevice } from '../../storage/displayActions.js';
 import { screenSize } from '../../display/model.js';
 import {
+  CHECK_FROM,
+  CHECK_OPTIONS,
+  CHECK_UNTIL,
   CONFIG_FILE,
   IMAGE_FILE,
   MAX_TIMES,
   describeUpdate,
+  inCheckWindow,
   localTimeZone,
   newPublishCode,
   nextUpdateTimes,
@@ -19,6 +23,7 @@ import {
   normalizeTime,
   publishUrl,
 } from '../../display/schedule.js';
+import { isValidGithubToken, maskToken, tokenCreationUrl } from '../../display/github.js';
 import { copyText } from '../../services/share.js';
 import { useNow } from '../../utils/hooks.js';
 import { confirmDialog, toast } from '../../components/ui.jsx';
@@ -29,6 +34,9 @@ const DEVICE_SCREEN = { w: 800, h: 480 };
 const siteUrl = () => `${window.location.origin}${import.meta.env.BASE_URL}`;
 // Página que instala o programa do PanelAI no aparelho pelo cabo USB (public/instalar-tela.html).
 const installerUrl = () => `${import.meta.env.BASE_URL}instalar-tela.html`;
+// Um pedido de "Atualizar a tela agora" é acompanhado por até 15 minutos.
+const FOLLOW_REQUEST_MS = 15 * 60_000;
+const hhmmHere = (ms) => new Date(ms).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
 
 export function DisplayDeviceSection() {
   const s = useStore();
@@ -39,6 +47,11 @@ export function DisplayDeviceSection() {
   const layout = s.displayLayouts[s.settings.displayLayoutId] ?? Object.values(s.displayLayouts)[0] ?? null;
   const upcoming = nextUpdateTimes(device, now.getTime(), { limit: 3 });
   const hereTz = localTimeZone();
+  // Endereço da imagem (só com a nuvem e a publicação ligada) e a última publicação.
+  const url = cloud && device.code ? publishUrl(siteUrl(), device.code) : '';
+  // Pedido recente de "Atualizar a tela agora" (de qualquer pessoa da casa): acompanha até sair a imagem.
+  const following = device.requestedAt > 0 && now.getTime() - device.requestedAt < FOLLOW_REQUEST_MS ? device.requestedAt : 0;
+  const status = usePublishedStatus(url, following);
 
   const addTime = (e) => {
     e?.preventDefault?.();
@@ -65,6 +78,8 @@ export function DisplayDeviceSection() {
         O aparelho fica desligado e acorda sozinho nos horários abaixo: baixa a imagem da tela pela internet, mostra e volta a dormir. O botão do
         aparelho atualiza na hora.
       </p>
+
+      {url && <UpdateNow device={device} token={s.githubToken} status={status} following={following} />}
 
       <div class="field">
         <span class="label with-icon" id="horarios-label">
@@ -111,15 +126,22 @@ export function DisplayDeviceSection() {
           )}
         </span>
         <span class="hint">
-          O aparelho confere os horários sempre que acorda (pelo menos a cada 6 horas), então uma mudança aqui vale a partir da próxima vez que
-          ele acordar. Para valer na hora, aperte o botão do aparelho.
+          O aparelho relê os horários sempre que acorda (nas conferências de pedidos ou, sem elas, pelo menos a cada 6 horas), então uma mudança
+          aqui vale a partir da próxima vez que ele acordar. Para valer na hora, aperte o botão do aparelho.
         </span>
       </div>
 
       <LayoutCheck layout={layout} />
 
+      {url && (
+        <>
+          <div class="divider" />
+          <RequestOptions device={device} token={s.githubToken} />
+        </>
+      )}
+
       <div class="divider" />
-      <Publish device={device} cloud={cloud} />
+      <Publish device={device} cloud={cloud} url={url} status={status} />
     </section>
   );
 }
@@ -156,10 +178,7 @@ function LayoutCheck({ layout }) {
 }
 
 /** Endereço secreto da imagem: ativar, copiar, conferir, trocar e desligar. */
-function Publish({ device, cloud }) {
-  const url = device.code ? publishUrl(siteUrl(), device.code) : '';
-  const status = usePublishedStatus(url);
-
+function Publish({ device, cloud, url, status }) {
   if (!cloud) {
     return (
       <div class="notice info" role="note">
@@ -184,7 +203,7 @@ function Publish({ device, cloud }) {
               const ok = await confirmDialog({
                 title: 'Ativar o endereço da imagem',
                 message:
-                  'A partir da próxima publicação (em até 30 minutos), a imagem da tela fica disponível num endereço secreto. Guarde o endereço só no aparelho.',
+                  'A partir da próxima publicação, a imagem da tela fica disponível num endereço secreto. Guarde o endereço só no aparelho.',
                 confirmLabel: 'Ativar',
               });
               if (ok) {
@@ -232,7 +251,7 @@ function Publish({ device, cloud }) {
             const ok = await confirmDialog({
               title: 'Trocar o endereço',
               message:
-                'Use se o endereço vazou. O endereço atual para de funcionar na próxima publicação (em até 30 minutos) e o aparelho precisa ser gravado de novo com o endereço novo.',
+                'Use se o endereço vazou. O endereço atual para de funcionar na próxima publicação e o endereço novo precisa ser colado na página do aparelho.',
               confirmLabel: 'Trocar endereço',
               danger: true,
             });
@@ -250,7 +269,7 @@ function Publish({ device, cloud }) {
           onClick={async () => {
             const ok = await confirmDialog({
               title: 'Desligar a publicação',
-              message: 'A imagem deixa de ser publicada na próxima publicação (em até 30 minutos). O aparelho continua mostrando a última imagem que baixou.',
+              message: 'A imagem deixa de ser publicada na próxima publicação. O aparelho continua mostrando a última imagem que baixou.',
               confirmLabel: 'Desligar',
               danger: true,
             });
@@ -268,29 +287,275 @@ function Publish({ device, cloud }) {
 }
 
 /**
- * Lê o config.json publicado para mostrar quando saiu a última imagem.
- * { state: 'checking' | 'ok' | 'missing' | 'error', generatedAt?: Date }
+ * "Atualizar a tela agora": pede ao GitHub a imagem nova e marca o pedido; a
+ * tela, na próxima conferência, vê o pedido no config.json e redesenha.
  */
-function usePublishedStatus(url) {
-  const [status, setStatus] = useState({ state: 'checking' });
+function UpdateNow({ device, token, status, following }) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  const [sentAt, setSentAt] = useState(0);
+  const now = useNow(5_000).getTime();
+  const ready = isValidGithubToken(token);
+  // Um minuto entre toques (cada pedido republica o site).
+  const cooling = sentAt > 0 && now - sentAt < 60_000;
+
+  const request = async () => {
+    setBusy(true);
+    setError('');
+    const r = await requestScreenUpdate();
+    setBusy(false);
+    if (!r.ok) return setError(r.message);
+    setSentAt(Date.now());
+    toast('Pedido enviado. A imagem nova fica pronta em uns 3 minutos.');
+  };
+
+  return (
+    <div class="field">
+      <div class="toolbar">
+        <button type="button" class="btn btn-primary" onClick={request} disabled={!ready || busy || cooling}>
+          {busy ? <Loader2 size={16} class="spin" /> : <RefreshCw size={16} />} Atualizar a tela agora
+        </button>
+      </div>
+      {!ready && (
+        <span class="hint">
+          Para usar este botão, salve a chave do GitHub em <strong>Atualizar sem esperar o horário</strong>, mais abaixo (uma vez só).
+        </span>
+      )}
+      {error && (
+        <div class="notice" role="alert">
+          <RefreshCw size={18} />
+          <span>{error}</span>
+        </div>
+      )}
+      {!error && following > 0 && <RequestProgress device={device} status={status} requestedAt={following} now={now} />}
+    </div>
+  );
+}
+
+/** Andamento do último pedido: gerando → publicada → quando a tela mostra. */
+function RequestProgress({ device, status, requestedAt, now }) {
+  const published = status.state === 'ok' && status.pedido >= Math.floor(requestedAt / 1000);
+  if (!published) {
+    const late = now - requestedAt > 10 * 60_000;
+    return (
+      <div class="notice info" role="status">
+        {late ? <Clock size={18} /> : <Loader2 size={18} class="spin" />}
+        <span>
+          {late
+            ? 'A imagem pedida ainda não saiu. O GitHub pode estar lento ou com problemas; tente de novo daqui a pouco.'
+            : `Gerando a imagem nova no GitHub (pedido às ${hhmmHere(requestedAt)}; leva uns 3 minutos)…`}
+        </span>
+      </div>
+    );
+  }
+  let when;
+  if (!device.checkMinutes) when = 'A tela mostra no próximo horário ou quando alguém apertar o botão dela.';
+  else if (inCheckWindow(device, now)) when = `A tela mostra na próxima conferência (em até ${device.checkMinutes} minutos).`;
+  else when = `A tela confere pedidos das ${CHECK_FROM} às ${CHECK_UNTIL}: mostra na primeira conferência a partir das ${CHECK_FROM} (ou aperte o botão dela).`;
+  return (
+    <div class="notice ok" role="status">
+      <Clock size={18} />
+      <span>
+        Imagem nova publicada às {hhmmHere(status.generatedAt.getTime())}. {when}
+      </span>
+    </div>
+  );
+}
+
+/** Chave do GitHub, conferência de pedidos pela tela e geração automática. */
+function RequestOptions({ device, token }) {
+  return (
+    <div class="form-section" style="gap:12px">
+      <h3 class="label with-icon" style="margin:0">
+        <Timer size={14} /> Atualizar sem esperar o horário
+      </h3>
+      <p class="small muted" style="margin:0">
+        Com a chave do GitHub salva, o PanelAI pede a imagem nova na hora: no botão <strong>Atualizar a tela agora</strong> e sozinho, logo depois que
+        algo muda. Sem a chave, a imagem só é refeita pelo agendamento do GitHub, que pode atrasar horas.
+      </p>
+      <GithubKey token={token} />
+      <label class="field">
+        <span class="label">A tela confere se houve pedido</span>
+        <select class="input" style="max-width:340px" value={String(device.checkMinutes)} onChange={(e) => updateDisplayDevice({ checkMinutes: Number(e.currentTarget.value) })}>
+          {CHECK_OPTIONS.map((m) => (
+            <option key={m} value={String(m)}>
+              {m ? `A cada ${m} minutos` : 'Não confere (só nos horários e no botão)'}
+            </option>
+          ))}
+        </select>
+        <span class="hint">
+          Só das {CHECK_FROM} às {CHECK_UNTIL}. Em cada conferência a tela acorda por alguns segundos, só lê se alguém pediu e volta a dormir, sem
+          piscar. Quanto mais vezes, mais bateria: a cada 10 minutos ela deve durar 1 a 2 meses; a cada 30, bem mais; sem conferir, vários meses
+          (estimativas). Ligada no cabo USB, tanto faz.
+        </span>
+      </label>
+      <label class="switch">
+        <input type="checkbox" checked={device.autoGenerate} onChange={(e) => updateDisplayDevice({ autoGenerate: e.currentTarget.checked })} />
+        <span>
+          Refazer a imagem sozinho quando algo mudar
+          <span class="xsmall muted" style="display:block">
+            Pouco depois de uma mudança no cardápio, nas tarefas ou no layout, o PanelAI pede ao GitHub as imagens novas de cada horário. A tela
+            não muda na hora: continua seguindo os horários.
+          </span>
+        </span>
+      </label>
+    </div>
+  );
+}
+
+/** Guarda, troca ou remove a chave do GitHub (src/display/github.js). */
+function GithubKey({ token }) {
+  const has = isValidGithubToken(token);
+  const [editing, setEditing] = useState(false);
+  const [value, setValue] = useState('');
+  const [error, setError] = useState('');
+
+  const save = async (e) => {
+    e.preventDefault();
+    const t = value.trim();
+    if (!isValidGithubToken(t)) return setError('Isso não parece uma chave do GitHub: ela começa com "github_pat_".');
+    setError('');
+    await setGithubToken(t);
+    setValue('');
+    setEditing(false);
+    toast('Chave do GitHub salva');
+  };
+
+  const remove = async () => {
+    const ok = await confirmDialog({
+      title: 'Remover a chave do GitHub',
+      message: 'O botão "Atualizar a tela agora" e a geração automática param. Para apagar a chave de vez, apague também no GitHub.',
+      confirmLabel: 'Remover',
+      danger: true,
+    });
+    if (!ok) return;
+    await setGithubToken(null);
+    toast('Chave removida');
+  };
+
+  if (has && !editing) {
+    return (
+      <div class="field">
+        <span class="label with-icon">
+          <KeyRound size={14} /> Chave do GitHub
+        </span>
+        <div class="toolbar">
+          <code>{maskToken(token)}</code>
+          <button type="button" class="btn btn-ghost" onClick={() => setEditing(true)}>
+            <KeyRound size={16} /> Trocar
+          </button>
+          <button type="button" class="btn btn-danger-ghost" onClick={remove}>
+            <Trash2 size={16} /> Remover
+          </button>
+        </div>
+        <span class="hint">Se a chave vencer ou for apagada no GitHub, o botão avisa: crie outra e salve aqui.</span>
+      </div>
+    );
+  }
+
+  return (
+    <form class="field" onSubmit={save}>
+      <label class="label with-icon" for="chave-github">
+        <KeyRound size={14} /> Chave do GitHub
+      </label>
+      <div class="toolbar">
+        <input
+          id="chave-github"
+          class="input"
+          type="password"
+          autocomplete="off"
+          spellcheck={false}
+          placeholder="github_pat_…"
+          style="max-width:340px"
+          value={value}
+          onInput={(e) => setValue(e.currentTarget.value)}
+        />
+        <button type="submit" class="btn btn-secondary" disabled={!value.trim()}>
+          Salvar chave
+        </button>
+        {has && (
+          <button
+            type="button"
+            class="btn btn-ghost"
+            onClick={() => {
+              setEditing(false);
+              setValue('');
+              setError('');
+            }}
+          >
+            Cancelar
+          </button>
+        )}
+      </div>
+      {error && (
+        <span class="error" role="alert">
+          {error}
+        </span>
+      )}
+      <details class="disclosure small">
+        <summary>Como criar a chave (uma vez só)</summary>
+        <ol style="margin:0;padding-left:20px;display:grid;gap:6px">
+          <li>
+            Abra{' '}
+            <a href={tokenCreationUrl()} target="_blank" rel="noopener noreferrer">
+              a página do GitHub que cria a chave
+            </a>{' '}
+            (entre na sua conta do GitHub se ele pedir). Ela já vem com o nome "PanelAI tela", sem data para vencer e com a permissão certa.
+          </li>
+          <li>
+            Em <strong>Repository access</strong>, escolha <strong>Only select repositories</strong> e selecione <strong>PanelAI</strong>.
+          </li>
+          <li>
+            Em <strong>Permissions</strong>, confira: <strong>Actions</strong> com <strong>Read and write</strong> (o <strong>Metadata</strong> vem junto,
+            só leitura). Não precisa de mais nada.
+          </li>
+          <li>
+            Toque em <strong>Generate token</strong>, copie a chave (começa com <code>github_pat_</code>), cole aqui e toque em <strong>Salvar chave</strong>.
+          </li>
+        </ol>
+        <p class="xsmall muted" style="margin:8px 0 0">
+          A chave só serve para o GitHub Actions do PanelAI (pedir a imagem e ver as execuções): não mexe no código, nos segredos nem nos dados da casa.
+          Fica guardada nos dados da casa, que só as pessoas da casa e a conta de tela leem, e não vai para os backups.
+        </p>
+      </details>
+    </form>
+  );
+}
+
+/**
+ * Lê o config.json publicado para mostrar quando saiu a última imagem.
+ * { state: 'checking' | 'ok' | 'missing' | 'error', generatedAt?: Date, pedido?: número (s) }
+ * Com `following` (ms de um pedido recente), confere de novo a cada 20 s até sair a imagem pedida.
+ */
+function usePublishedStatus(url, following = 0) {
+  const [status, setStatus] = useState({ state: 'checking', url });
+  const [round, setRound] = useState(0);
   useEffect(() => {
     if (!url) return undefined;
     let alive = true;
-    setStatus({ state: 'checking' });
+    // Só mostra "conferindo" na primeira vez (as conferências seguintes não piscam).
+    setStatus((prev) => (prev.url === url ? prev : { state: 'checking', url }));
     fetch(`${url}/${CONFIG_FILE}?t=${Date.now()}`, { cache: 'no-store' })
       .then(async (r) => {
         if (!alive) return;
         // 404 (ou outra página no lugar do JSON): ainda não publicada.
-        if (r.status === 404 || (r.ok && !(r.headers.get('content-type') ?? '').includes('json'))) return setStatus({ state: 'missing' });
-        if (!r.ok) return setStatus({ state: 'error' });
+        if (r.status === 404 || (r.ok && !(r.headers.get('content-type') ?? '').includes('json'))) return setStatus({ state: 'missing', url });
+        if (!r.ok) return setStatus({ state: 'error', url });
         const cfg = await r.json();
-        setStatus({ state: 'ok', generatedAt: new Date(Number(cfg.gerado) * 1000) });
+        if (alive) setStatus({ state: 'ok', url, generatedAt: new Date(Number(cfg.gerado) * 1000), pedido: Number(cfg.pedido) || 0 });
       })
-      .catch(() => alive && setStatus({ state: 'error' }));
+      .catch(() => alive && setStatus({ state: 'error', url }));
     return () => {
       alive = false;
     };
-  }, [url]);
+  }, [url, round]);
+
+  const waiting = following > 0 && !(status.state === 'ok' && status.pedido >= Math.floor(following / 1000));
+  useEffect(() => {
+    if (!url || !waiting) return undefined;
+    const t = setInterval(() => setRound((n) => n + 1), 20_000);
+    return () => clearInterval(t);
+  }, [url, waiting]);
   return status;
 }
 
@@ -302,7 +567,8 @@ function PublishedStatus({ status }) {
       <div class="notice ok" role="status">
         <Clock size={18} />
         <span>
-          Última imagem publicada: {describeUpdate(d.getTime(), Date.now(), localTimeZone()).replace(' às ', ', ')}. Ela é refeita a cada 30 minutos.
+          Última imagem publicada: {describeUpdate(d.getTime(), Date.now(), localTimeZone()).replace(' às ', ', ')}. Ela é refeita quando algo muda
+          no PanelAI (com a chave do GitHub salva) e pelo agendamento do GitHub, que pode atrasar.
         </span>
       </div>
     );
@@ -312,8 +578,8 @@ function PublishedStatus({ status }) {
       <div class="notice" role="status">
         <Clock size={18} />
         <span>
-          Ainda não há imagem neste endereço. Ela sai na próxima publicação do GitHub (até 30 minutos), desde que a conta da tela esteja configurada
-          lá (passo a passo em <code>docs/DISPLAY.md</code>).
+          Ainda não há imagem neste endereço. Ela sai na próxima publicação do GitHub (com a chave do GitHub salva, em uns 3 minutos; sem ela, pode
+          demorar), desde que a conta da tela esteja configurada lá (passo a passo em <code>docs/DISPLAY.md</code>).
         </span>
       </div>
     );

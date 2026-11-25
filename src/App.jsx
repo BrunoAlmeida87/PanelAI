@@ -9,6 +9,7 @@ import { useOnline } from './utils/hooks.js';
 import { lazyPage } from './utils/lazy.js';
 import { ToastRegion, ConfirmHost } from './components/ui.jsx';
 import { ShortcutsModal } from './components/ShortcutsModal.jsx';
+import { ScreenAutoUpdate } from './components/ScreenAutoUpdate.jsx';
 import { WeekSelector } from './components/WeekSelector.jsx';
 import { MenuPage } from './pages/MenuPage.jsx';
 import { ShoppingPage } from './pages/ShoppingPage.jsx';
@@ -222,6 +223,7 @@ export function App() {
       <ToastRegion />
       <ConfirmHost />
       <RecurringTasks />
+      <ScreenAutoUpdate />
       <ShortcutsModal open={showShortcuts} onClose={() => setShowShortcuts(false)} />
     </>
   );

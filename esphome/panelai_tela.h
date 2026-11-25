@@ -29,6 +29,14 @@ constexpr uint32_t SONECA_MIN = 60;
 // O YAML declara a variável global com o mesmo tipo escrito por extenso.
 using Agenda = std::array<uint32_t, 24>;
 
+// Janelas em que a tela confere se alguém tocou em "Atualizar a tela agora":
+// pares [início, fim) em segundos UTC (das 6h às 23h de cada dia, no fuso da
+// casa), em ordem; 0 = vazio. Vem do config.json ("conferir").
+using Janelas = std::array<uint32_t, 16>;
+// Conferência entre 5 minutos e 2 horas (0 = desligada).
+constexpr uint32_t CONFERIR_MIN = 300;
+constexpr uint32_t CONFERIR_MAX = 7200;
+
 inline bool hora_valida(uint32_t agora) { return agora > HORA_VALIDA; }
 
 /** Chegou a hora da atualização que o aparelho estava esperando? */
@@ -45,6 +53,44 @@ inline uint32_t proximo_horario(uint32_t agora, const Agenda &agenda) {
   return 0;
 }
 
+/** Intervalo de conferência de pedidos lido do config.json, dentro dos limites (0 = desligada). */
+inline uint32_t intervalo_conferencia(uint32_t segundos) {
+  return segundos == 0 ? 0 : std::min(std::max(segundos, CONFERIR_MIN), CONFERIR_MAX);
+}
+
+/** Segundos até a próxima conferência de pedidos (0 = nenhuma marcada). */
+inline uint32_t ate_conferir(uint32_t agora, const Janelas &janelas, uint32_t cada) {
+  cada = intervalo_conferencia(cada);
+  if (!hora_valida(agora) || cada == 0) return 0;
+  for (size_t i = 0; i + 1 < janelas.size(); i += 2) {
+    const uint32_t inicio = janelas[i], fim = janelas[i + 1];
+    if (inicio == 0) break;                    // fim da lista
+    if (fim <= inicio || agora >= fim) continue;  // inválida ou já passou
+    if (agora < inicio) return inicio - agora;    // antes da janela: acorda quando ela começa
+    if (agora + cada < fim) return cada;          // dentro da janela
+    // A próxima conferência cairia depois do fim desta janela: vale a seguinte.
+  }
+  return 0;
+}
+
+/** Alguém tocou em "Atualizar a tela agora" desde a última imagem mostrada? */
+inline bool pedido_novo(uint32_t pedido, uint32_t ultimo) { return pedido != 0 && pedido != ultimo; }
+
+/**
+ * Qual imagem baixar: 0 = a principal (tela.png); senão, o horário da imagem
+ * pronta (tela-<horário>.png). Vale a do horário mais recente que já chegou
+ * (contando a folga), se for mais nova que a principal. Ex.: a imagem foi
+ * gerada ontem à noite e agora são 6h: a de 06:00 já vem com os dados de hoje.
+ */
+inline uint32_t horario_da_imagem(uint32_t agora, uint32_t referencia, const Agenda &agenda) {
+  if (!hora_valida(agora)) return 0;
+  uint32_t melhor = 0;
+  for (const uint32_t t : agenda) {
+    if (t != 0 && t <= agora + FOLGA && t > referencia && t > melhor) melhor = t;
+  }
+  return melhor;
+}
+
 /** Espera depois de falhas seguidas: 5, 10, 20 e depois 30 minutos. */
 inline uint32_t espera_por_falhas(uint8_t falhas) {
   const int passos = std::min<int>(std::max<int>(falhas, 1) - 1, 3);
@@ -59,11 +105,15 @@ struct Soneca {
 /**
  * Quanto dormir agora.
  *  - falhou: esta vez não deu certo (sem Wi-Fi ou sem imagem);
- *  - atualizando: esta vez era para redesenhar a tela (horário, botão ou ligado);
- *  - falhas: falhas seguidas, já contando esta.
+ *  - atualizando: esta vez era para redesenhar a tela (horário, botão, ligado ou pedido);
+ *  - falhas: falhas seguidas, já contando esta;
+ *  - janelas e cada: conferência de pedidos (acorda no máximo a cada `cada`
+ *    segundos dentro das janelas). Com falha, vale só a espera por falhas, que
+ *    gasta menos bateria do que tentar o Wi-Fi a toda hora.
  * Se a atualização falhou, ela fica pendente (alvo no passado) e é tentada de novo.
  */
-inline Soneca calcular_soneca(uint32_t agora, const Agenda &agenda, bool falhou, bool atualizando, uint8_t falhas) {
+inline Soneca calcular_soneca(uint32_t agora, const Agenda &agenda, bool falhou, bool atualizando, uint8_t falhas,
+                              const Janelas &janelas = Janelas{}, uint32_t cada = 0) {
   const bool tem_hora = hora_valida(agora);
   Soneca s{SEM_HORA, 0};
   if (falhou && atualizando) {
@@ -81,7 +131,12 @@ inline Soneca calcular_soneca(uint32_t agora, const Agenda &agenda, bool falhou,
       const uint32_t falta = proximo - agora;
       s.segundos = falta <= ULTIMA_ETAPA + 300 ? falta : std::min(falta - ULTIMA_ETAPA, SALTO_MAX);
     }
-    if (falhou) s.segundos = std::min(s.segundos, espera_por_falhas(falhas));
+    if (falhou) {
+      s.segundos = std::min(s.segundos, espera_por_falhas(falhas));
+    } else {
+      const uint32_t conferir = ate_conferir(agora, janelas, cada);
+      if (conferir != 0) s.segundos = std::min(s.segundos, conferir);
+    }
   }
   s.segundos = std::max(s.segundos, SONECA_MIN);
   return s;

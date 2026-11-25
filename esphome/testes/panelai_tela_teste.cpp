@@ -95,6 +95,56 @@ int main() {
   CONFERE(calcular_soneca(AGORA, agenda({AGORA + FOLGA + 10}), false, false, 0).segundos == FOLGA + 10);
   CONFERE(calcular_soneca(AGORA, agenda({AGORA + FOLGA + 10}), false, false, 0).segundos >= SONECA_MIN);
 
+  // ---------- Conferência de pedidos ("Atualizar a tela agora") ----------
+  // Janelas das 6h às 23h em SP: hoje (9h–2h UTC) e amanhã.
+  const uint32_t HOJE_6H = AGORA - 4 * H, HOJE_23H = AGORA + 13 * H;
+  const Janelas jan = {HOJE_6H, HOJE_23H, HOJE_6H + 24 * H, HOJE_23H + 24 * H};
+  CONFERE(intervalo_conferencia(0) == 0);
+  CONFERE(intervalo_conferencia(60) == CONFERIR_MIN);
+  CONFERE(intervalo_conferencia(600) == 600);
+  CONFERE(intervalo_conferencia(86400) == CONFERIR_MAX);
+  // Dentro da janela: a cada 10 min
+  CONFERE(ate_conferir(AGORA, jan, 600) == 600);
+  // Perto do fim do dia (22:55): a próxima é às 6h de amanhã
+  CONFERE(ate_conferir(HOJE_23H - 300, jan, 600) == 300 + 7 * H);
+  // De madrugada (antes das 6h): acorda quando a janela começa
+  CONFERE(ate_conferir(HOJE_6H - 2 * H, jan, 600) == 2 * H);
+  // Depois de todas as janelas, desligada ou sem relógio: nenhuma
+  CONFERE(ate_conferir(HOJE_23H + 24 * H, jan, 600) == 0);
+  CONFERE(ate_conferir(AGORA, jan, 0) == 0);
+  CONFERE(ate_conferir(0, jan, 600) == 0);
+  CONFERE(ate_conferir(AGORA, Janelas{}, 600) == 0);
+  // A soneca respeita a conferência, mas mantém o horário esperado
+  {
+    const Soneca s = calcular_soneca(AGORA, agenda({AGORA + 8 * H}), false, false, 0, jan, 600);
+    CONFERE(s.segundos == 600 && s.alvo == AGORA + 8 * H);
+    CONFERE(!chegou_a_hora(AGORA + s.segundos, s.alvo));  // ao acordar, só confere
+  }
+  // Horário antes da próxima conferência: dorme até o horário
+  CONFERE(calcular_soneca(AGORA, agenda({AGORA + 300}), false, false, 0, jan, 600).segundos == 300);
+  // Com falha (sem Wi-Fi), vale a espera por falhas, não a conferência
+  CONFERE(calcular_soneca(AGORA, agenda({AGORA + 8 * H}), true, false, 3, jan, 600).segundos == 1200);
+  // Pedido novo: qualquer valor diferente do último mostrado (relógio do celular pode estar adiantado)
+  CONFERE(pedido_novo(1795611000u, 0));
+  CONFERE(pedido_novo(1795611000u, 1795612000u));
+  CONFERE(!pedido_novo(1795611000u, 1795611000u));
+  CONFERE(!pedido_novo(0, 1795611000u));
+
+  // ---------- Qual imagem baixar ----------
+  {
+    const uint32_t ontem_22h = AGORA - 12 * H, hoje_6h = AGORA - 4 * H, hoje_18h = AGORA + 8 * H;
+    const Agenda ag = agenda({hoje_6h, hoje_18h, hoje_6h + 24 * H});
+    // Gerada ontem às 22h; agora (10h) a de 06:00 é mais nova
+    CONFERE(horario_da_imagem(AGORA, ontem_22h, ag) == hoje_6h);
+    // Acordou 1 min antes das 18h (dentro da folga): já usa a das 18h
+    CONFERE(horario_da_imagem(hoje_18h - 60, ontem_22h, ag) == hoje_18h);
+    // Gerada agora (pedido): a principal é a mais nova
+    CONFERE(horario_da_imagem(AGORA, AGORA, ag) == 0);
+    // Gerada "para" as 06:00 (perto do horário): a principal já é a das 06:00
+    CONFERE(horario_da_imagem(hoje_6h + 30, hoje_6h, ag) == 0);
+    CONFERE(horario_da_imagem(0, ontem_22h, ag) == 0);
+  }
+
   // Endereço colado na página do aparelho
   const std::string ok = "https://exemplo.github.io/PanelAI/tela/AbCdEfGhIjKlMnOpQrStUvWxYz012345";
   CONFERE(limpar_endereco("  " + ok + "/ \n") == ok);

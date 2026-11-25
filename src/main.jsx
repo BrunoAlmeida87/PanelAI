@@ -39,6 +39,8 @@ async function registerServiceWorker() {
     console.warn('Service worker não registrado', err);
     return;
   }
+  // Navegadores automáticos (ex.: o gerador da imagem do display) podem bloquear o service worker.
+  if (!reg) return;
   let requested = false;
   const apply = (worker) => {
     requested = true;

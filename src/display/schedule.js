@@ -8,10 +8,15 @@
 // (epoch), então não precisa saber de fuso nem de horário de verão.
 //
 // Formato guardado em settings.displayDevice:
-//   { times: ['06:00', '18:00'], timeZone: 'America/Sao_Paulo', code: 'Ab3…' | null }
+//   { times: ['06:00', '18:00'], timeZone: 'America/Sao_Paulo', code: 'Ab3…' | null,
+//     checkMinutes: 10, autoGenerate: true, requestedAt: 0 }
 //   - times: horários de atualização (HH:MM, sem repetição, em ordem). Vazio =
 //     a tela só atualiza quando alguém aperta o botão do aparelho.
 //   - code: código secreto do endereço da imagem. null = publicação desligada.
+//   - checkMinutes: de quanto em quanto tempo a tela confere se alguém pediu
+//     "Atualizar a tela agora" (só das 6h às 23h; 0 = não confere).
+//   - autoGenerate: o site pede uma imagem nova ao GitHub quando algo muda.
+//   - requestedAt: quando alguém tocou em "Atualizar a tela agora" (ms; 0 = nunca).
 
 export const DEFAULT_TIMEZONE = 'America/Sao_Paulo';
 export const MAX_TIMES = 8;
@@ -21,11 +26,30 @@ export const PUBLISH_CODE_LENGTH = 32;
 export const PUBLISH_DIR = 'tela';
 export const IMAGE_FILE = 'tela.png';
 export const CONFIG_FILE = 'config.json';
-/** Versão do formato do config.json lido pelo aparelho (esphome/panelai-tela.yaml). */
-export const DEVICE_CONFIG_VERSION = 1;
+/** Imagem pronta para um horário de atualização (segundos UTC): tela-1764136800.png. */
+export const slotImageFile = (sec) => `tela-${sec}.png`;
+/**
+ * Versão do formato do config.json lido pelo aparelho (esphome/panelai-tela.yaml).
+ * 2: + pedido, conferir_cada, conferir e as imagens prontas por horário.
+ * Os campos da versão 1 continuam iguais (aparelhos antigos seguem funcionando).
+ */
+export const DEVICE_CONFIG_VERSION = 2;
+
+/** De quanto em quanto tempo a tela pode conferir pedidos (minutos; 0 = não confere). */
+export const CHECK_OPTIONS = [5, 10, 15, 30, 0];
+/** A tela só confere pedidos nesse horário do dia (no fuso da casa), para poupar bateria. */
+export const CHECK_FROM = '06:00';
+export const CHECK_UNTIL = '23:00';
 
 // Congelado: entra em DEFAULT_SETTINGS e é compartilhado (nunca alterar no lugar).
-export const DEFAULT_DISPLAY_DEVICE = Object.freeze({ times: Object.freeze(['06:00']), timeZone: DEFAULT_TIMEZONE, code: null });
+export const DEFAULT_DISPLAY_DEVICE = Object.freeze({
+  times: Object.freeze(['06:00']),
+  timeZone: DEFAULT_TIMEZONE,
+  code: null,
+  checkMinutes: 10,
+  autoGenerate: true,
+  requestedAt: 0,
+});
 
 const CODE_ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
 const CODE_RE = /^[A-Za-z0-9]{24,64}$/;
@@ -72,10 +96,14 @@ export const isValidPublishCode = (code) => typeof code === 'string' && CODE_RE.
 /** Configuração da tela sempre num formato válido (dados antigos ou incompletos viram o padrão). */
 export function normalizeDisplayDevice(device) {
   const d = device && typeof device === 'object' ? device : {};
+  const requested = Number(d.requestedAt);
   return {
     times: Array.isArray(d.times) ? normalizeTimes(d.times) : [...DEFAULT_DISPLAY_DEVICE.times],
     timeZone: isValidTimeZone(d.timeZone) ? d.timeZone : DEFAULT_TIMEZONE,
     code: isValidPublishCode(d.code) ? d.code : null,
+    checkMinutes: CHECK_OPTIONS.includes(d.checkMinutes) ? d.checkMinutes : DEFAULT_DISPLAY_DEVICE.checkMinutes,
+    autoGenerate: typeof d.autoGenerate === 'boolean' ? d.autoGenerate : DEFAULT_DISPLAY_DEVICE.autoGenerate,
+    requestedAt: Number.isFinite(requested) && requested > 0 ? Math.floor(requested) : 0,
   };
 }
 
@@ -192,6 +220,37 @@ export function nextUpdateTimes(device, fromMs, { days = 8, limit = 24 } = {}) {
 }
 
 /**
+ * Janelas em que a tela confere pedidos de "Atualizar a tela agora", para os
+ * próximos `days` dias: [início, fim, início, fim, …] em segundos UTC (das
+ * CHECK_FROM às CHECK_UNTIL no fuso da casa). Vazio se a conferência está desligada.
+ */
+export function checkWindows(device, fromMs, { days = 8 } = {}) {
+  const dev = normalizeDisplayDevice(device);
+  if (!dev.checkMinutes) return [];
+  const start = zonedParts(fromMs, dev.timeZone);
+  const [fh, fm] = CHECK_FROM.split(':').map(Number);
+  const [uh, um] = CHECK_UNTIL.split(':').map(Number);
+  const out = [];
+  for (let d = 0; d < days; d++) {
+    const day = new Date(Date.UTC(start.year, start.month - 1, start.day + d));
+    const ymd = { year: day.getUTCFullYear(), month: day.getUTCMonth() + 1, day: day.getUTCDate() };
+    const ini = zonedTimeToMs({ ...ymd, hour: fh, minute: fm }, dev.timeZone);
+    const fim = zonedTimeToMs({ ...ymd, hour: uh, minute: um }, dev.timeZone);
+    if (fim > fromMs) out.push(Math.floor(ini / 1000), Math.floor(fim / 1000));
+  }
+  return out;
+}
+
+/** Agora é horário de a tela conferir pedidos (das CHECK_FROM às CHECK_UNTIL no fuso da casa)? */
+export function inCheckWindow(device, ms) {
+  const dev = normalizeDisplayDevice(device);
+  if (!dev.checkMinutes) return false;
+  const p = zonedParts(ms, dev.timeZone);
+  const hm = `${String(p.hour).padStart(2, '0')}:${String(p.minute).padStart(2, '0')}`;
+  return hm >= CHECK_FROM && hm < CHECK_UNTIL;
+}
+
+/**
  * Momento que a imagem representa. Se a próxima atualização está perto
  * (dentro de `windowMs`), a imagem já é gerada "para" ela: uma tela que
  * atualiza à meia-noite mostra o cardápio do dia novo, não o da véspera.
@@ -215,7 +274,13 @@ export function buildDeviceConfig({ device, nowMs, referenceMs = nowMs, width, h
     referencia: sec(referenceMs),
     horarios: dev.times,
     fuso: dev.timeZone,
+    // Cada horário daqui tem a sua imagem pronta: tela-<horário>.png (slotImageFile).
     proximas: nextUpdateTimes(dev, nowMs, { limit }).map(sec),
+    // Último "Atualizar a tela agora" (segundos UTC; 0 = nunca). A tela redesenha quando muda.
+    pedido: sec(dev.requestedAt),
+    // De quanto em quanto tempo conferir pedidos (segundos; 0 = não confere) e em que janelas.
+    conferir_cada: dev.checkMinutes * 60,
+    conferir: checkWindows(dev, nowMs),
     largura: width,
     altura: height,
   };

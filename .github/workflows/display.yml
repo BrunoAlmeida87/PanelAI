@@ -1,13 +1,17 @@
 name: Imagem do display
 
 # Gera a imagem da tela e-ink (kit TRMNL 7,5" DIY) e publica junto com o site, no
-# endereço secreto de Configurações → Tela e-ink: <site>/tela/<código>/tela.png
-# e config.json. O aparelho baixa esses arquivos pela internet nos horários
-# escolhidos. Como tudo funciona e o que configurar: docs/DISPLAY.md.
+# endereço secreto de Configurações → Tela e-ink: <site>/tela/<código>/tela.png,
+# tela-<horário>.png (uma pronta para cada próximo horário) e config.json. O
+# aparelho baixa esses arquivos pela internet nos horários escolhidos.
+# Como tudo funciona e o que configurar: docs/DISPLAY.md.
 #
 # Quando roda:
-#  - a cada 30 minutos (o GitHub às vezes atrasa alguns minutos);
+#  - quando o PanelAI pede (workflow_dispatch com a chave do GitHub da casa):
+#    no botão "Atualizar a tela agora" e logo depois de mudanças no PanelAI;
 #  - logo depois de cada publicação do site, que substitui o site inteiro;
+#  - a cada 30 minutos, como reserva (o GitHub atrasa ou pula esse agendamento
+#    quando está cheio: não dá para depender dele);
 #  - manualmente: Actions → Imagem do display → Run workflow.
 #
 # Segredos (Settings → Secrets and variables → Actions):
@@ -34,10 +38,12 @@ permissions:
   # Ler as publicações do site, apagar o artefato com a imagem e manter o agendamento ativo.
   actions: write
 
-# Uma geração por vez; a mais nova vale.
+# Uma geração por vez. A que está rodando termina (nunca é cortada no meio);
+# dos pedidos que chegam enquanto isso, só o mais novo roda depois, e ele já lê
+# tudo o que mudou.
 concurrency:
   group: imagem-do-display
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   gerar:

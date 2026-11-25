@@ -34,6 +34,9 @@ let state = {
   // Aba Montessori: crianças (com as atividades escolhidas para o dia) e registros.
   children: {},
   montessoriLogs: {},
+  // Chave do GitHub da casa (meta/github) para pedir a imagem da tela agora.
+  // Fica fora das configurações para não entrar nos backups (src/display/github.js).
+  githubToken: null,
   // 'local' | 'cloud' | 'gate' (nuvem configurada, sem login: só a tela de entrar)
   // | 'demo' (modo de teste: dados de exemplo só neste navegador, sem nuvem)
   mode: 'local',
@@ -100,6 +103,14 @@ export function useStore() {
 
 // ---------- Persistência ----------
 
+const persistListeners = new Set();
+
+/** Avisa a cada gravação feita neste aparelho (não as que chegam da nuvem). Devolve a função para parar. */
+export function onPersist(fn) {
+  persistListeners.add(fn);
+  return () => persistListeners.delete(fn);
+}
+
 let pending = Promise.resolve();
 let inFlight = 0;
 let writer = writeBatch;
@@ -112,6 +123,13 @@ export function setWriter(fn) {
 /** Enfileira gravações para manter a ordem e atualiza o indicador de salvamento. */
 export function persist(ops) {
   if (!ops.length) return pending;
+  for (const l of persistListeners) {
+    try {
+      l(ops);
+    } catch (err) {
+      console.warn('Aviso de gravação falhou', err);
+    }
+  }
   inFlight++;
   setState({ saveStatus: 'saving' });
   pending = pending
@@ -145,6 +163,8 @@ export function seedOps(seed) {
   ops.push({ store: 'meta', type: 'clear' });
   ops.push({ store: 'meta', type: 'put', value: { key: 'settings', value: seed.settings } });
   ops.push({ store: 'meta', type: 'put', value: { key: 'seeded', value: true } });
+  // A chave do GitHub não vem de backups: a que já existia continua.
+  if (seed.githubToken) ops.push({ store: 'meta', type: 'put', value: { key: 'github', value: { token: seed.githubToken } } });
   return ops;
 }
 
@@ -180,6 +200,7 @@ function reduceChanges(s, store, changes) {
       if (c.key === 'settings') patch.settings = { ...DEFAULT_SETTINGS, ...(v ?? {}) };
       else if (c.key === 'monthlySession') patch.monthlySession = v ?? EMPTY_SESSION;
       else if (c.key === 'countDraft') patch.countDraft = v ?? {};
+      else if (c.key === 'github') patch.githubToken = v?.token ?? null;
     }
     return patch;
   }
@@ -223,6 +244,7 @@ export function loadFromChanges(initial) {
     displayLayouts: {},
     children: {},
     montessoriLogs: {},
+    githubToken: null,
   };
   for (const [store, changes] of Object.entries(initial)) s = { ...s, ...reduceChanges(s, store, changes) };
   setState(s);
@@ -349,6 +371,7 @@ async function bootstrapLocal({ demo = false } = {}) {
         displayLayouts: byKey(all.displayLayouts, 'id'),
         children: byKey(all.children, 'id'),
         montessoriLogs: byKey(all.montessoriLogs, 'id'),
+        githubToken: meta.github?.value?.token ?? null,
       });
     }
     setState({ ready: true, persistent, mode: demo ? 'demo' : 'local' });
