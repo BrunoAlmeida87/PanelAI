@@ -98,8 +98,10 @@ Sem instalar nada no computador: só o **Chrome** ou o **Edge** e um cabo USB-C 
 2. Ligue a placa da tela no computador pelo cabo (chave em ON) e clique em **Instalar o PanelAI na
    tela** → escolha o aparelho na lista → marque **Apagar o aparelho** (remove o programa do TRMNL)
    → confirme. Leva 1 a 2 minutos.
-   - Não aparece na lista? Segure o botãozinho **BOOT** da XIAO (ao lado do USB), aperte e solte o
-     **RESET**, solte o BOOT e tente de novo.
+   - Deu "Failed to initialize" ou não aparece na lista? Modo de gravação: segure o botão minúsculo
+     **B** (BOOT) da plaquinha XIAO, bem ao lado da entrada do cabo USB-C; sem soltar, aperte e solte o
+     **RESET** da lateral da placa; solte o B e clique em Instalar de novo (a porta pode mudar de
+     nome). No fim da instalação, aperte RESET uma vez se a tela não mudar.
 3. **Wi-Fi**: na mesma janela, escolha a rede da casa (2,4 GHz) e a senha.
 4. **Visitar o aparelho** (ou abra o `http://…` que aparece na tela) → no campo **Endereço da
    imagem**, cole o endereço de Configurações → Tela e-ink → **Copiar endereço**.
@@ -117,13 +119,13 @@ que aparece na tela para colar o endereço da imagem.
   (no máximo a cada 6 horas), então a mudança vale a partir da próxima vez que ele acordar. Para valer
   na hora, aperte o **botão** do aparelho.
 - **Mudar o que aparece**: aba **Display**. O layout marcado "no display" é o que vai para a tela.
-- **Atualizar agora**: aperte o **botão** do aparelho (o mesmo que acordava o TRMNL; na placa é o D4 /
-  GPIO5). A imagem tem no máximo ~30 minutos.
-- **Modo de configuração** (trocar o endereço ou o Wi-Fi): **segure o botão por 5 segundos**. A tela
+- **Atualizar agora**: aperte o botão **KEY3** da lateral da placa (o mesmo que acordava o TRMNL; KEY1
+  e KEY2 não fazem nada). A imagem tem no máximo ~30 minutos.
+- **Modo de configuração** (trocar o endereço ou o Wi-Fi): **segure o KEY3 por 5 segundos**. A tela
   mostra as instruções e o aparelho fica acordado por até 15 minutos.
 - **Bateria fraca**: aparece um ícone de bateria no canto de baixo, à direita. Carregue pelo USB-C.
 - **Trocar o endereço** (se vazou): Configurações → Tela e-ink → **Trocar endereço**. O endereço antigo
-  para de funcionar na próxima publicação. Depois, segure o botão do aparelho por 5 segundos e cole o
+  para de funcionar na próxima publicação. Depois, segure o KEY3 por 5 segundos e cole o
   novo endereço na página dele.
 - **Desligar a publicação**: Configurações → Tela e-ink → **Desligar**. A tela continua mostrando a
   última imagem.
@@ -200,7 +202,7 @@ Riscos que continuam existindo, e o que fazer:
 
 Pinos da placa (kit TRMNL 7,5" DIY: XIAO ESP32-S3 Plus + XIAO ePaper Display Board), conferidos na
 documentação da Seeed e no firmware do TRMNL: SPI CLK GPIO7 / MOSI GPIO9; tela CS GPIO44, DC GPIO10,
-RESET GPIO38, BUSY GPIO4 (invertido); botões D1 GPIO2, D2 GPIO3, D4 GPIO5 (o que acorda); bateria
+RESET GPIO38, BUSY GPIO4 (invertido); botões KEY1 = D1 GPIO2, KEY2 = D2 GPIO3, KEY3 = D4 GPIO5 (o que acorda); bateria
 GPIO1 com o circuito ligado pelo GPIO6.
 
 Contrato do `config.json` (versão 1), lido pelo aparelho — mudar um campo exige mudar o firmware também:

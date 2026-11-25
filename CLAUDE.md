@@ -76,7 +76,7 @@ Publicado em https://brunoalmeida87.github.io/PanelAI/ (GitHub Pages), com dados
   Wi-Fi por Improv (no instalador) ou pela rede `PanelAI-Tela` (senha `panelai123`, captive portal);
   endereço da imagem colado na página do aparelho (entidade `text` "Endereço da imagem",
   `restore_value`). Pinos: SPI CLK 7 / MOSI 9; tela CS 44, DC 10, RST 38, BUSY 4 (invertido),
-  `epaper_spi` modelo `waveshare-7.5in-v2`; botões D1 GPIO2, D2 GPIO3, **D4 GPIO5 (acorda, ext0)**;
+  `epaper_spi` modelo `waveshare-7.5in-v2`; botões na lateral KEY1 = D1 GPIO2, KEY2 = D2 GPIO3, **KEY3 = D4 GPIO5 (acorda, ext0)** e RESET;
   bateria ADC GPIO1 com ADC_EN GPIO6. Botão: apertar = atualizar; segurar 5 s = modo de configuração
   (fica acordado até 15 min com instruções na tela).
 - **Instalação:** `public/instalar-tela.html` (ESP Web Tools 10.4.0 via unpkg) lê

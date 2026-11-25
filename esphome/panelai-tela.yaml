@@ -185,7 +185,7 @@ sensor:
       - multiply: 2.0 # divisor de tensão da placa
 
 binary_sensor:
-  # O botão que acordava o TRMNL (D4 / GPIO5). Segurar 5 s: modo de configuração.
+  # Botão KEY3 da lateral da placa (D4 / GPIO5, o que acordava o TRMNL). Segurar 5 s: modo de configuração.
   - platform: gpio
     id: botao
     name: "Botão"
