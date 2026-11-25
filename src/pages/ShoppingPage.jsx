@@ -592,9 +592,23 @@ function ItemDetail({ weekId, item, onClose }) {
 }
 
 function ExtraDetail({ weekId, extra, onClose }) {
+  const s = useStore();
   const [qty, setQty] = useState(extra?.qty ?? 1);
   const [name, setName] = useState(extra?.name ?? '');
   if (!extra) return null;
+  const save = () => {
+    const n = name.trim() || extra.name;
+    const patch = { qty, name: n };
+    if (normalizeText(n) !== normalizeText(extra.name)) {
+      // Outro produto: refaz a ligação com o catálogo (senão a compra entraria no estoque do produto antigo).
+      const ing = Object.values(s.ingredients).find((i) => normalizeText(i.name) === normalizeText(n));
+      patch.name = ing?.name ?? n;
+      patch.category = ing?.category ?? 'outros';
+      patch.ingredientId = ing && factorToBase(extra.unit, ing) != null ? ing.id : null;
+    }
+    updateExtra(weekId, extra.id, patch);
+    onClose();
+  };
   return (
     <Modal
       open
@@ -608,7 +622,7 @@ function ExtraDetail({ weekId, extra, onClose }) {
             <Trash2 size={16} /> Remover
           </button>
           <span class="spacer hide-mobile" />
-          <button type="button" class="btn btn-primary" onClick={() => { updateExtra(weekId, extra.id, { qty, name: name.trim() || extra.name }); onClose(); }}>
+          <button type="button" class="btn btn-primary" onClick={save}>
             Salvar
           </button>
         </>

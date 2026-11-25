@@ -178,14 +178,12 @@ export function forecastView(raw, now, today, o = {}) {
   let d0 = dTimes.indexOf(today);
   if (d0 < 0) d0 = dTimes.findIndex((t) => t > today);
   const nDays = Math.max(0, Math.min(7, Number(o.days ?? 3)));
-  const days = [];
-  for (let i = Math.max(0, d0); d0 >= 0 && i < dTimes.length && days.length < nDays; i++) {
+  const dayAt = (i, k) => {
     const date = dTimes[i];
     const dt = new Date(`${date}T12:00:00`);
-    const k = days.length;
-    days.push({
+    return {
       date,
-      label: date === today ? 'Hoje' : k === 1 && d0 >= 0 && dTimes[d0] === today ? 'Amanhã' : `${WEEKDAYS[dt.getDay()]} ${dt.getDate()}`,
+      label: date === today ? 'Hoje' : k === 1 && dTimes[d0] === today ? 'Amanhã' : `${WEEKDAYS[dt.getDay()]} ${dt.getDate()}`,
       short: date === today ? 'Hoje' : WEEKDAYS[dt.getDay()],
       max: round(D.temperature_2m_max?.[i]),
       min: round(D.temperature_2m_min?.[i]),
@@ -196,10 +194,13 @@ export function forecastView(raw, now, today, o = {}) {
       sunrise: String(D.sunrise?.[i] ?? '').slice(11, 16),
       sunset: String(D.sunset?.[i] ?? '').slice(11, 16),
       ...sky(D.weather_code?.[i], true),
-    });
-  }
+    };
+  };
+  const days = [];
+  for (let i = Math.max(0, d0); d0 >= 0 && i < dTimes.length && days.length < nDays; i++) days.push(dayAt(i, days.length));
 
-  const todayDaily = dTimes[d0] === today ? days[0] ?? null : null;
+  // Resumo de hoje (máx./mín., UV, sol) não depende de quantos dias o card mostra.
+  const todayDaily = d0 >= 0 && dTimes[d0] === today ? dayAt(d0, 0) : null;
   // "Agora": o dado atual da API; se a tela é para outro horário (imagem gerada
   // antes da hora), usa a previsão daquela hora.
   const currentKey = String(C.time ?? '').slice(0, 13);

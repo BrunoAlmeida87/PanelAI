@@ -803,7 +803,7 @@ export function DisplayScreen({ params }) {
         })
       : null;
   return (
-    <div class={`display-fullscreen ${exact ? 'exact' : ''}`}>
+    <div class={`display-fullscreen ${exact ? 'exact' : ''}`} data-pronto={weatherReady ? '1' : '0'}>
       <DisplayRender layout={layout} data={data} scale={scale} />
       {!exact && <span class="fs-hint">{layout.name} · {w}×{h}</span>}
       {publish && <div hidden id="panelai-publicacao" data-json={publish} />}

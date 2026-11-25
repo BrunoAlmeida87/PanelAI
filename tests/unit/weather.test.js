@@ -97,6 +97,8 @@ describe('clima: resumo do card', () => {
     const v = forecastView(fakeForecast(), at('2026-11-25T14:45'), '2026-11-25', { hours: 0, days: 0 });
     expect(v.hours).toEqual([]);
     expect(v.days).toEqual([]);
+    // O resumo de hoje (máx./mín., UV, sol) continua disponível para o "agora" e os detalhes.
+    expect(v.today).toMatchObject({ max: 31, min: 19, uv: 9, sunrise: '05:12' });
   });
 
   it('imagem gerada antes da hora usa a previsão daquela hora como "agora"', () => {

@@ -118,6 +118,8 @@ async function waitForScreen(page, timeout = 90_000) {
     const text = (await page.locator('body').innerText().catch(() => '')).replace(/\s+/g, ' ').slice(0, 300);
     throw new UserError(`a tela do display não apareceu. Na página: "${text}"`);
   }
+  // Cards de clima: espera a previsão chegar (a própria tela desiste em 20 s).
+  await page.locator('.display-fullscreen[data-pronto="1"]').first().waitFor({ state: 'attached', timeout: 30_000 }).catch(() => {});
   await page.evaluate(() => document.fonts?.ready);
 }
 
