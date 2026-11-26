@@ -242,6 +242,7 @@ export async function createHouseholdFromThisDevice(name) {
   });
   ops.push({ store: 'meta', type: 'put', value: { key: 'monthlySession', value: s.monthlySession ?? { id: null, checked: {}, qty: {} } } });
   ops.push({ store: 'meta', type: 'put', value: { key: 'countDraft', value: s.countDraft ?? {} } });
+  if (s.mealTexts && Object.keys(s.mealTexts).length) ops.push({ store: 'meta', type: 'put', value: { key: 'mealTexts', value: s.mealTexts } });
   const id = await cloud.createHousehold(name, ops);
   writeCache(getState().cloud.user.email, id);
   reloadApp();

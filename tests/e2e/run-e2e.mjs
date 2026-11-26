@@ -119,6 +119,43 @@ async function flows(browser, label, opts) {
     await page.getByRole('dialog').waitFor({ state: 'detached' });
   });
 
+  await step(`[${label}] 3b. comida escrita vira sugestão e sai pela lixeira`, async () => {
+    const openPicker = async (day, slotLabel, slotAria) => {
+      await page.goto(`${BASE}#/cardapio`);
+      if (mobile) {
+        await page.getByRole('tab', { name: new RegExp(`^${day}`) }).click();
+        await page.getByRole('region', { name: slotLabel }).getByRole('button', { name: /Adicionar|Definir/ }).click();
+      } else {
+        await page.getByRole('button', { name: `Adicionar ${slotAria} em ${day}` }).click();
+      }
+      const dialog = page.getByRole('dialog');
+      await dialog.getByRole('tab', { name: 'Escrever' }).click();
+      return dialog;
+    };
+    let dialog = await openPicker('Domingo', 'Café da manhã', 'café da manhã');
+    await dialog.getByLabel('O que vai ter?').fill('Macarrão teste E2E');
+    await dialog.getByRole('button', { name: /^Adicionar$/ }).click();
+    await page.getByRole('dialog').waitFor({ state: 'detached' });
+
+    dialog = await openPicker('Sábado', 'Café da manhã', 'café da manhã');
+    await dialog.getByLabel('O que vai ter?').fill('macarrao te');
+    const row = dialog.getByRole('listitem').filter({ hasText: 'Macarrão teste E2E' });
+    await row.waitFor({ timeout: 3000 });
+    await shot('written-suggestion');
+    await row.getByRole('button', { name: /^Macarrão teste E2E/ }).click();
+    const v = await dialog.getByLabel('O que vai ter?').inputValue();
+    assert(v === 'Macarrão teste E2E', `campo = ${v}`);
+    await dialog.getByLabel('O que vai ter?').fill('macarrao te');
+    await row.getByRole('button', { name: 'Apagar “Macarrão teste E2E” das sugestões' }).click();
+    await row.waitFor({ state: 'detached', timeout: 3000 });
+    await page.getByText('apagada das sugestões').waitFor();
+    // Volta para a aba Receita (o seletor lembra a última aba usada).
+    await dialog.getByRole('tab', { name: 'Receita' }).click();
+    await page.keyboard.press('Escape');
+    await page.getByRole('dialog').waitFor({ state: 'detached' });
+    return 'sugerida ao digitar "macarrao te", usada e apagada';
+  });
+
   await step(`[${label}] 4. navegar entre semanas`, async () => {
     const before = await page.getByRole('button', { name: /Escolher outra semana/ }).innerText();
     await page.getByRole('button', { name: 'Próxima semana' }).click();

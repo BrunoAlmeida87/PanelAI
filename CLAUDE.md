@@ -166,6 +166,14 @@ Publicado em https://brunoalmeida87.github.io/PanelAI/ (GitHub Pages), com dados
   `parseShoppingText` entende "2 kg de batata"). O card do display tem `options.day` = `week|today|tomorrow`.
 - Refeição escrita à mão = entrada `kind: 'text'` (já existia). No seletor, aba **Escrever** (lembra a
   última aba usada) e, na busca de receitas, "Usar “…” escrito à mão".
+- **Histórico de comidas escritas** (`meta/mealTexts`, regras puras em `src/services/mealTexts.js`,
+  testes `tests/unit/mealTexts.test.js`): `{ [chave normalizada]: { text, n, last, hidden? } }`, mesclado
+  item a item na nuvem (`markFields` → `mt`). Guardado à parte porque semanas vão para o arquivo depois de
+  120 dias. `addMeals`/`replaceMeal`/`updateMeal` registram o uso (`rememberMealTexts`). Sugestões =
+  histórico + textos das semanas abertas; enquanto digita, filtra sem acento (começa-com primeiro). A
+  **lixeira** marca `hidden` (some mesmo se a comida ainda está numa semana; volta só se escrita e salva de
+  novo), com "Desfazer". Entra no backup (`data.mealTexts`, opcional; importar junta com o atual) e fica ao
+  restaurar demonstração/começar do zero. Na busca de receitas também aparecem as escritas parecidas.
 
 ## Montessori (decisões já tomadas)
 

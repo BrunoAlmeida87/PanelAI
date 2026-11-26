@@ -2,10 +2,11 @@
 // Desktop: modal centralizado. Celular: tela cheia (bottom sheet alto), com rodapé fixo.
 
 import { useMemo, useState } from 'preact/hooks';
-import { Search, Star, Check, ChevronDown, ChevronUp, Box, Utensils, MapPin, SlidersHorizontal, PencilLine } from 'lucide-preact';
+import { Search, Star, Check, ChevronDown, ChevronUp, Box, Utensils, MapPin, SlidersHorizontal, PencilLine, Trash2, History } from 'lucide-preact';
 import { Modal, Stepper, Chip, Segmented, toast } from '../../components/ui.jsx';
 import { useStore } from '../../storage/store.js';
-import { addMeals, replaceMeal, createMarmita, marmitaUsage } from '../../storage/actions.js';
+import { addMeals, replaceMeal, createMarmita, marmitaUsage, forgetMealText, restoreMealText } from '../../storage/actions.js';
+import { suggestMealTexts } from '../../services/mealTexts.js';
 import { MEAL_SLOTS, PROTEINS, SPEEDS, slotLabel } from '../../models/constants.js';
 import { scaleIngredients, recipeSpeed } from '../../models/recipe.js';
 import { formatQty } from '../../models/units.js';
@@ -21,25 +22,6 @@ const TABS = [
   { id: 'out', label: 'Fora', icon: MapPin },
 ];
 const TAB_IDS = TABS.map((t) => t.id);
-
-/** Refeições já escritas à mão (as mais usadas primeiro), para tocar e repetir. */
-function writtenMeals(weeks, max = 12) {
-  const count = new Map();
-  for (const w of Object.values(weeks ?? {})) {
-    for (const day of Object.values(w.meals ?? {})) {
-      for (const list of Object.values(day ?? {})) {
-        for (const e of list ?? []) {
-          const t = e.kind === 'text' ? (e.text ?? '').trim() : '';
-          if (t) count.set(t, (count.get(t) ?? 0) + 1);
-        }
-      }
-    }
-  }
-  return [...count.entries()]
-    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], 'pt-BR'))
-    .slice(0, max)
-    .map(([t]) => t);
-}
 
 export function MealPicker({ weekId, date, slot, replaceEntryId = null, onClose }) {
   const s = useStore();
@@ -78,7 +60,22 @@ export function MealPicker({ weekId, date, slot, replaceEntryId = null, onClose 
   const [text, setText] = useState('');
   const [note, setNote] = useState('');
   const weeks = s.weeks;
-  const written = useMemo(() => (tab === 'text' ? writtenMeals(weeks) : []), [tab, weeks]);
+  const mealTexts = s.mealTexts;
+  const readOnly = !!s.cloud?.readOnly;
+  // Comidas já escritas antes: as mais usadas, ou as parecidas com o que está sendo digitado.
+  const written = useMemo(
+    () => (tab === 'text' ? suggestMealTexts({ stored: mealTexts, weeks, query: text, max: text.trim() ? 8 : 12 }) : []),
+    [tab, weeks, mealTexts, text],
+  );
+  // Na busca de receitas, também mostra comidas escritas parecidas.
+  const writtenForQuery = useMemo(
+    () => (tab === 'recipe' && query.trim() ? suggestMealTexts({ stored: mealTexts, weeks, query, max: 4 }) : []),
+    [tab, weeks, mealTexts, query],
+  );
+  const forget = (t) => {
+    const before = forgetMealText(t);
+    toast(`“${t}” apagada das sugestões`, { action: { label: 'Desfazer', onClick: () => restoreMealText(t, before) } });
+  };
 
   const recipes = useMemo(() => {
     const q = normalizeText(query);
@@ -303,6 +300,10 @@ export function MealPicker({ weekId, date, slot, replaceEntryId = null, onClose 
               );
             })}
             {!recipes.length && <p class="muted small" style="padding:16px 16px 4px;text-align:center">Nenhuma receita encontrada.</p>}
+            {!selected.length &&
+              writtenForQuery.map((w) => (
+                <WrittenRow key={w.key} item={w} onPick={() => save([{ kind: 'text', text: w.text, note: '' }])} onForget={readOnly ? null : () => forget(w.text)} hint="Escrita antes · toque para usar" />
+              ))}
             {query.trim() && !selected.length && (
               <div class="picker-row">
                 <button type="button" onClick={saveQueryAsText}>
@@ -438,14 +439,13 @@ export function MealPicker({ weekId, date, slot, replaceEntryId = null, onClose 
           </label>
           {written.length > 0 && (
             <div class="field">
-              <span class="label">Já escritos antes</span>
-              <div class="chip-row" role="group" aria-label="Refeições já escritas">
-                {written.map((t) => (
-                  <Chip key={t} pressed={text.trim() === t} onClick={() => setText(t)}>
-                    {t}
-                  </Chip>
+              <span class="label">{text.trim() ? 'Já escritas antes, parecidas' : 'Já escritas antes'}</span>
+              <div class="picker-list written-list" role="list" aria-label="Comidas já escritas">
+                {written.map((w) => (
+                  <WrittenRow key={w.key} item={w} onPick={() => setText(w.text)} onForget={readOnly ? null : () => forget(w.text)} />
                 ))}
               </div>
+              <span class="hint">Toque para usar. A lixeira tira só da lista de sugestões; o cardápio não muda.</span>
             </div>
           )}
           <label class="field">
@@ -487,5 +487,26 @@ export function IngredientPreview({ recipe, servings }) {
         );
       })}
     </ul>
+  );
+}
+
+/** Comida escrita antes: toque para usar; lixeira para tirar das sugestões (ex.: escrita errada). */
+function WrittenRow({ item, onPick, onForget, hint = null }) {
+  const uses = item.n > 1 ? `${item.n} vezes` : item.n === 1 ? '1 vez' : '';
+  return (
+    <div class="picker-row written-row" role="listitem">
+      <button type="button" onClick={onPick}>
+        <History size={16} aria-hidden="true" />
+        <span class="p-main">
+          <span class="p-name">{item.text}</span>
+          {(hint || uses) && <span class="p-sub">{hint ?? uses}</span>}
+        </span>
+      </button>
+      {onForget && (
+        <button type="button" class="icon-btn written-trash" aria-label={`Apagar “${item.text}” das sugestões`} title="Apagar das sugestões" onClick={onForget}>
+          <Trash2 size={18} />
+        </button>
+      )}
+    </div>
   );
 }

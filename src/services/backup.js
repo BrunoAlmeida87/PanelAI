@@ -5,6 +5,7 @@ import { validateRecipe } from '../models/recipe.js';
 import { isUnit } from '../models/units.js';
 import { isValidISODate, weekStartOf } from '../utils/dates.js';
 import { AUTONOMY_LEVELS, INTEREST_LEVELS } from '../models/montessori.js';
+import { sanitizeMealTexts } from './mealTexts.js';
 
 export const BACKUP_APP = 'PanelAI';
 export const BACKUP_VERSION = 1;
@@ -34,6 +35,8 @@ export function buildBackup(data, now = new Date()) {
       children: Object.values(data.children ?? {}),
       montessoriLogs: Object.values(data.montessoriLogs ?? {}),
       settings: data.settings ?? {},
+      // Comidas escritas à mão (sugestões da aba "Escrever"). Opcional: backups antigos não têm.
+      mealTexts: data.mealTexts ?? {},
     },
   };
 }
@@ -151,6 +154,8 @@ export function validateBackup(raw) {
   const movements = d.movements.filter((m) => isObj(m) && isStr(m.id));
   const purchases = d.purchases.filter((p) => isObj(p) && isStr(p.id));
   const settings = isObj(d.settings) ? d.settings : {};
+  // Ausente (backup antigo) = undefined: o histórico atual fica como está.
+  const mealTexts = d.mealTexts === undefined ? undefined : sanitizeMealTexts(d.mealTexts);
 
   const tasks = {};
   (d.tasks ?? []).forEach((t, idx) => {
@@ -213,6 +218,6 @@ export function validateBackup(raw) {
   return {
     ok: true,
     errors: [],
-    data: { ingredients, recipes, pantry, weeks, marmitas, movements, purchases, settings, tasks, taskTemplates, displayLayouts, children, montessoriLogs },
+    data: { ingredients, recipes, pantry, weeks, marmitas, movements, purchases, settings, tasks, taskTemplates, displayLayouts, children, montessoriLogs, mealTexts },
   };
 }

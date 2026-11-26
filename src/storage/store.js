@@ -28,6 +28,8 @@ let state = {
   settings: { ...DEFAULT_SETTINGS },
   monthlySession: { id: null, checked: {}, qty: {} },
   countDraft: {},
+  // Comidas escritas à mão (sugestões da aba "Escrever"): src/services/mealTexts.js.
+  mealTexts: {},
   tasks: {},
   taskTemplates: {},
   displayLayouts: {},
@@ -163,6 +165,7 @@ export function seedOps(seed) {
   ops.push({ store: 'meta', type: 'clear' });
   ops.push({ store: 'meta', type: 'put', value: { key: 'settings', value: seed.settings } });
   ops.push({ store: 'meta', type: 'put', value: { key: 'seeded', value: true } });
+  if (seed.mealTexts && Object.keys(seed.mealTexts).length) ops.push({ store: 'meta', type: 'put', value: { key: 'mealTexts', value: seed.mealTexts } });
   // A chave do GitHub não vem de backups: a que já existia continua.
   if (seed.githubToken) ops.push({ store: 'meta', type: 'put', value: { key: 'github', value: { token: seed.githubToken } } });
   return ops;
@@ -180,6 +183,7 @@ export function applyFullData(data) {
     settings: { ...DEFAULT_SETTINGS, ...data.settings },
     monthlySession: { id: null, checked: {}, qty: {} },
     countDraft: {},
+    mealTexts: data.mealTexts ?? {},
     tasks: data.tasks ?? {},
     taskTemplates: data.taskTemplates ?? {},
     displayLayouts: data.displayLayouts ?? {},
@@ -200,6 +204,7 @@ function reduceChanges(s, store, changes) {
       if (c.key === 'settings') patch.settings = { ...DEFAULT_SETTINGS, ...(v ?? {}) };
       else if (c.key === 'monthlySession') patch.monthlySession = v ?? EMPTY_SESSION;
       else if (c.key === 'countDraft') patch.countDraft = v ?? {};
+      else if (c.key === 'mealTexts') patch.mealTexts = v ?? {};
       else if (c.key === 'github') patch.githubToken = v?.token ?? null;
     }
     return patch;
@@ -239,6 +244,7 @@ export function loadFromChanges(initial) {
     settings: { ...DEFAULT_SETTINGS },
     monthlySession: EMPTY_SESSION,
     countDraft: {},
+    mealTexts: {},
     tasks: {},
     taskTemplates: {},
     displayLayouts: {},
@@ -335,6 +341,7 @@ export async function readLocalData() {
       settings: { ...DEFAULT_SETTINGS, ...(meta.settings?.value ?? {}) },
       monthlySession: meta.monthlySession?.value ?? EMPTY_SESSION,
       countDraft: meta.countDraft?.value ?? {},
+      mealTexts: meta.mealTexts?.value ?? {},
     };
   } catch (err) {
     console.warn('Não foi possível ler os dados deste aparelho', err);
@@ -366,6 +373,7 @@ async function bootstrapLocal({ demo = false } = {}) {
         settings: { ...DEFAULT_SETTINGS, ...(meta.settings?.value ?? {}) },
         monthlySession: meta.monthlySession?.value ?? { id: null, checked: {}, qty: {} },
         countDraft: meta.countDraft?.value ?? {},
+        mealTexts: meta.mealTexts?.value ?? {},
         tasks: byKey(all.tasks, 'id'),
         taskTemplates: byKey(all.taskTemplates, 'id'),
         displayLayouts: byKey(all.displayLayouts, 'id'),

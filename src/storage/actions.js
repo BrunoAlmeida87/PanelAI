@@ -15,9 +15,10 @@ import {
 } from '../services/planning.js';
 import { applyStockDelta, newPantryItem, setStock } from '../services/pantry.js';
 import { buildBackup } from '../services/backup.js';
+import { hiddenItem, mealTextKey, mergeMealTexts, rememberedItem } from '../services/mealTexts.js';
 import { DEFAULT_SETTINGS } from '../models/constants.js';
 import { convert } from '../models/units.js';
-import { addDays } from '../utils/dates.js';
+import { addDays, todayISO } from '../utils/dates.js';
 import { uid, uniqueSlug } from '../utils/id.js';
 
 // ---------- Semanas ----------
@@ -33,15 +34,61 @@ export function saveWeek(week) {
   return w;
 }
 
+// ---------- Comidas escritas à mão (histórico de sugestões) ----------
+
+function saveMealTexts(next) {
+  setState({ mealTexts: next });
+  persist([{ store: 'meta', type: 'put', value: { key: 'mealTexts', value: next } }]);
+}
+
+/** Guarda no histórico as comidas escritas à mão (para sugerir da próxima vez). */
+export function rememberMealTexts(texts, date = todayISO()) {
+  const s = getState();
+  if (s.cloud?.readOnly) return;
+  let next = s.mealTexts ?? {};
+  let changed = false;
+  for (const text of texts) {
+    const k = mealTextKey(text);
+    const item = k && rememberedItem(next[k], text, date);
+    if (!item) continue;
+    next = { ...next, [k]: item };
+    changed = true;
+  }
+  if (changed) saveMealTexts(next);
+}
+
+/** Lixeira: tira a comida das sugestões (o que já está no cardápio não muda). */
+export function forgetMealText(text) {
+  const s = getState();
+  const k = mealTextKey(text);
+  if (!k) return null;
+  const before = s.mealTexts?.[k];
+  saveMealTexts({ ...(s.mealTexts ?? {}), [k]: hiddenItem(before, text) });
+  return before ?? null;
+}
+
+/** Desfaz a lixeira. */
+export function restoreMealText(text, before) {
+  const s = getState();
+  const k = mealTextKey(text);
+  const next = { ...(s.mealTexts ?? {}) };
+  if (before) next[k] = before;
+  else delete next[k];
+  saveMealTexts(next);
+}
+
 /** Adiciona uma mesma refeição em vários destinos (dia/refeição). */
 export function addMeals(weekId, targets, data) {
   let w = getWeek(weekId);
   for (const t of targets) w = addEntry(w, t.date, t.slot, newEntry(data));
+  if (data.kind === 'text') rememberMealTexts([data.text]);
   return saveWeek(w);
 }
 
 export function updateMeal(weekId, date, slot, entryId, patch) {
-  return saveWeek(updateEntry(getWeek(weekId), date, slot, entryId, patch));
+  const w = getWeek(weekId);
+  if (typeof patch.text === 'string' && findEntry(w, entryId)?.entry?.kind === 'text') rememberMealTexts([patch.text]);
+  return saveWeek(updateEntry(w, date, slot, entryId, patch));
 }
 
 /** Remove e devolve a semana anterior para permitir "Desfazer". */
@@ -69,6 +116,7 @@ export function replaceMeal(weekId, date, slot, entryId, newDataList) {
   const list = w.meals[date]?.[slot] ?? [];
   const idx = list.findIndex((e) => e.id === entryId);
   const fresh = newDataList.map((d) => newEntry(d));
+  rememberMealTexts(newDataList.filter((d) => d.kind === 'text').map((d) => d.text));
   const next = idx === -1 ? [...list, ...fresh] : [...list.slice(0, idx), ...fresh, ...list.slice(idx + 1)];
   w = { ...w, meals: { ...w.meals, [date]: { ...w.meals[date], [slot]: next } } };
   return saveWeek(w);
@@ -521,7 +569,8 @@ export function exportData() {
 }
 
 /** Dados da aba Montessori atuais (mantidos ao restaurar a demonstração ou começar do zero). */
-const montessoriData = (s = getState()) => ({ children: s.children, montessoriLogs: s.montessoriLogs });
+// Dados reais que ficam ao restaurar a demonstração ou começar do zero.
+const montessoriData = (s = getState()) => ({ children: s.children, montessoriLogs: s.montessoriLogs, mealTexts: s.mealTexts });
 
 export async function importData(data) {
   const s = getState();
@@ -530,6 +579,8 @@ export async function importData(data) {
     // Backup de versão anterior (sem a aba Montessori): mantém o que já existe.
     children: data.children ?? s.children,
     montessoriLogs: data.montessoriLogs ?? s.montessoriLogs,
+    // Comidas escritas: junta as do backup com as que já existem.
+    mealTexts: data.mealTexts ? mergeMealTexts(s.mealTexts, data.mealTexts) : s.mealTexts,
     settings: { ...DEFAULT_SETTINGS, ...data.settings },
   };
   // A chave do GitHub não vem de backups: continua a que já estava.

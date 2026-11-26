@@ -59,12 +59,15 @@ const MONTHLY_FIELDS = [
   { id: 'mq', path: ['value', 'qty'] },
 ];
 const COUNT_FIELDS = [{ id: 'cd', path: ['value'] }];
+// Histórico de comidas escritas: cada comida é um item (dois celulares não se sobrescrevem).
+const MEAL_TEXT_FIELDS = [{ id: 'mt', path: ['value'] }];
 
 /** Campos de um registro que são mesclados item a item (ou null). */
 export function markFields(store, key) {
   if (store === 'weeks') return WEEK_FIELDS;
   if (store === 'meta' && key === 'monthlySession') return MONTHLY_FIELDS;
   if (store === 'meta' && key === 'countDraft') return COUNT_FIELDS;
+  if (store === 'meta' && key === 'mealTexts') return MEAL_TEXT_FIELDS;
   return null;
 }
 

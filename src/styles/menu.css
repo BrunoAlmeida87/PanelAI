@@ -540,6 +540,31 @@
   gap: 10px;
   padding: 0 12px 12px 44px;
 }
+.picker-row.written-row {
+  display: flex;
+  align-items: center;
+}
+.picker-row.written-row > button:first-child {
+  flex: 1;
+  min-width: 0;
+  min-height: 44px;
+}
+.picker-row.written-row .p-name {
+  overflow-wrap: anywhere;
+}
+.picker-row.written-row > .written-trash {
+  flex: none;
+  width: 44px;
+  height: 44px;
+  min-height: 44px;
+  padding: 0;
+  margin-right: 4px;
+  justify-content: center;
+  color: var(--text-2);
+}
+.written-list {
+  margin-top: 0;
+}
 .picker-sticky {
   position: sticky;
   top: -16px;
