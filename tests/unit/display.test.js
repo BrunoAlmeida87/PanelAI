@@ -7,7 +7,9 @@ import {
   normalizeTypography,
   typographyCheck,
   typographyVars,
+  changeCardType,
   clampCard,
+  hasRoomFor,
   findFreeSpot,
   newLayout,
   overlappingIds,
@@ -226,5 +228,21 @@ describe('display: letras (fontes, peso, tamanho)', () => {
     expect(r.titlePx).toBeLessThan(9);
     expect(r.warnings.some((w) => w.startsWith('Títulos com'))).toBe(true);
     expect(r.warnings.some((w) => w.startsWith('O texto em negrito'))).toBe(true);
+  });
+});
+
+describe('display: trocar e adicionar cards', () => {
+  it('trocar o tipo mantém lugar, tamanho e aparência', () => {
+    const l = newLayout({ presetId: 'cozinha' });
+    const tasks = l.cards.find((c) => c.type === 'tasksDay');
+    const m = changeCardType({ ...tasks, fontScale: 1.3, border: 'thick', title: 'X' }, 'montessori');
+    expect(m).toMatchObject({ id: tasks.id, type: 'montessori', x: tasks.x, y: tasks.y, w: tasks.w, h: tasks.h, fontScale: 1.3, border: 'thick', title: '' });
+    expect(m.options).toEqual({ showChild: true, showCategory: false, showDone: true });
+  });
+
+  it('sabe quando a tela está cheia', () => {
+    const l = newLayout({ presetId: 'cozinha' });
+    expect(hasRoomFor(l.cards, l.grid, 'montessori')).toBe(false);
+    expect(hasRoomFor(l.cards.filter((c) => c.type !== 'pending'), l.grid, 'montessori')).toBe(true);
   });
 });

@@ -425,14 +425,31 @@ export function findFreeSpot(cards, grid, w, h) {
   return null;
 }
 
+const newCardSizes = (t, grid) => [
+  [Math.min(t.size.w, grid.cols), Math.min(t.size.h, grid.rows)],
+  [Math.min(4, grid.cols), Math.min(2, grid.rows)],
+  [Math.min(2, grid.cols), 1],
+];
+
+/** Há espaço livre para um card novo deste tipo (sem ficar por cima de outro)? */
+export function hasRoomFor(cards, grid, type) {
+  const t = cardType(type);
+  return !!t && newCardSizes(t, grid).some(([w, h]) => findFreeSpot(cards, grid, w, h));
+}
+
+/**
+ * Troca o tipo de um card mantendo lugar, tamanho e aparência (letra, borda, fundo).
+ * Título e opções voltam ao padrão do tipo novo.
+ */
+export function changeCardType(card, type) {
+  const fresh = newCard(type, card);
+  return { ...fresh, id: card.id, fontScale: card.fontScale ?? 1, border: card.border ?? 'line', invert: !!card.invert };
+}
+
 /** Posiciona um card novo: tamanho padrão; se não couber, procura menor. */
 export function placeNewCard(cards, grid, type) {
   const t = cardType(type);
-  const sizes = [
-    [Math.min(t.size.w, grid.cols), Math.min(t.size.h, grid.rows)],
-    [Math.min(4, grid.cols), Math.min(2, grid.rows)],
-    [Math.min(2, grid.cols), 1],
-  ];
+  const sizes = newCardSizes(t, grid);
   for (const [w, h] of sizes) {
     const spot = findFreeSpot(cards, grid, w, h);
     if (spot) return newCard(type, spot);

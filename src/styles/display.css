@@ -625,6 +625,58 @@
   min-width: 0;
   max-width: 100%;
 }
+.card-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+.card-list > li {
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  padding: 6px 6px 8px 10px;
+  display: grid;
+  gap: 4px;
+}
+.card-list > li.overlap {
+  border-color: var(--danger);
+  background: var(--danger-light);
+}
+.card-list .cl-head {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.card-list .cl-name {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border: 0;
+  background: transparent;
+  text-align: left;
+  padding: 4px 0;
+  color: inherit;
+}
+.card-list .cl-name > span {
+  display: grid;
+  min-width: 0;
+}
+.card-list .cl-swap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-right: 4px;
+}
+.card-list .cl-swap .input {
+  flex: 1;
+  min-width: 0;
+  min-height: 36px;
+  padding-top: 4px;
+  padding-bottom: 4px;
+}
 .card-type-list {
   display: grid;
   gap: 8px;

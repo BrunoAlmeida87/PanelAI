@@ -421,6 +421,36 @@ async function flows(browser, label, opts) {
     await shot('tela-eink');
   });
 
+  await step(`[${label}] 14d. pôr e tirar cards (Montessori com a tela cheia)`, async () => {
+    await page.goto(`${BASE}#/display`);
+    const insp = page.locator('.display-inspector');
+    const list = insp.getByRole('list', { name: 'Cards nesta tela' });
+    await list.waitFor();
+    const before = await list.getByRole('listitem').count();
+    // Tela cheia: o app pergunta qual card substituir.
+    await page.locator('.display-toolbar').getByRole('button', { name: 'Adicionar card' }).click();
+    await page.getByRole('dialog').getByRole('button', { name: /^Montessori de hoje/ }).click();
+    const ask = page.getByRole('dialog', { name: 'A tela está cheia' });
+    await ask.waitFor();
+    await shot('tela-cheia');
+    await ask.getByRole('button', { name: /^No lugar de: Tarefas de hoje/ }).click();
+    await page.locator('.display-stage .eink-card[data-type="montessori"]').waitFor();
+    assert((await page.locator('.display-stage .eink-card[data-type="tasksDay"]').count()) === 0, 'tarefas continuam na tela');
+    // Volta ao painel da tela e tira as pendências pela lixeira.
+    await insp.getByRole('button', { name: 'Tela', exact: true }).click();
+    await list.getByRole('button', { name: 'Tirar Pendências e atrasadas da tela' }).click();
+    await page.getByText('Card removido').waitFor();
+    assert((await list.getByRole('listitem').count()) === before - 1, 'card não saiu');
+    // "Trocar por": lista de compras vira Recado no mesmo lugar.
+    await list.getByLabel('Trocar Lista de compras por').selectOption('note');
+    await page.locator('.display-stage .eink-card[data-type="note"]').waitFor();
+    await shot('cards-lista');
+    // Desfaz tudo (o layout volta como estava para os próximos testes).
+    for (let i = 0; i < 3; i++) await page.locator('.display-toolbar').getByRole('button', { name: 'Desfazer' }).click();
+    await page.locator('.display-stage .eink-card[data-type="tasksDay"]').waitFor();
+    return 'Montessori no lugar das tarefas, pendências tiradas, compras trocadas por recado';
+  });
+
   await step(`[${label}] 14c. letras da tela: fonte, peso, aviso e prévia fiel`, async () => {
     await page.goto(`${BASE}#/display`);
     const insp = page.locator('.display-inspector');

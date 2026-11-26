@@ -174,6 +174,11 @@ Publicado em https://brunoalmeida87.github.io/PanelAI/ (GitHub Pages), com dados
   **lixeira** marca `hidden` (some mesmo se a comida ainda está numa semana; volta só se escrita e salva de
   novo), com "Desfazer". Entra no backup (`data.mealTexts`, opcional; importar junta com o atual) e fica ao
   restaurar demonstração/começar do zero. Na busca de receitas também aparecem as escritas parecidas.
+- **Categorias das comidas escritas** (opcionais): entrada `kind: 'text'` pode ter `composition[]` e
+  `protein` (mesmas listas das receitas, `cleanMealTags` marca `proteina` junto com o tipo). `balanceStats`
+  conta a escrita que tem categoria. O histórico guarda as categorias (`rememberedItem` com `tags`; sem
+  `tags` mantém as anteriores; `count: false` ao só mudar categoria) e o seletor pré-marca pela comida igual
+  (`knownMealTags`). Componente `src/pages/menu/MealTags.jsx` (aba Escrever e detalhe da refeição).
 
 ## Montessori (decisões já tomadas)
 
@@ -242,3 +247,7 @@ Publicado em https://brunoalmeida87.github.io/PanelAI/ (GitHub Pages), com dados
   script usa ele, a não ser que `--limiar` seja passado. No editor: bloco **Letras** (painel "Tela") com
   avisos de letra pequena/negrito embolando e o botão **Prévia fiel** (escala 1 + filtro SVG com o mesmo
   limiar; exato com devicePixelRatio 1, aproximado no celular).
+- **Editor do display: pôr/tirar cards** — painel "Tela" começa com **Cards nesta tela** (`CardList`:
+  editar, lixeira, "Trocar por" = `changeCardType`, mantém lugar/tamanho/aparência). "Adicionar card" com
+  a tela cheia (`hasRoomFor` falso) abre "A tela está cheia" para escolher qual card substituir (ou pôr por
+  cima). No celular, tocar num card rola até o painel (`selectCard`).

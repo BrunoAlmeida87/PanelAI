@@ -20,6 +20,8 @@ import {
   Type,
   Eye,
   TriangleAlert,
+  Pencil,
+  ListChecks,
 } from 'lucide-preact';
 import { useStore } from '../storage/store.js';
 import { createLayout, deleteLayout, duplicateLayout, saveLayout, setActiveLayout } from '../storage/displayActions.js';
@@ -41,7 +43,9 @@ import {
   typographyCheck,
   LAYOUT_PRESETS,
   cardType,
+  changeCardType,
   clampCard,
+  hasRoomFor,
   defaultGrid,
   newCard,
   newLayout,
@@ -114,6 +118,14 @@ function Editor({ layout: stored, layouts, activeId, onSwitch }) {
   // Prévia fiel: tamanho real (1 px da tela = 1 px) e preto e branco com o mesmo limiar do gerador.
   const [faithful, setFaithful] = useState(false);
   const [adding, setAdding] = useState(false);
+  // Tela cheia ao adicionar: tipo escolhido, esperando a pessoa dizer qual card substituir.
+  const [replaceFor, setReplaceFor] = useState(null);
+  const inspectorRef = useRef(null);
+  /** Seleciona um card e, no celular (painel embaixo da tela), leva o painel até as opções dele. */
+  const selectCard = (id) => {
+    setSelectedId(id);
+    if (id && window.innerWidth < 1100) requestAnimationFrame(() => inspectorRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
+  };
   const [presets, setPresets] = useState(false);
   const undo = useRef([]);
   const [undoCount, setUndoCount] = useState(0);
@@ -191,7 +203,11 @@ function Editor({ layout: stored, layouts, activeId, onSwitch }) {
     const d = drag.current;
     drag.current = null;
     if (d?.moved && draft) commit(draft);
-    else setDraft(null);
+    else {
+      setDraft(null);
+      // Toque sem arrastar: abre as opções do card.
+      if (d && !d.moved) selectCard(d.card.id);
+    }
   };
 
   const onBoxKey = (e, card) => {
@@ -213,11 +229,23 @@ function Editor({ layout: stored, layouts, activeId, onSwitch }) {
     toast('Card removido', { action: { label: 'Desfazer', onClick: doUndo } });
   };
 
-  const addCard = (type) => {
+  const addCard = (type, { force = false } = {}) => {
+    // Tela cheia: em vez de jogar o card novo por cima, pergunta qual card ele substitui.
+    if (!force && !hasRoomFor(layout.cards, layout.grid, type)) {
+      setAdding(false);
+      setReplaceFor(type);
+      return;
+    }
     const card = placeNewCard(layout.cards, layout.grid, type);
     commit({ ...layout, cards: [...layout.cards, card] });
     setSelectedId(card.id);
     setAdding(false);
+    setReplaceFor(null);
+  };
+
+  const swapCard = (id, type) => {
+    commit({ ...layout, cards: layout.cards.map((c) => (c.id === id ? changeCardType(c, type) : c)) });
+    toast(`Trocado por "${cardType(type)?.label}"`, { action: { label: 'Desfazer', onClick: doUndo } });
   };
 
   const applyPreset = async (preset) => {
@@ -377,7 +405,7 @@ function Editor({ layout: stored, layouts, activeId, onSwitch }) {
           </p>
         </div>
 
-        <aside class="display-inspector card card-pad form-section" aria-label="Propriedades">
+        <aside class="display-inspector card card-pad form-section" aria-label="Propriedades" ref={inspectorRef}>
           {selected ? (
             <CardInspector
               key={selected.id}
@@ -399,19 +427,59 @@ function Editor({ layout: stored, layouts, activeId, onSwitch }) {
               onClose={() => setSelectedId(null)}
             />
           ) : (
-            <ScreenInspector layout={layout} isActive={isActive} onChange={(next) => commit(next)} />
+            <>
+              <CardList cards={layout.cards} overlapping={overlapping} onSelect={selectCard} onRemove={removeCard} onSwap={swapCard} onAdd={() => setAdding(true)} />
+              <div class="divider" />
+              <ScreenInspector layout={layout} isActive={isActive} onChange={(next) => commit(next)} />
+            </>
           )}
         </aside>
       </div>
 
       <Modal open={adding} onClose={() => setAdding(false)} title="Adicionar card" subtitle="Escolha o que mostrar. Depois ajuste posição, tamanho e opções.">
         <div class="card-type-list">
-          {CARD_TYPES.map((t) => (
-            <button key={t.id} type="button" onClick={() => addCard(t.id)}>
-              <strong>{t.label}</strong>
-              <span>{t.description}</span>
+          {CARD_TYPES.map((t) => {
+            const n = layout.cards.filter((c) => c.type === t.id).length;
+            return (
+              <button key={t.id} type="button" onClick={() => addCard(t.id)}>
+                <strong>
+                  {t.label}
+                  {n > 0 && <span class="badge" style="margin-left:8px;text-transform:none">já na tela{n > 1 ? ` (${n})` : ''}</span>}
+                </strong>
+                <span>{t.description}</span>
+              </button>
+            );
+          })}
+        </div>
+      </Modal>
+
+      <Modal
+        open={!!replaceFor}
+        onClose={() => setReplaceFor(null)}
+        title="A tela está cheia"
+        subtitle={replaceFor ? `Onde colocar "${cardType(replaceFor)?.label}"? Ele fica no lugar e no tamanho do card escolhido.` : ''}
+      >
+        <div class="card-type-list">
+          {layout.cards.map((c) => (
+            <button
+              key={c.id}
+              type="button"
+              onClick={() => {
+                swapCard(c.id, replaceFor);
+                setReplaceFor(null);
+                setSelectedId(c.id);
+              }}
+            >
+              <strong>No lugar de: {cardTitle(c)}</strong>
+              <span>
+                {cardType(c.type)?.label} · coluna {c.x + 1}, linha {c.y + 1} · {c.w} × {c.h}
+              </span>
             </button>
           ))}
+          <button type="button" onClick={() => addCard(replaceFor, { force: true })}>
+            <strong>Colocar por cima (eu ajusto depois)</strong>
+            <span>O card novo fica em vermelho até você mudar o tamanho dos outros para abrir espaço.</span>
+          </button>
         </div>
       </Modal>
 
@@ -433,6 +501,65 @@ function Editor({ layout: stored, layouts, activeId, onSwitch }) {
         </div>
       </Modal>
     </div>
+  );
+}
+
+/** Lista dos cards da tela: editar, trocar por outro tipo e tirar. */
+function CardList({ cards, overlapping, onSelect, onRemove, onSwap, onAdd }) {
+  return (
+    <>
+      <h2 class="section-title" style="margin:0;display:flex;gap:8px;align-items:center">
+        <ListChecks size={18} /> Cards nesta tela
+      </h2>
+      <p class="small muted" style="margin:0">
+        Para tirar um card, toque na lixeira. Para pôr outro no mesmo lugar (ex.: Montessori no lugar das tarefas), use "Trocar por".
+      </p>
+      <ul class="card-list" aria-label="Cards nesta tela">
+        {cards.map((c) => (
+          <li key={c.id} class={overlapping.has(c.id) ? 'overlap' : ''}>
+            <div class="cl-head">
+              <button type="button" class="cl-name" onClick={() => onSelect(c.id)} aria-label={`Editar ${cardTitle(c)}`}>
+                <Pencil size={14} aria-hidden="true" />
+                <span>
+                  <strong>{cardTitle(c)}</strong>
+                  <span class="hint">
+                    {cardType(c.type)?.label} · {c.w} × {c.h}
+                    {overlapping.has(c.id) ? ' · por cima de outro' : ''}
+                  </span>
+                </span>
+              </button>
+              <button type="button" class="icon-btn" aria-label={`Tirar ${cardTitle(c)} da tela`} title="Tirar da tela" onClick={() => onRemove(c.id)}>
+                <Trash2 size={18} />
+              </button>
+            </div>
+            <label class="cl-swap">
+              <span class="hint">Trocar por</span>
+              <select
+                class="input"
+                aria-label={`Trocar ${cardTitle(c)} por`}
+                value=""
+                onChange={(e) => {
+                  const v = e.currentTarget.value;
+                  e.currentTarget.value = '';
+                  if (v) onSwap(c.id, v);
+                }}
+              >
+                <option value="">Escolher…</option>
+                {CARD_TYPES.filter((t) => t.id !== c.type).map((t) => (
+                  <option key={t.id} value={t.id}>
+                    {t.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </li>
+        ))}
+        {!cards.length && <li class="hint">Nenhum card. Toque em "Adicionar card".</li>}
+      </ul>
+      <button type="button" class="btn btn-secondary" style="justify-self:start" onClick={onAdd}>
+        <Plus size={16} /> Adicionar card
+      </button>
+    </>
   );
 }
 
