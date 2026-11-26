@@ -515,7 +515,7 @@ function DayCard({ date, week, today, onAdd, onEntry }) {
               onClick={() => onAdd(date, slot.id)}
               aria-label={`Adicionar ${slot.label.toLowerCase()} em ${weekdayName(date)}`}
             >
-              <Plus size={14} /> {entries.length ? 'adicionar' : slot.snack ? 'sem lanche' : 'definir'}
+              <Plus size={14} /> {entries.length ? 'adicionar' : slot.snack ? (slot.emptyText ?? 'sem lanche') : 'definir'}
             </button>
           </div>
         );
@@ -596,7 +596,7 @@ function DayView({ week, dates, day, today, onDay, onAdd, onEntry }) {
                 ))}
               </div>
               <button type="button" class="add-slot" onClick={() => onAdd(day, slot.id)}>
-                <Plus size={16} /> {entries.length ? 'Adicionar mais' : slot.snack ? 'Adicionar lanche' : 'Definir refeição'}
+                <Plus size={16} /> {entries.length ? 'Adicionar mais' : slot.snack ? (slot.addText ?? 'Adicionar lanche') : 'Definir refeição'}
               </button>
             </section>
           );

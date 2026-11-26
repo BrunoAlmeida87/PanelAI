@@ -41,7 +41,7 @@ export const BORDERS = [
 ];
 
 const SLOT_CHOICES = [
-  { id: 'lanche_manha', label: 'Lanche da manhã' },
+  { id: 'lanche_manha', label: 'Café da manhã' },
   { id: 'almoco', label: 'Almoço' },
   { id: 'lanche_tarde', label: 'Lanche da tarde' },
   { id: 'jantar', label: 'Jantar' },
@@ -56,7 +56,7 @@ export const DONE_FOR_CHOICES = [
   { id: '72', label: '3 dias depois de feita' },
   { id: 'day', label: 'Só no dia da tarefa' },
 ];
-// Destaque dos nomes das refeições (Lanche da manhã, Jantar…). Primeira opção = padrão.
+// Destaque dos nomes das refeições (Café da manhã, Jantar…). Primeira opção = padrão.
 export const MEAL_LABEL_STYLES = [
   { id: 'underline', label: 'Negrito e sublinhado' },
   { id: 'band', label: 'Tarja preta (letra branca)' },

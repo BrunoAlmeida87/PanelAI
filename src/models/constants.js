@@ -4,9 +4,10 @@
 import { DEFAULT_DISPLAY_DEVICE } from '../display/schedule.js';
 
 export const MEAL_SLOTS = [
-  { id: 'lanche_manha', label: 'Lanche da manhã', short: 'Manhã', snack: true },
+  // O id continua 'lanche_manha' (dados salvos); só o nome mostrado mudou para Café da manhã.
+  { id: 'lanche_manha', label: 'Café da manhã', short: 'Café', snack: true, emptyText: 'sem café', addText: 'Adicionar café da manhã' },
   { id: 'almoco', label: 'Almoço', short: 'Almoço', snack: false },
-  { id: 'lanche_tarde', label: 'Lanche da tarde', short: 'Tarde', snack: true },
+  { id: 'lanche_tarde', label: 'Lanche da tarde', short: 'Tarde', snack: true, emptyText: 'sem lanche', addText: 'Adicionar lanche' },
   { id: 'jantar', label: 'Jantar', short: 'Jantar', snack: false },
 ];
 export const MEAL_SLOT_IDS = MEAL_SLOTS.map((s) => s.id);
