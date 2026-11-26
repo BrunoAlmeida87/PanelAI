@@ -348,7 +348,7 @@ function BalanceCard({ balance, bare }) {
         </h2>
       )}
       {balance.meals === 0 ? (
-        <p class="small muted" style="margin-top:10px">Adicione receitas para ver a distribuição da semana.</p>
+        <p class="small muted" style="margin-top:10px">Adicione receitas (ou marque o que tem nas comidas escritas) para ver a distribuição da semana.</p>
       ) : (
         <>
           <div class="protein-list" aria-label="Proteínas da semana">

@@ -6,26 +6,54 @@
 //   n      = quantas vezes foi usada
 //   last   = data (AAAA-MM-DD) do último uso
 //   hidden = apagada pela lixeira (some das sugestões; volta se for escrita e salva de novo)
+//   composition, protein = categorias opcionais (Massa, Leguminosa…; tipo de proteína), as
+//            mesmas das receitas: entram no equilíbrio da semana e vêm marcadas da próxima vez
 //
 // As semanas antigas vão para o arquivo depois de 120 dias, por isso o histórico
 // fica guardado à parte. As comidas que já estão nas semanas abertas também
 // entram nas sugestões (assim o que foi escrito antes desta versão não se perde).
 
 import { normalizeText } from '../utils/id.js';
+import { COMPOSITION, PROTEINS } from '../models/constants.js';
 
 const MAX_LEN = 120;
+
+/**
+ * Categorias de uma comida escrita (todas opcionais). Só valores conhecidos, sem repetir,
+ * na ordem da lista. Escolher um tipo de proteína marca "Proteína" junto.
+ */
+export function cleanMealTags(raw) {
+  const set = new Set(Array.isArray(raw?.composition) ? raw.composition : []);
+  const protein = PROTEINS.some((p) => p.id === raw?.protein) ? raw.protein : null;
+  if (protein) set.add('proteina');
+  const composition = COMPOSITION.map((c) => c.id).filter((id) => set.has(id));
+  return { composition, protein };
+}
+
+export const hasMealTags = (t) => !!(t?.composition?.length || t?.protein);
+
+/** Campos de categoria para gravar na refeição (sem campos vazios). */
+export function mealTagFields(raw) {
+  const t = cleanMealTags(raw);
+  return { ...(t.composition.length ? { composition: t.composition } : {}), ...(t.protein ? { protein: t.protein } : {}) };
+}
 
 /** Chave do histórico: espaços repetidos viram um só, sem acento e minúsculo. */
 export const mealTextKey = (text) => normalizeText(String(text ?? '').replace(/\s+/g, ' '));
 
 const cleanText = (text) => String(text ?? '').replace(/\s+/g, ' ').trim().slice(0, MAX_LEN);
 
-/** Registra um uso. Devolve o item novo (ou null se o texto está vazio). */
-export function rememberedItem(current, text, date) {
+/**
+ * Registra um uso. Devolve o item novo (ou null se o texto está vazio).
+ * `tags` (opcional): categorias escolhidas agora; ausente = mantém as que já estavam.
+ * `count: false` = só atualiza (ex.: mudou a categoria na refeição já criada).
+ */
+export function rememberedItem(current, text, date, tags = undefined, { count = true } = {}) {
   const t = cleanText(text);
   if (!t) return null;
-  const n = (Number(current?.n) || 0) + 1;
-  return { text: t, n, last: date > (current?.last ?? '') ? date : (current?.last ?? date) };
+  const n = (Number(current?.n) || 0) + (count ? 1 : 0);
+  const kept = tags === undefined ? mealTagFields(current) : mealTagFields(tags);
+  return { text: t, n, last: date > (current?.last ?? '') ? date : (current?.last ?? date), ...kept };
 }
 
 /** Marca como apagada (lixeira). */
@@ -45,7 +73,10 @@ export function textsFromWeeks(weeks) {
           if (!t) continue;
           const k = mealTextKey(t);
           const cur = out.get(k);
-          out.set(k, { text: cur && cur.last > date ? cur.text : t, n: (cur?.n ?? 0) + 1, last: cur && cur.last > date ? cur.last : date });
+          const older = cur && cur.last > date;
+          // Categorias: as da refeição mais recente que tem alguma.
+          const tags = hasMealTags(e) && !(older && hasMealTags(cur)) ? mealTagFields(e) : mealTagFields(cur);
+          out.set(k, { text: older ? cur.text : t, n: (cur?.n ?? 0) + 1, last: older ? cur.last : date, ...tags });
         }
       }
     }
@@ -72,10 +103,13 @@ export function suggestMealTexts({ stored = {}, weeks = {}, query = '', max = 12
       continue;
     }
     const newer = fromWeeks && fromWeeks.last > (item.last ?? '');
+    // Categorias guardadas no histórico valem; se não houver, as da semana.
+    const tags = hasMealTags(item) ? mealTagFields(item) : mealTagFields(fromWeeks);
     all.set(k, {
       text: newer ? fromWeeks.text : item.text,
       n: Math.max(Number(item.n) || 0, fromWeeks?.n ?? 0),
       last: newer ? fromWeeks.last : (item.last ?? ''),
+      ...tags,
     });
   }
   const q = mealTextKey(query);
@@ -89,7 +123,18 @@ export function suggestMealTexts({ stored = {}, weeks = {}, query = '', max = 12
       (a.last < b.last ? 1 : a.last > b.last ? -1 : 0) ||
       a.text.localeCompare(b.text, 'pt-BR'),
   );
-  return list.slice(0, max).map(({ key, text, n, last }) => ({ key, text, n, last }));
+  return list.slice(0, max).map(({ key, text, n, last, composition, protein }) => ({ key, text, n, last, ...mealTagFields({ composition, protein }) }));
+}
+
+/** Categorias já conhecidas de uma comida (pelo texto exato, sem ligar para acento), ou null. */
+export function knownMealTags({ stored = {}, weeks = {}, text }) {
+  const k = mealTextKey(text);
+  if (!k) return null;
+  const item = stored?.[k];
+  if (item && !item.hidden && hasMealTags(item)) return cleanMealTags(item);
+  if (item?.hidden) return null;
+  const w = textsFromWeeks(weeks).get(k);
+  return w && hasMealTags(w) ? cleanMealTags(w) : null;
 }
 
 /** Junta dois históricos (ex.: o atual e o de um backup): fica o uso mais recente de cada comida. */
@@ -111,7 +156,7 @@ export function sanitizeMealTexts(v) {
     const text = cleanText(item.text);
     if (!text) continue;
     const last = typeof item.last === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(item.last) ? item.last : '';
-    out[mealTextKey(text)] = { text, n: Math.max(0, Math.round(Number(item.n) || 0)), last, ...(item.hidden ? { hidden: true } : {}) };
+    out[mealTextKey(text)] = { text, n: Math.max(0, Math.round(Number(item.n) || 0)), last, ...mealTagFields(item), ...(item.hidden ? { hidden: true } : {}) };
   }
   return out;
 }

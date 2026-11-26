@@ -15,7 +15,7 @@ import {
 } from '../services/planning.js';
 import { applyStockDelta, newPantryItem, setStock } from '../services/pantry.js';
 import { buildBackup } from '../services/backup.js';
-import { hiddenItem, mealTextKey, mergeMealTexts, rememberedItem } from '../services/mealTexts.js';
+import { hiddenItem, mealTagFields, mealTextKey, mergeMealTexts, rememberedItem } from '../services/mealTexts.js';
 import { DEFAULT_SETTINGS } from '../models/constants.js';
 import { convert } from '../models/units.js';
 import { addDays, todayISO } from '../utils/dates.js';
@@ -41,15 +41,21 @@ function saveMealTexts(next) {
   persist([{ store: 'meta', type: 'put', value: { key: 'mealTexts', value: next } }]);
 }
 
-/** Guarda no histórico as comidas escritas à mão (para sugerir da próxima vez). */
-export function rememberMealTexts(texts, date = todayISO()) {
+/**
+ * Guarda no histórico as comidas escritas à mão (para sugerir da próxima vez).
+ * Cada item: texto, ou { text, composition?, protein? } (categorias opcionais;
+ * sem essas chaves, as categorias já guardadas ficam). `count: false` não soma uso.
+ */
+export function rememberMealTexts(items, { date = todayISO(), count = true } = {}) {
   const s = getState();
   if (s.cloud?.readOnly) return;
   let next = s.mealTexts ?? {};
   let changed = false;
-  for (const text of texts) {
+  for (const it of items) {
+    const text = typeof it === 'string' ? it : it?.text;
+    const tags = typeof it === 'object' && it && ('composition' in it || 'protein' in it) ? it : undefined;
     const k = mealTextKey(text);
-    const item = k && rememberedItem(next[k], text, date);
+    const item = k && rememberedItem(next[k], text, date, tags, { count });
     if (!item) continue;
     next = { ...next, [k]: item };
     changed = true;
@@ -81,14 +87,24 @@ export function restoreMealText(text, before) {
 export function addMeals(weekId, targets, data) {
   let w = getWeek(weekId);
   for (const t of targets) w = addEntry(w, t.date, t.slot, newEntry(data));
-  if (data.kind === 'text') rememberMealTexts([data.text]);
+  if (data.kind === 'text') rememberMealTexts([data]);
   return saveWeek(w);
 }
 
 export function updateMeal(weekId, date, slot, entryId, patch) {
   const w = getWeek(weekId);
-  if (typeof patch.text === 'string' && findEntry(w, entryId)?.entry?.kind === 'text') rememberMealTexts([patch.text]);
+  const entry = findEntry(w, entryId)?.entry;
+  if (entry?.kind === 'text') {
+    if (typeof patch.text === 'string') rememberMealTexts([{ ...mealTagFields(entry), composition: entry.composition ?? [], protein: entry.protein ?? null, text: patch.text }]);
+    else if ('composition' in patch || 'protein' in patch) rememberMealTexts([{ text: entry.text, ...patch }], { count: false });
+  }
   return saveWeek(updateEntry(w, date, slot, entryId, patch));
+}
+
+/** Categorias (opcionais) de uma comida escrita à mão: valem para o equilíbrio da semana. */
+export function setMealTags(weekId, date, slot, entryId, tags) {
+  const t = mealTagFields(tags);
+  return updateMeal(weekId, date, slot, entryId, { composition: t.composition ?? [], protein: t.protein ?? null });
 }
 
 /** Remove e devolve a semana anterior para permitir "Desfazer". */
@@ -116,7 +132,7 @@ export function replaceMeal(weekId, date, slot, entryId, newDataList) {
   const list = w.meals[date]?.[slot] ?? [];
   const idx = list.findIndex((e) => e.id === entryId);
   const fresh = newDataList.map((d) => newEntry(d));
-  rememberMealTexts(newDataList.filter((d) => d.kind === 'text').map((d) => d.text));
+  rememberMealTexts(newDataList.filter((d) => d.kind === 'text'));
   const next = idx === -1 ? [...list, ...fresh] : [...list.slice(0, idx), ...fresh, ...list.slice(idx + 1)];
   w = { ...w, meals: { ...w.meals, [date]: { ...w.meals[date], [slot]: next } } };
   return saveWeek(w);

@@ -47,6 +47,8 @@ export function balanceStats({ week, recipesById, marmitasById = {} }) {
     let recipe = null;
     if (entry.kind === 'recipe') recipe = recipesById[entry.recipeId];
     if (entry.kind === 'marmita') recipe = recipesById[marmitasById[entry.marmitaId]?.recipeId];
+    // Comida escrita à mão conta quando tem alguma categoria (são opcionais).
+    if (entry.kind === 'text' && (entry.composition?.length || entry.protein)) recipe = entry;
     if (!recipe) continue;
     meals++;
     if (recipe.protein in proteins) proteins[recipe.protein]++;

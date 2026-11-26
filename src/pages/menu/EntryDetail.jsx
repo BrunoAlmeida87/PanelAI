@@ -12,7 +12,9 @@ import {
   duplicateMeal,
   setMealDone,
   marmitaUsage,
+  setMealTags,
 } from '../../storage/actions.js';
+import { MealTags } from './MealTags.jsx';
 import { MEAL_SLOTS, slotLabel, marmitaStatusLabel } from '../../models/constants.js';
 import { formatDayMonth, weekDates, weekdayName, weekdayShort } from '../../utils/dates.js';
 import { navigate } from '../../utils/router.js';
@@ -192,6 +194,10 @@ export function EntryDetail({ weekId, date, slot, entryId, onClose, onReplace })
                 onBlur={() => text !== entry.text && updateMeal(weekId, date, slot, entryId, { text: text.trim() })}
               />
             </label>
+          )}
+
+          {entry.kind === 'text' && (
+            <MealTags value={entry} hint={false} onChange={(t) => setMealTags(weekId, date, slot, entryId, t)} />
           )}
 
           <label class="field">

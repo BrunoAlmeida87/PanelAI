@@ -134,6 +134,8 @@ async function flows(browser, label, opts) {
     };
     let dialog = await openPicker('Domingo', 'Café da manhã', 'café da manhã');
     await dialog.getByLabel('O que vai ter?').fill('Macarrão teste E2E');
+    // Categoria opcional: marca "Massa".
+    await dialog.getByRole('group', { name: 'Categorias da comida' }).getByRole('button', { name: 'Massa' }).click();
     await dialog.getByRole('button', { name: /^Adicionar$/ }).click();
     await page.getByRole('dialog').waitFor({ state: 'detached' });
 
@@ -145,6 +147,9 @@ async function flows(browser, label, opts) {
     await row.getByRole('button', { name: /^Macarrão teste E2E/ }).click();
     const v = await dialog.getByLabel('O que vai ter?').inputValue();
     assert(v === 'Macarrão teste E2E', `campo = ${v}`);
+    // A categoria escolhida da outra vez já vem marcada.
+    const massa = await dialog.getByRole('group', { name: 'Categorias da comida' }).getByRole('button', { name: 'Massa' }).getAttribute('aria-pressed');
+    assert(massa === 'true', `Massa marcada = ${massa}`);
     await dialog.getByLabel('O que vai ter?').fill('macarrao te');
     await row.getByRole('button', { name: 'Apagar “Macarrão teste E2E” das sugestões' }).click();
     await row.waitFor({ state: 'detached', timeout: 3000 });
@@ -153,7 +158,7 @@ async function flows(browser, label, opts) {
     await dialog.getByRole('tab', { name: 'Receita' }).click();
     await page.keyboard.press('Escape');
     await page.getByRole('dialog').waitFor({ state: 'detached' });
-    return 'sugerida ao digitar "macarrao te", usada e apagada';
+    return 'sugerida ao digitar "macarrao te" já com a categoria Massa, usada e apagada';
   });
 
   await step(`[${label}] 4. navegar entre semanas`, async () => {

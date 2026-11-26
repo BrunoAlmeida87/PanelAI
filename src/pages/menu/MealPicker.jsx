@@ -6,8 +6,9 @@ import { Search, Star, Check, ChevronDown, ChevronUp, Box, Utensils, MapPin, Sli
 import { Modal, Stepper, Chip, Segmented, toast } from '../../components/ui.jsx';
 import { useStore } from '../../storage/store.js';
 import { addMeals, replaceMeal, createMarmita, marmitaUsage, forgetMealText, restoreMealText } from '../../storage/actions.js';
-import { suggestMealTexts } from '../../services/mealTexts.js';
-import { MEAL_SLOTS, PROTEINS, SPEEDS, slotLabel } from '../../models/constants.js';
+import { cleanMealTags, knownMealTags, mealTagFields, suggestMealTexts } from '../../services/mealTexts.js';
+import { MealTags } from './MealTags.jsx';
+import { MEAL_SLOTS, PROTEINS, SPEEDS, compositionLabel, proteinLabel, slotLabel } from '../../models/constants.js';
 import { scaleIngredients, recipeSpeed } from '../../models/recipe.js';
 import { formatQty } from '../../models/units.js';
 import { addDays, formatDayMonth, weekDates, weekdayName, weekdayShort } from '../../utils/dates.js';
@@ -59,6 +60,9 @@ export function MealPicker({ weekId, date, slot, replaceEntryId = null, onClose 
   // --- Texto (Escrever / Fora)
   const [text, setText] = useState('');
   const [note, setNote] = useState('');
+  // Categorias opcionais da comida escrita. Enquanto a pessoa não mexe, vêm do histórico
+  // (mesma comida escrita antes); depois de mexer, valem as escolhidas.
+  const [tagsChosen, setTagsChosen] = useState(null);
   const weeks = s.weeks;
   const mealTexts = s.mealTexts;
   const readOnly = !!s.cloud?.readOnly;
@@ -72,6 +76,12 @@ export function MealPicker({ weekId, date, slot, replaceEntryId = null, onClose 
     () => (tab === 'recipe' && query.trim() ? suggestMealTexts({ stored: mealTexts, weeks, query, max: 4 }) : []),
     [tab, weeks, mealTexts, query],
   );
+  const knownTags = useMemo(() => (tab === 'text' ? knownMealTags({ stored: mealTexts, weeks, text }) : null), [tab, mealTexts, weeks, text]);
+  const tags = tagsChosen ?? knownTags ?? cleanMealTags(null);
+  const pickWritten = (w) => {
+    setText(w.text);
+    setTagsChosen(null);
+  };
   const forget = (t) => {
     const before = forgetMealText(t);
     toast(`“${t}” apagada das sugestões`, { action: { label: 'Desfazer', onClick: () => restoreMealText(t, before) } });
@@ -143,14 +153,18 @@ export function MealPicker({ weekId, date, slot, replaceEntryId = null, onClose 
       }
     } else {
       if (tab === 'text' && !text.trim()) return toast('Escreva o que vai ter na refeição', { type: 'error' });
-      save([{ kind: tab, text: text.trim(), note: note.trim() }]);
+      if (tab === 'text') {
+        // composition/protein sempre presentes: "nenhuma" também é uma escolha (limpa o histórico).
+        const t = cleanMealTags(tags);
+        save([{ kind: 'text', text: text.trim(), note: note.trim(), composition: t.composition, protein: t.protein }]);
+      } else save([{ kind: tab, text: text.trim(), note: note.trim() }]);
     }
   }
 
   /** Busca sem receita certa: usa o próprio texto digitado como refeição. */
   function saveQueryAsText() {
     const t = query.trim();
-    if (t) save([{ kind: 'text', text: t.slice(0, 120), note: '' }]);
+    if (t) save([{ kind: 'text', text: t.slice(0, 120), note: '', ...mealTagFields(knownMealTags({ stored: mealTexts, weeks, text: t })) }]);
   }
 
   const dates = weekDates(weekId);
@@ -302,7 +316,7 @@ export function MealPicker({ weekId, date, slot, replaceEntryId = null, onClose 
             {!recipes.length && <p class="muted small" style="padding:16px 16px 4px;text-align:center">Nenhuma receita encontrada.</p>}
             {!selected.length &&
               writtenForQuery.map((w) => (
-                <WrittenRow key={w.key} item={w} onPick={() => save([{ kind: 'text', text: w.text, note: '' }])} onForget={readOnly ? null : () => forget(w.text)} hint="Escrita antes · toque para usar" />
+                <WrittenRow key={w.key} item={w} onPick={() => save([{ kind: 'text', text: w.text, note: '', ...mealTagFields(w) }])} onForget={readOnly ? null : () => forget(w.text)} hint="Escrita antes · toque para usar" />
               ))}
             {query.trim() && !selected.length && (
               <div class="picker-row">
@@ -442,12 +456,13 @@ export function MealPicker({ weekId, date, slot, replaceEntryId = null, onClose 
               <span class="label">{text.trim() ? 'Já escritas antes, parecidas' : 'Já escritas antes'}</span>
               <div class="picker-list written-list" role="list" aria-label="Comidas já escritas">
                 {written.map((w) => (
-                  <WrittenRow key={w.key} item={w} onPick={() => setText(w.text)} onForget={readOnly ? null : () => forget(w.text)} />
+                  <WrittenRow key={w.key} item={w} onPick={() => pickWritten(w)} onForget={readOnly ? null : () => forget(w.text)} />
                 ))}
               </div>
               <span class="hint">Toque para usar. A lixeira tira só da lista de sugestões; o cardápio não muda.</span>
             </div>
           )}
+          <MealTags value={tags} onChange={setTagsChosen} />
           <label class="field">
             <span class="label">Observação (opcional)</span>
             <input class="input" value={note} maxLength={200} onInput={(e) => setNote(e.currentTarget.value)} />
@@ -490,16 +505,22 @@ export function IngredientPreview({ recipe, servings }) {
   );
 }
 
+/** "Massa, Proteína (Frango)" — categorias guardadas, para mostrar na sugestão. */
+function tagSummary(item) {
+  const t = cleanMealTags(item);
+  return t.composition.map((c) => (c === 'proteina' && t.protein ? `Proteína (${proteinLabel(t.protein)})` : compositionLabel(c))).join(', ');
+}
+
 /** Comida escrita antes: toque para usar; lixeira para tirar das sugestões (ex.: escrita errada). */
 function WrittenRow({ item, onPick, onForget, hint = null }) {
-  const uses = item.n > 1 ? `${item.n} vezes` : item.n === 1 ? '1 vez' : '';
+  const uses = [item.n > 1 ? `${item.n} vezes` : item.n === 1 ? '1 vez' : '', tagSummary(item)].filter(Boolean).join(' · ');
   return (
     <div class="picker-row written-row" role="listitem">
       <button type="button" onClick={onPick}>
         <History size={16} aria-hidden="true" />
         <span class="p-main">
           <span class="p-name">{item.text}</span>
-          {(hint || uses) && <span class="p-sub">{hint ?? uses}</span>}
+          {(hint || uses) && <span class="p-sub">{[hint, uses].filter(Boolean).join(' · ')}</span>}
         </span>
       </button>
       {onForget && (
