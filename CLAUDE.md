@@ -217,3 +217,10 @@ Publicado em https://brunoalmeida87.github.io/PanelAI/ (GitHub Pages), com dados
   outro módulo, confira o teste de responsividade (960, 1024 e 1200 px).
 - `__APP_VERSION__` vem do `package.json` (definido no `vite.config.js`); ao lançar versão, suba o
   `version` do `package.json` (e do `package-lock.json`).
+- **Tarefas feitas na tela (1.8):** cards `tasksDay`/`tasksWeek` têm `doneFor` (`'24'` padrão, `'6'`,
+  `'12'`, `'48'`, `'72'` horas ou `'day'` = só no dia da tarefa). A feita fica marcada ✓ (CSS
+  `.eink-box.on::after`) até `doneAt + doneFor`, comparando com o **momento** da imagem; atrasada de outro
+  dia ticada aparece em "Tarefas de hoje" como "(de dd/mm)". Regra pura `doneStillVisible` em
+  `src/display/data.js`. Cards antigos sem a opção usam 24 h. Some de verdade só na próxima atualização da tela.
+- **Nome da refeição (1.8):** `menuDay.options.labelStyle` = `underline` (padrão: negrito e sublinhado),
+  `band` (tarja preta), `divider` (linha entre refeições) ou `plain` (como antes).

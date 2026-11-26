@@ -31,6 +31,21 @@ function displayTasks(s, today, weekId, now) {
 }
 
 /**
+ * Uma tarefa feita ainda aparece na tela (marcada ✓)?
+ * `doneFor`: 'day' = só no dia da tarefa; número de horas (texto ou número) = até
+ * esse tempo depois de ticada (`doneAt`). Tarefa antiga sem `doneAt` segue a regra do dia.
+ */
+export function doneStillVisible(task, now, doneFor = '24') {
+  if (task.status !== 'done') return true;
+  if (doneFor === 'day' || !task.doneAt) return true;
+  const hours = Number(doneFor);
+  if (!Number.isFinite(hours) || hours <= 0) return true;
+  const at = new Date(task.doneAt).getTime();
+  if (!Number.isFinite(at)) return true;
+  return now.getTime() - at < hours * 3600e3;
+}
+
+/**
  * @param now       instante "da tela" (dia de hoje, horas do clima…). Perto de um horário
  *                  agendado, a imagem é feita para ele (ex.: 00:00, para já mostrar o dia novo).
  * @param updatedAt quando a imagem foi realmente gerada ("Atualizado às" do card de data).
@@ -114,6 +129,14 @@ export function buildDisplayData(s, now = new Date(), updatedAt = now) {
     meals,
     tasksOn: (date) => tasksOn(tasks, date).filter((t) => t.status !== 'postponed'),
     overdue: () => overdueTasks(tasks, today),
+    /** Feitas dentro da janela `doneFor` (horas), de qualquer data — ex.: atrasada de ontem ticada hoje. */
+    recentlyDone: (doneFor) =>
+      doneFor === 'day'
+        ? []
+        : tasks
+            .filter((t) => !t.deleted && t.status === 'done' && t.doneAt && doneStillVisible(t, now, doneFor))
+            .sort((a, b) => (a.doneAt < b.doneAt ? -1 : 1)),
+    doneVisible: (t, doneFor) => doneStillVisible(t, now, doneFor),
     pending: () => {
       const list = tasks.filter((t) => !t.deleted && t.status === 'pending');
       const late = overdueTasks(tasks, today).filter((t) => t.status !== 'pending');

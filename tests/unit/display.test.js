@@ -11,7 +11,7 @@ import {
   rescaleCards,
   screenSize,
 } from '../../src/display/model.js';
-import { buildDisplayData } from '../../src/display/data.js';
+import { buildDisplayData, doneStillVisible } from '../../src/display/data.js';
 import { buildSeed } from '../../src/data/seed.js';
 
 const grid = { cols: 12, rows: 8, gap: 8, padding: 12 };
@@ -157,5 +157,36 @@ describe('display: Montessori de hoje', () => {
   it('sem criança cadastrada, o card fica vazio', () => {
     const now = new Date('2026-11-24T06:00:00');
     expect(buildDisplayData(buildSeed(now), now).montessori()).toEqual([]);
+  });
+});
+
+describe('display: tarefas feitas somem depois de um tempo', () => {
+  const now = new Date('2026-11-26T17:51:00');
+  const done = (doneAt, date = '2026-11-26') => ({ id: doneAt, title: 'x', date, status: 'done', doneAt });
+
+  it('fica na tela até o tempo escolhido depois de ticada', () => {
+    expect(doneStillVisible(done('2026-11-25T18:00:00'), now, '24')).toBe(true);
+    expect(doneStillVisible(done('2026-11-25T17:00:00'), now, '24')).toBe(false);
+    expect(doneStillVisible(done('2026-11-26T10:00:00'), now, '6')).toBe(false);
+    expect(doneStillVisible(done('2026-11-24T18:00:00'), now, '48')).toBe(true);
+  });
+
+  it('"só no dia", tarefa aberta e tarefa antiga sem doneAt continuam como antes', () => {
+    expect(doneStillVisible(done('2026-11-20T10:00:00'), now, 'day')).toBe(true);
+    expect(doneStillVisible({ status: 'todo' }, now, '6')).toBe(true);
+    expect(doneStillVisible({ status: 'done', date: '2026-11-26' }, now, '24')).toBe(true);
+  });
+
+  it('atrasada de ontem ticada hoje aparece entre as feitas recentes', () => {
+    const s = buildSeed(now);
+    s.taskTemplates = {};
+    s.tasks = {
+      lixo: { id: 'lixo', title: 'Tirar o lixo', date: '2026-11-25', status: 'done', doneAt: '2026-11-26T08:00:00', createdAt: '2026-11-20T10:00:00Z' },
+      velha: { id: 'velha', title: 'Lavar louça', date: '2026-11-25', status: 'done', doneAt: '2026-11-25T10:00:00', createdAt: '2026-11-20T10:00:00Z' },
+    };
+    const d = buildDisplayData(s, now);
+    expect(d.recentlyDone('24').map((t) => t.id)).toEqual(['lixo']);
+    expect(d.recentlyDone('day')).toEqual([]);
+    expect(d.overdue()).toEqual([]);
   });
 });

@@ -46,6 +46,23 @@ const SLOT_CHOICES = [
   { id: 'lanche_tarde', label: 'Lanche da tarde' },
   { id: 'jantar', label: 'Jantar' },
 ];
+// Por quanto tempo uma tarefa feita continua na tela (marcada ✓) depois de ticada.
+// 'day' = só no dia da tarefa (comportamento antigo). Primeira opção = padrão dos cards antigos.
+export const DONE_FOR_CHOICES = [
+  { id: '24', label: '24 horas depois de feita' },
+  { id: '6', label: '6 horas depois de feita' },
+  { id: '12', label: '12 horas depois de feita' },
+  { id: '48', label: '2 dias depois de feita' },
+  { id: '72', label: '3 dias depois de feita' },
+  { id: 'day', label: 'Só no dia da tarefa' },
+];
+// Destaque dos nomes das refeições (Lanche da manhã, Jantar…). Primeira opção = padrão.
+export const MEAL_LABEL_STYLES = [
+  { id: 'underline', label: 'Negrito e sublinhado' },
+  { id: 'band', label: 'Tarja preta (letra branca)' },
+  { id: 'divider', label: 'Negrito com linha separando as refeições' },
+  { id: 'plain', label: 'Discreto (como antes)' },
+];
 const DAY_CHOICES = [
   { id: 'today', label: 'Hoje' },
   { id: 'tomorrow', label: 'Amanhã' },
@@ -77,6 +94,7 @@ export const CARD_TYPES = [
       { key: 'slots', label: 'Refeições', type: 'multi', default: ['lanche_manha', 'almoco', 'lanche_tarde', 'jantar'], choices: SLOT_CHOICES },
       { key: 'showServings', label: 'Mostrar porções', type: 'toggle', default: false },
       { key: 'hideEmpty', label: 'Esconder refeições vazias', type: 'toggle', default: true },
+      { key: 'labelStyle', label: 'Destaque do nome da refeição', type: 'select', default: 'underline', choices: MEAL_LABEL_STYLES },
     ],
   },
   {
@@ -124,7 +142,8 @@ export const CARD_TYPES = [
     size: { w: 6, h: 4 },
     options: [
       { key: 'day', label: 'Dia', type: 'select', default: 'today', choices: DAY_CHOICES },
-      { key: 'showDone', label: 'Mostrar feitas', type: 'toggle', default: true },
+      { key: 'showDone', label: 'Mostrar feitas (marcadas ✓)', type: 'toggle', default: true },
+      { key: 'doneFor', label: 'Feitas somem da tela', type: 'select', default: '24', choices: DONE_FOR_CHOICES },
       { key: 'showAssignee', label: 'Mostrar responsável', type: 'toggle', default: true },
       { key: 'showOverdue', label: 'Incluir atrasadas', type: 'toggle', default: true },
       { key: 'max', label: 'Máximo de itens', type: 'number', default: 12, min: 1, max: 40 },
@@ -136,7 +155,8 @@ export const CARD_TYPES = [
     description: 'Tarefas agrupadas por dia.',
     size: { w: 12, h: 3 },
     options: [
-      { key: 'showDone', label: 'Mostrar feitas', type: 'toggle', default: false },
+      { key: 'showDone', label: 'Mostrar feitas (marcadas ✓)', type: 'toggle', default: false },
+      { key: 'doneFor', label: 'Feitas somem da tela', type: 'select', default: '24', choices: DONE_FOR_CHOICES },
       { key: 'showAssignee', label: 'Mostrar responsável', type: 'toggle', default: false },
       { key: 'layout', label: 'Disposição', type: 'select', default: 'columns', choices: [{ id: 'columns', label: 'Colunas' }, { id: 'rows', label: 'Linhas' }] },
       { key: 'maxPerDay', label: 'Máximo por dia', type: 'number', default: 5, min: 1, max: 20 },

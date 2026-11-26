@@ -134,10 +134,12 @@ function MenuDay({ o, data }) {
   const slots = data.meals(date).filter((m) => (o.slots ?? []).includes(m.slot) && (!o.hideEmpty || m.entries.length));
   if (!slots.length) return <Empty>Nada planejado para {o.day === 'tomorrow' ? 'amanhã' : 'hoje'}.</Empty>;
   return (
-    <dl class="eink-meals">
+    <dl class={`eink-meals label-${o.labelStyle ?? 'underline'}`}>
       {slots.map((m) => (
         <div key={m.slot} class="meal">
-          <dt>{m.label}</dt>
+          <dt>
+            <span>{m.label}</span>
+          </dt>
           <dd>
             {m.entries.length
               ? m.entries.map((e) => `${e.text}${o.showServings && e.servings ? ` (${e.servings})` : ''}`).join(' + ')
@@ -176,8 +178,10 @@ function MenuWeek({ o, data }) {
   );
 }
 
-function TaskLine({ t, o, today, showDate = false }) {
+function TaskLine({ t, o, today, day = null, showDate = false }) {
   const late = t.date < today && t.status !== 'done';
+  // Feita de outro dia (ex.: atrasada de ontem ticada hoje): mostra de quando era.
+  const otherDay = t.status === 'done' && day && t.date !== day;
   return (
     <li class={`${t.status}`}>
       <Box on={t.status === 'done'} warn={t.status === 'pending'} />
@@ -185,7 +189,7 @@ function TaskLine({ t, o, today, showDate = false }) {
         {t.title}
         {o.showAssignee && t.assignee ? <span class="who"> · {t.assignee}</span> : null}
         {t.movedFrom?.length ? <span class="from"> ↪ de {formatDayMonth(t.movedFrom[t.movedFrom.length - 1])}</span> : null}
-        {late || showDate ? <span class="from"> ({late ? 'atrasada ' : ''}{formatDayMonth(t.date)})</span> : null}
+        {late || showDate || otherDay ? <span class="from"> ({late ? 'atrasada ' : otherDay ? 'de ' : ''}{formatDayMonth(t.date)})</span> : null}
       </span>
     </li>
   );
@@ -193,15 +197,23 @@ function TaskLine({ t, o, today, showDate = false }) {
 
 function TasksDay({ o, data }) {
   const date = data.dayOf(o.day);
-  let list = data.tasksOn(date);
-  if (!o.showDone) list = list.filter((t) => t.status !== 'done');
-  if (o.showOverdue && o.day !== 'tomorrow') list = [...data.overdue(), ...list];
+  const doneFor = o.doneFor ?? '24';
+  const day = data.tasksOn(date);
+  const open = day.filter((t) => t.status !== 'done');
+  let done = [];
+  if (o.showDone) {
+    done = day.filter((t) => t.status === 'done' && data.doneVisible(t, doneFor));
+    // Feitas de dias anteriores (ex.: atrasada ticada hoje) continuam ✓ até a janela acabar.
+    if (o.day !== 'tomorrow') done = [...data.recentlyDone(doneFor).filter((t) => t.date < date), ...done];
+  }
+  // Abertas primeiro (atrasadas no topo), feitas no fim da lista.
+  let list = [...(o.showOverdue && o.day !== 'tomorrow' ? data.overdue() : []), ...open, ...done];
   list = list.slice(0, o.max ?? 12);
   if (!list.length) return <Empty>Nenhuma tarefa.</Empty>;
   return (
     <ul class="eink-list">
       {list.map((t) => (
-        <TaskLine key={t.id} t={t} o={o} today={data.today} />
+        <TaskLine key={t.id} t={t} o={o} today={data.today} day={date} />
       ))}
     </ul>
   );
@@ -213,7 +225,7 @@ function TasksWeek({ o, data }) {
     <div class={`eink-week ${o.layout === 'rows' ? 'rows' : 'cols'}`} style={o.layout === 'rows' ? undefined : { gridTemplateColumns: 'repeat(7, minmax(0, 1fr))' }}>
       {days.map((d) => {
         let list = data.tasksOn(d);
-        if (!o.showDone) list = list.filter((t) => t.status !== 'done');
+        list = o.showDone ? list.filter((t) => data.doneVisible(t, o.doneFor ?? '24')) : list.filter((t) => t.status !== 'done');
         const extra = Math.max(0, list.length - (o.maxPerDay ?? 5));
         list = list.slice(0, o.maxPerDay ?? 5);
         return (
