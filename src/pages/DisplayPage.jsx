@@ -17,6 +17,9 @@ import {
   MapPin,
   Search,
   LocateFixed,
+  Type,
+  Eye,
+  TriangleAlert,
 } from 'lucide-preact';
 import { useStore } from '../storage/store.js';
 import { createLayout, deleteLayout, duplicateLayout, saveLayout, setActiveLayout } from '../storage/displayActions.js';
@@ -24,8 +27,18 @@ import {
   BORDERS,
   CARD_TYPES,
   COLOR_MODES,
+  DEFAULT_TYPOGRAPHY,
+  DISPLAY_FONTS,
   DISPLAY_MODELS,
   FONT_SCALES,
+  FONT_WEIGHTS,
+  INK_LEVELS,
+  LETTER_SPACINGS,
+  TYPE_SIZES,
+  displayFont,
+  inkThreshold,
+  normalizeTypography,
+  typographyCheck,
   LAYOUT_PRESETS,
   cardType,
   clampCard,
@@ -98,6 +111,8 @@ function Editor({ layout: stored, layouts, activeId, onSwitch }) {
   const [draft, setDraft] = useState(null); // durante arrastar/redimensionar
   const [selectedId, setSelectedId] = useState(null);
   const [showGrid, setShowGrid] = useState(true);
+  // Prévia fiel: tamanho real (1 px da tela = 1 px) e preto e branco com o mesmo limiar do gerador.
+  const [faithful, setFaithful] = useState(false);
   const [adding, setAdding] = useState(false);
   const [presets, setPresets] = useState(false);
   const undo = useRef([]);
@@ -108,7 +123,9 @@ function Editor({ layout: stored, layouts, activeId, onSwitch }) {
   const layout = draft ?? stored;
   const { w, h } = screenSize(layout);
   const maxH = typeof window !== 'undefined' ? Math.max(240, window.innerHeight * 0.68) : 600;
-  const scale = stageWidth ? Math.min(1, (stageWidth - 48) / w, maxH / h) : 0.5;
+  const fitScale = stageWidth ? Math.min(1, (stageWidth - 48) / w, maxH / h) : 0.5;
+  const scale = faithful ? 1 : fitScale;
+  const threshold = inkThreshold(normalizeTypography(layout.typography).ink);
   const selected = layout.cards.find((c) => c.id === selectedId) ?? null;
   const overlapping = useMemo(() => overlappingIds(layout.cards), [layout.cards]);
   const isActive = activeId === layout.id;
@@ -294,6 +311,9 @@ function Editor({ layout: stored, layouts, activeId, onSwitch }) {
         <Chip pressed={showGrid} onClick={() => setShowGrid((v) => !v)}>
           <Grid3x3 size={14} /> Grade
         </Chip>
+        <Chip pressed={faithful} onClick={() => setFaithful((v) => !v)} title="Tamanho real e só preto e branco, como no aparelho">
+          <Eye size={14} /> Prévia fiel
+        </Chip>
         <Menu
           trigger={(p) => (
             <button type="button" class="icon-btn" aria-label="Mais opções do layout" aria-expanded={p['aria-expanded']} onClick={p.toggle}>
@@ -327,19 +347,29 @@ function Editor({ layout: stored, layouts, activeId, onSwitch }) {
 
       <div class="display-editor">
         <div>
-          <div class="display-stage" ref={stageRef} onPointerDown={(e) => e.target === e.currentTarget && setSelectedId(null)}>
+          <div class={`display-stage ${faithful ? 'faithful' : ''}`} ref={stageRef} onPointerDown={(e) => e.target === e.currentTarget && setSelectedId(null)}>
+            {faithful && <OneBitFilter id={`eink-1bit-${threshold}`} threshold={threshold} />}
             <DisplayRender
               layout={layout}
               data={data}
               scale={scale}
+              filter={faithful ? `url(#eink-1bit-${threshold})` : null}
               overlay={
-                <>
-                  {guides}
-                  {boxes}
-                </>
+                faithful ? null : (
+                  <>
+                    {guides}
+                    {boxes}
+                  </>
+                )
               }
             />
           </div>
+          {faithful && (
+            <p class="small muted" style="margin-top:8px">
+              <Eye size={14} style="vertical-align:-2px" /> Prévia fiel: tamanho real, só preto e branco. No computador é idêntica ao aparelho; no celular a tela tem mais pixels,
+              então as letras aparecem um pouco mais lisas do que vão ficar. Para mover os cards, desligue a prévia.
+            </p>
+          )}
           <p class="small muted" style="margin-top:8px">
             {w} × {h} px · grade {g.cols} × {g.rows} · arraste para mover, puxe as bolinhas para mudar o tamanho (no teclado: setas e Shift+setas).
             {overlapping.size > 0 && <strong style="color:var(--danger)"> Há cards sobrepostos (em vermelho).</strong>}
@@ -506,6 +536,9 @@ function ScreenInspector({ layout, isActive, onChange }) {
           <Stepper value={layout.grid.padding} min={0} max={60} decimals={0} unit="px" label="Margem da tela" onChange={(v) => setGrid({ padding: v })} />
         </div>
       </div>
+      <div class="divider" />
+      <TypographyFields layout={layout} onChange={onChange} />
+      <div class="divider" />
       <div class="field">
         <span class="label">Horários de atualização da tela</span>
         <span>{times.length ? formatTimes(times) : 'Só pelo botão do aparelho'}</span>
@@ -513,6 +546,117 @@ function ScreenInspector({ layout, isActive, onChange }) {
           Valem para o aparelho, com o layout marcado "no display". <a href="#/ajustes">Alterar em Configurações → Tela e-ink</a>.
         </span>
       </div>
+    </>
+  );
+}
+
+/**
+ * Filtro SVG que imita a conversão do gerador (scripts/lib/png.mjs): claridade
+ * (0,299 R + 0,587 G + 0,114 B) ≥ limiar → branco; senão preto.
+ */
+function OneBitFilter({ id, threshold }) {
+  const steps = 255;
+  const table = Array.from({ length: steps }, (_, i) => ((i / steps) * 255 >= threshold - 0.5 ? 1 : 0)).join(' ');
+  return (
+    <svg width="0" height="0" style="position:absolute" aria-hidden="true">
+      <filter id={id} color-interpolation-filters="sRGB">
+        <feColorMatrix type="matrix" values="0.299 0.587 0.114 0 0  0.299 0.587 0.114 0 0  0.299 0.587 0.114 0 0  0 0 0 1 0" />
+        <feComponentTransfer>
+          <feFuncR type="discrete" tableValues={table} />
+          <feFuncG type="discrete" tableValues={table} />
+          <feFuncB type="discrete" tableValues={table} />
+        </feComponentTransfer>
+      </filter>
+    </svg>
+  );
+}
+
+/** Letras do layout: fonte, peso, tamanho e espaçamento de títulos e textos. */
+function TypographyFields({ layout, onChange }) {
+  const t = normalizeTypography(layout.typography);
+  const check = typographyCheck(layout);
+  const set = (group, patch) => onChange({ ...layout, typography: { ...t, [group]: { ...t[group], ...patch } } });
+  const changed = JSON.stringify(t) !== JSON.stringify(normalizeTypography(DEFAULT_TYPOGRAPHY));
+  const group = (key, title) => {
+    const g = t[key];
+    const font = displayFont(g.font);
+    const weights = FONT_WEIGHTS.filter((x) => x.id >= font.min && x.id <= font.max);
+    return (
+      <fieldset class="type-group">
+        <legend class="label">{title}</legend>
+        <label class="field">
+          <span class="hint">Fonte</span>
+          <select class="input" value={g.font} aria-label={`Fonte dos ${title.toLowerCase()}`} style={{ fontFamily: font.css }} onChange={(e) => set(key, { font: e.currentTarget.value })}>
+            {DISPLAY_FONTS.map((f) => (
+              <option key={f.id} value={f.id} style={{ fontFamily: f.css }}>
+                {f.label}
+              </option>
+            ))}
+          </select>
+          <span class="hint">{font.hint}</span>
+        </label>
+        <label class="field">
+          <span class="hint">Peso (grossura)</span>
+          <select class="input" value={String(g.weight)} aria-label={`Peso dos ${title.toLowerCase()}`} onChange={(e) => set(key, { weight: Number(e.currentTarget.value) })}>
+            {weights.map((x) => (
+              <option key={x.id} value={String(x.id)}>
+                {x.label}
+                {x.id === DEFAULT_TYPOGRAPHY[key].weight ? ' (padrão)' : ''}
+              </option>
+            ))}
+          </select>
+        </label>
+        <div class="field">
+          <span class="hint">Tamanho</span>
+          <Segmented options={TYPE_SIZES} value={g.size} label={`Tamanho dos ${title.toLowerCase()}`} onChange={(v) => set(key, { size: v })} />
+        </div>
+        <div class="field">
+          <span class="hint">Espaço entre letras</span>
+          <Segmented options={LETTER_SPACINGS} value={g.spacing} label={`Espaço entre letras dos ${title.toLowerCase()}`} onChange={(v) => set(key, { spacing: v })} />
+        </div>
+        {key === 'title' && (
+          <label class="switch">
+            <input type="checkbox" checked={g.upper} onChange={(e) => set('title', { upper: e.currentTarget.checked })} />
+            <span>Títulos em MAIÚSCULAS</span>
+          </label>
+        )}
+      </fieldset>
+    );
+  };
+  const ink = INK_LEVELS.find((l) => l.id === t.ink);
+  return (
+    <>
+      <h3 class="section-title" style="margin:0;display:flex;gap:8px;align-items:center;font-size:1rem">
+        <Type size={18} /> Letras
+      </h3>
+      <p class="small muted" style="margin:0">
+        Títulos = nome do card, data, nome da refeição e do dia. Textos = o conteúdo. O tamanho de cada card continua no próprio card.
+      </p>
+      {group('title', 'Títulos')}
+      {group('text', 'Textos')}
+      <div class="field">
+        <span class="label">Espessura no aparelho</span>
+        <Segmented options={INK_LEVELS} value={t.ink} label="Espessura das letras no aparelho" onChange={(v) => onChange({ ...layout, typography: { ...t, ink: v } })} />
+        <span class="hint">
+          A tela só tem preto e branco: a imagem é convertida ponto a ponto. {ink?.hint || 'Equilíbrio entre letras finas e negrito.'}
+        </span>
+      </div>
+      <div class={`type-check ${check.warnings.length ? 'warn' : ''}`} role="status">
+        <span>
+          Menores letras na tela ({screenSize(layout).w} × {screenSize(layout).h}): títulos ≈ {check.titlePx} px, textos ≈ {check.textPx} px.
+        </span>
+        {check.warnings.map((w) => (
+          <span key={w} class="type-warn">
+            <TriangleAlert size={14} aria-hidden="true" /> {w}
+          </span>
+        ))}
+        <span class="hint">Use a “Prévia fiel” acima da tela para conferir antes de mandar para o aparelho.</span>
+      </div>
+      {changed && (
+        <button type="button" class="btn btn-ghost btn-sm" style="justify-self:start" onClick={() => onChange({ ...layout, typography: structuredClone(DEFAULT_TYPOGRAPHY) })}>
+          Voltar às letras padrão
+        </button>
+      )}
     </>
   );
 }
@@ -798,7 +942,8 @@ export function DisplayScreen({ params }) {
     params.publicar === '1' && weatherReady
       ? JSON.stringify({
           device: normalizeDisplayDevice(s.settings.displayDevice),
-          layout: { id: layout.id, name: layout.name, width: w, height: h, colorMode: layout.colorMode },
+          // threshold: espessura escolhida em Letras (limiar do preto e branco no gerador).
+          layout: { id: layout.id, name: layout.name, width: w, height: h, colorMode: layout.colorMode, threshold: inkThreshold(normalizeTypography(layout.typography).ink) },
           moment: data.now.getTime(),
         })
       : null;

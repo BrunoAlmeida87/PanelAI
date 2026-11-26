@@ -416,6 +416,27 @@ async function flows(browser, label, opts) {
     await shot('tela-eink');
   });
 
+  await step(`[${label}] 14c. letras da tela: fonte, peso, aviso e prévia fiel`, async () => {
+    await page.goto(`${BASE}#/display`);
+    const insp = page.locator('.display-inspector');
+    await insp.getByRole('heading', { name: 'Letras' }).waitFor();
+    await insp.getByLabel('Fonte dos títulos').selectOption('lexend');
+    await insp.getByLabel('Peso dos textos').selectOption('700');
+    await insp.getByRole('tablist', { name: 'Tamanho dos textos' }).getByRole('tab', { name: 'P', exact: true }).click();
+    // A tela usa a fonte escolhida.
+    const fam = await page.locator('.display-stage .eink-title').first().evaluate((el) => getComputedStyle(el).fontFamily);
+    assert(fam.includes('Lexend'), `fonte do título: ${fam}`);
+    await insp.locator('.type-warn').first().waitFor();
+    await page.getByRole('button', { name: 'Prévia fiel' }).click();
+    const filter = await page.locator('.display-stage .eink-frame').evaluate((el) => el.style.filter);
+    assert(filter.includes('eink-1bit-150'), `filtro: ${filter}`);
+    await shot('letras');
+    await page.getByRole('button', { name: 'Prévia fiel' }).click();
+    await insp.getByRole('button', { name: 'Voltar às letras padrão' }).click();
+    await insp.getByRole('button', { name: 'Voltar às letras padrão' }).waitFor({ state: 'detached' });
+    return 'Lexend nos títulos, aviso de negrito pequeno, prévia em preto e branco';
+  });
+
   if (mobile) {
     await step(`[${label}] 15. navegação inferior não cobre o conteúdo`, async () => {
       await page.goto(`${BASE}#/compras`);

@@ -34,6 +34,132 @@ export const FONT_SCALES = [
   { id: 2.3, label: 'XG' },
 ];
 
+// ---------- Letras (fontes) ----------
+// Fontes embutidas no app (src/display/fonts.js): funcionam no gerador da imagem
+// (GitHub) mesmo sem fontes instaladas no computador. Todas são variáveis (qualquer peso).
+export const DISPLAY_FONTS = [
+  { id: 'inter', label: 'Inter (padrão)', css: "'Inter Variable', Inter, sans-serif", min: 100, max: 900, hint: 'Clara e neutra.' },
+  { id: 'atkinson', label: 'Atkinson Hyperlegible', css: "'Atkinson Hyperlegible Next Variable', sans-serif", min: 200, max: 800, hint: 'Feita para leitura fácil: letras parecidas (I, l, 1) bem diferentes.' },
+  { id: 'lexend', label: 'Lexend', css: "'Lexend Variable', sans-serif", min: 100, max: 900, hint: 'Larga e espaçada: boa de longe, ocupa mais espaço.' },
+  { id: 'roboto-condensed', label: 'Roboto Condensed', css: "'Roboto Condensed Variable', sans-serif", min: 100, max: 900, hint: 'Estreita: cabe mais texto por linha.' },
+  { id: 'nunito', label: 'Nunito', css: "'Nunito Variable', sans-serif", min: 200, max: 1000, hint: 'Arredondada e amigável.' },
+  { id: 'source-serif', label: 'Source Serif (com serifa)', css: "'Source Serif 4 Variable', serif", min: 200, max: 900, hint: 'Estilo de livro. Em tamanho pequeno, as serifas podem sumir.' },
+];
+export const displayFont = (id) => DISPLAY_FONTS.find((f) => f.id === id) ?? DISPLAY_FONTS[0];
+
+export const FONT_WEIGHTS = [
+  { id: 300, label: 'Leve' },
+  { id: 400, label: 'Normal' },
+  { id: 500, label: 'Médio' },
+  { id: 600, label: 'Seminegrito' },
+  { id: 700, label: 'Negrito' },
+  { id: 800, label: 'Extranegrito' },
+  { id: 900, label: 'Preto' },
+];
+export const TYPE_SIZES = [
+  { id: 0.85, label: 'P' },
+  { id: 1, label: 'M' },
+  { id: 1.15, label: 'G' },
+  { id: 1.3, label: 'GG' },
+  { id: 1.5, label: 'XG' },
+];
+export const LETTER_SPACINGS = [
+  { id: 'normal', label: 'Normal' },
+  { id: 'open', label: 'Aberto' },
+];
+/** Espessura do traço na conversão para preto e branco (limiar de claridade do gerador da imagem). */
+export const INK_LEVELS = [
+  { id: 'thin', label: 'Mais finas', threshold: 115, hint: 'Negrito não embola, mas letras finas podem falhar.' },
+  { id: 'normal', label: 'Normal', threshold: 150, hint: '' },
+  { id: 'bold', label: 'Mais grossas', threshold: 185, hint: 'Letras finas aparecem melhor, mas negrito pequeno pode embolar.' },
+];
+export const inkThreshold = (id) => (INK_LEVELS.find((l) => l.id === id) ?? INK_LEVELS[1]).threshold;
+
+/** Padrão = visual de antes desta opção existir (layouts antigos não mudam). */
+export const DEFAULT_TYPOGRAPHY = {
+  title: { font: 'inter', weight: 800, size: 1, upper: true, spacing: 'normal' },
+  text: { font: 'inter', weight: 400, size: 1, spacing: 'normal' },
+  ink: 'normal',
+};
+
+const pick = (list, v, fallback) => (list.some((x) => x.id === v) ? v : fallback);
+
+/** Letras do layout com valores válidos (dados antigos ou incompletos viram o padrão). */
+export function normalizeTypography(t) {
+  const d = DEFAULT_TYPOGRAPHY;
+  const title = t?.title ?? {};
+  const text = t?.text ?? {};
+  return {
+    title: {
+      font: pick(DISPLAY_FONTS, title.font, d.title.font),
+      weight: pick(FONT_WEIGHTS, Number(title.weight), d.title.weight),
+      size: pick(TYPE_SIZES, Number(title.size), d.title.size),
+      upper: typeof title.upper === 'boolean' ? title.upper : d.title.upper,
+      spacing: pick(LETTER_SPACINGS, title.spacing, d.title.spacing),
+    },
+    text: {
+      font: pick(DISPLAY_FONTS, text.font, d.text.font),
+      weight: pick(FONT_WEIGHTS, Number(text.weight), d.text.weight),
+      size: pick(TYPE_SIZES, Number(text.size), d.text.size),
+      spacing: pick(LETTER_SPACINGS, text.spacing, d.text.spacing),
+    },
+    ink: pick(INK_LEVELS, t?.ink, d.ink),
+  };
+}
+
+const clampWeight = (font, w) => Math.max(font.min, Math.min(font.max, w));
+
+/** Variáveis CSS que o DisplayRender aplica na tela. */
+export function typographyVars(t) {
+  const n = normalizeTypography(t);
+  const tf = displayFont(n.title.font);
+  const xf = displayFont(n.text.font);
+  const textW = clampWeight(xf, n.text.weight);
+  return {
+    '--title-font': tf.css,
+    '--title-weight': String(clampWeight(tf, n.title.weight)),
+    // Rótulos (nome da refeição, dia da semana) um pouco mais fortes que o título, sem passar do máximo.
+    '--label-weight': String(clampWeight(tf, Math.min(900, n.title.weight + 100))),
+    '--title-size': String(n.title.size),
+    '--title-case': n.title.upper ? 'uppercase' : 'none',
+    '--title-spacing': n.title.spacing === 'open' ? (n.title.upper ? '0.12em' : '0.06em') : n.title.upper ? '0.06em' : '0.01em',
+    '--text-font': xf.css,
+    '--text-weight': String(textW),
+    // Destaques do texto (comida, recado): +200 como antes (400 → 600).
+    '--strong-weight': String(clampWeight(xf, Math.min(900, n.text.weight + 200))),
+    '--text-size': String(n.text.size),
+    '--text-spacing': n.text.spacing === 'open' ? '0.03em' : '0',
+  };
+}
+
+/**
+ * Menores letras que vão aparecer na tela (em pixels do aparelho) e avisos de
+ * legibilidade para telas de 1 bit, onde não há meio-tom para suavizar as bordas.
+ * `base` = tamanho base da tela (DisplayRender: menor lado ÷ 30, mín. 10 px).
+ */
+export function typographyCheck(layout) {
+  const { w, h } = screenSize(layout);
+  const base = Math.max(10, Math.round(Math.min(w, h) / 30));
+  const n = normalizeTypography(layout.typography);
+  const scales = (layout.cards ?? []).map((c) => Number(c.fontScale) || 1);
+  const minScale = scales.length ? Math.min(...scales) : 1;
+  const titlePx = Math.round(base * minScale * 0.72 * n.title.size * 10) / 10;
+  // Partes menores do texto (responsável, data, quantidade) usam 0,8 do tamanho.
+  const textPx = Math.round(base * minScale * 0.8 * n.text.size * 10) / 10;
+  const warnings = [];
+  const thick = n.ink === 'bold';
+  if (n.title.weight >= 800 && titlePx < 11 + (thick ? 2 : 0))
+    warnings.push(`Títulos com ${titlePx} px em ${FONT_WEIGHTS.find((x) => x.id === n.title.weight).label.toLowerCase()} podem embolar no aparelho. Use Negrito ou Seminegrito, aumente o tamanho ou deixe o espaço entre letras "Aberto".`);
+  if (n.title.upper && n.title.spacing === 'normal' && n.title.weight >= 700 && titlePx < 10)
+    warnings.push('Títulos em maiúsculas muito pequenos ficam colados: experimente o espaço entre letras "Aberto".');
+  if (n.text.weight >= 600 && textPx < 11 + (thick ? 2 : 0))
+    warnings.push(`O texto em negrito fica com partes de ${textPx} px: as letras podem se juntar. Use Normal ou Médio, ou aumente o tamanho.`);
+  if (n.text.weight <= 300 && n.ink !== 'bold') warnings.push('Peso "Leve" tem traço fino: no preto e branco algumas partes das letras podem sumir. Prefira Normal ou "Mais grossas".');
+  if (textPx < 9) warnings.push(`Há texto com ${textPx} px: pequeno demais para ler de longe numa tela de ${w} × ${h}.`);
+  if (n.text.font === 'source-serif' && textPx < 12) warnings.push('Fonte com serifa em tamanho pequeno perde os detalhes no preto e branco.');
+  return { base, titlePx, textPx, warnings };
+}
+
 export const BORDERS = [
   { id: 'line', label: 'Linha' },
   { id: 'thick', label: 'Grossa' },
@@ -440,6 +566,7 @@ export function newLayout({ name = 'Meu display', modelId = '7in5', orientation 
     screen: { w: model.w, h: model.h },
     orientation: orient,
     colorMode: 'bw',
+    typography: structuredClone(DEFAULT_TYPOGRAPHY),
     grid,
     cards: presetCards(preset, grid),
     createdAt: now,

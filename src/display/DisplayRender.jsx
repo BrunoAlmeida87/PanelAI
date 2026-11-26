@@ -2,7 +2,8 @@
 // Usado no editor (com escala), nas miniaturas e na tela cheia (#/display/tela).
 
 import { Sun, CloudSun, Cloud, CloudFog, CloudDrizzle, CloudRain, CloudRainWind, CloudSnow, CloudLightning, CloudHail, Moon, CloudMoon, Umbrella, Droplets, Wind, Sunrise, Sunset } from 'lucide-preact';
-import { cardType, colorMode, screenSize } from './model.js';
+import { cardType, colorMode, screenSize, typographyVars } from './model.js';
+import './fonts.js';
 import { forecastView, formatMm } from './weather.js';
 import { useForecast } from './useWeather.js';
 import { formatDayMonth, weekdayName, weekdayShort, addDays, weekStartOf, formatWeekRange, parseISODate } from '../utils/dates.js';
@@ -30,7 +31,7 @@ export function cardTitle(card) {
   }
 }
 
-export function DisplayRender({ layout, data, scale = 1, overlay = null, className = '' }) {
+export function DisplayRender({ layout, data, scale = 1, overlay = null, className = '', filter = null }) {
   const { w, h } = screenSize(layout);
   const mode = colorMode(layout.colorMode);
   const g = layout.grid;
@@ -42,7 +43,7 @@ export function DisplayRender({ layout, data, scale = 1, overlay = null, classNa
     padding: `${g.padding}px`,
   };
   return (
-    <div class={`eink-frame ${className}`} style={{ width: `${w * scale}px`, height: `${h * scale}px` }}>
+    <div class={`eink-frame ${className}`} style={{ width: `${w * scale}px`, height: `${h * scale}px`, ...(filter ? { filter } : {}) }}>
       <div
         class={`eink eink-${mode.id}`}
         style={{
@@ -53,6 +54,7 @@ export function DisplayRender({ layout, data, scale = 1, overlay = null, classNa
           '--base': `${base}px`,
           '--accent': mode.accent,
           '--soft': mode.soft,
+          ...typographyVars(layout.typography),
         }}
       >
         {layout.cards.map((card) => (

@@ -1,7 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import {
   CARD_TYPES,
+  DEFAULT_TYPOGRAPHY,
   LAYOUT_PRESETS,
+  inkThreshold,
+  normalizeTypography,
+  typographyCheck,
+  typographyVars,
   clampCard,
   findFreeSpot,
   newLayout,
@@ -188,5 +193,38 @@ describe('display: tarefas feitas somem depois de um tempo', () => {
     expect(d.recentlyDone('24').map((t) => t.id)).toEqual(['lixo']);
     expect(d.recentlyDone('day')).toEqual([]);
     expect(d.overdue()).toEqual([]);
+  });
+});
+
+describe('display: letras (fontes, peso, tamanho)', () => {
+  it('layout antigo sem letras usa o padrão (visual de antes)', () => {
+    expect(normalizeTypography(undefined)).toEqual(DEFAULT_TYPOGRAPHY);
+    const v = typographyVars(undefined);
+    expect(v['--title-weight']).toBe('800');
+    expect(v['--label-weight']).toBe('900');
+    expect(v['--strong-weight']).toBe('600');
+    expect(v['--title-case']).toBe('uppercase');
+    expect(inkThreshold(normalizeTypography(undefined).ink)).toBe(150);
+  });
+
+  it('valores inválidos voltam ao padrão e o peso respeita o que a fonte tem', () => {
+    const t = normalizeTypography({ title: { font: 'comic', weight: 950, size: 7 }, text: { font: 'atkinson', weight: 900 }, ink: 'x' });
+    expect(t.title).toMatchObject({ font: 'inter', weight: 800, size: 1 });
+    expect(t.ink).toBe('normal');
+    // Atkinson vai só até 800.
+    expect(typographyVars(t)['--text-weight']).toBe('800');
+    expect(typographyVars({ text: { font: 'lexend', weight: 300 } })['--text-font']).toContain('Lexend');
+  });
+
+  it('avisa quando negrito fica pequeno demais para a tela de 1 bit', () => {
+    const layout = newLayout({ modelId: '7in5', presetId: 'cozinha' });
+    const ok = typographyCheck(layout);
+    expect(ok.base).toBe(16);
+    expect(ok.warnings).toEqual([]);
+    const small = { ...layout, cards: layout.cards.map((c) => ({ ...c, fontScale: 0.75 })), typography: { title: { weight: 900, size: 0.85 }, text: { weight: 700 } } };
+    const r = typographyCheck(small);
+    expect(r.titlePx).toBeLessThan(9);
+    expect(r.warnings.some((w) => w.startsWith('Títulos com'))).toBe(true);
+    expect(r.warnings.some((w) => w.startsWith('O texto em negrito'))).toBe(true);
   });
 });

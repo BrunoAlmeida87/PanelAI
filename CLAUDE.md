@@ -232,3 +232,13 @@ Publicado em https://brunoalmeida87.github.io/PanelAI/ (GitHub Pages), com dados
   `src/display/data.js`. Cards antigos sem a opção usam 24 h. Some de verdade só na próxima atualização da tela.
 - **Nome da refeição (1.8):** `menuDay.options.labelStyle` = `underline` (padrão: negrito e sublinhado),
   `band` (tarja preta), `divider` (linha entre refeições) ou `plain` (como antes).
+- **Letras do display** (`layout.typography`, opcional; `normalizeTypography`/`typographyVars`/
+  `typographyCheck` em `src/display/model.js`): `title` e `text` com `font` (6 fontes variáveis embutidas,
+  `DISPLAY_FONTS`, importadas em `src/display/fonts.js` — o gerador no GitHub não tem fontes instaladas),
+  `weight` (300–900, limitado ao que a fonte tem), `size`, `spacing` (`normal|open`), `title.upper`; e
+  `ink` (`thin|normal|bold` = limiar 115/150/185 do preto e branco). O padrão reproduz **pixel a pixel**
+  o visual antigo (conferido nos 8 layouts sugeridos): rótulos usam `--title-*`, destaques do texto usam
+  `--text-weight` + 200/250/300. O limiar vai na publicação (`#panelai-publicacao` → `layout.threshold`) e o
+  script usa ele, a não ser que `--limiar` seja passado. No editor: bloco **Letras** (painel "Tela") com
+  avisos de letra pequena/negrito embolando e o botão **Prévia fiel** (escala 1 + filtro SVG com o mesmo
+  limiar; exato com devicePixelRatio 1, aproximado no celular).

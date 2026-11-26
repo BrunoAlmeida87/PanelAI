@@ -5,6 +5,18 @@
   flex: none;
 }
 .eink {
+  /* Letras do layout (Letras, no editor): padrão = visual antigo. Ver typographyVars em model.js. */
+  --title-font: var(--font);
+  --title-weight: 800;
+  --label-weight: 900;
+  --title-size: 1;
+  --title-case: uppercase;
+  --title-spacing: 0.06em;
+  --text-font: var(--font);
+  --text-weight: 400;
+  --strong-weight: 600;
+  --text-size: 1;
+  --text-spacing: 0;
   position: absolute;
   top: 0;
   left: 0;
@@ -13,7 +25,9 @@
   box-sizing: border-box;
   background: #fff;
   color: #000;
-  font-family: var(--font);
+  font-family: var(--text-font);
+  font-weight: var(--text-weight);
+  letter-spacing: var(--text-spacing);
   font-size: var(--base);
   line-height: 1.25;
   -webkit-font-smoothing: antialiased;
@@ -50,10 +64,11 @@
 }
 
 .eink-title {
-  font-size: 0.72em;
-  font-weight: 800;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
+  font-family: var(--title-font);
+  font-size: calc(0.72em * var(--title-size));
+  font-weight: var(--title-weight);
+  letter-spacing: var(--title-spacing);
+  text-transform: var(--title-case);
   padding-bottom: 0.25em;
   margin-bottom: 0.35em;
   border-bottom: 2px solid currentColor;
@@ -74,6 +89,7 @@
   color: #000;
 }
 .eink-body {
+  font-size: calc(1em * var(--text-size));
   flex: 1;
   min-height: 0;
   overflow: hidden;
@@ -90,7 +106,7 @@
   align-content: center;
   white-space: pre-wrap;
   font-size: 1.15em;
-  font-weight: 650;
+  font-weight: min(900, calc(var(--text-weight) + 250));
 }
 
 .eink-clock {
@@ -102,8 +118,9 @@
   align-content: center;
 }
 .eink-clock .date {
+  font-family: var(--title-font);
   font-size: 1.35em;
-  font-weight: 800;
+  font-weight: var(--title-weight);
 }
 .eink-clock .week,
 .eink-clock .time {
@@ -120,14 +137,16 @@
   gap: 0.35em;
 }
 .eink-meals .meal dt {
+  font-family: var(--title-font);
   font-size: 0.68em;
-  font-weight: 800;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
+  font-weight: var(--title-weight);
+  /* Um pouco mais justo que o título do card (como antes: 0,04em). */
+  letter-spacing: calc(var(--title-spacing) - 0.02em);
+  text-transform: var(--title-case);
 }
 .eink-meals .meal dd {
   margin: 0;
-  font-weight: 600;
+  font-weight: var(--strong-weight);
 }
 /* Destaque do nome da refeição (opção "Destaque do nome da refeição" do card). */
 .eink-meals.label-underline,
@@ -139,7 +158,7 @@
 .eink-meals.label-band .meal dt,
 .eink-meals.label-divider .meal dt {
   font-size: 0.78em;
-  font-weight: 900;
+  font-weight: var(--label-weight);
   margin-bottom: 0.12em;
 }
 .eink-meals.label-underline .meal dt span {
@@ -187,9 +206,12 @@
   padding-top: 0.2em;
 }
 .eink-week .day-name {
+  font-family: var(--title-font);
   font-size: 0.72em;
-  font-weight: 800;
-  text-transform: uppercase;
+  font-weight: var(--title-weight);
+  /* Nome do dia: sem espaço extra no padrão (como antes); "Aberto" soma o mesmo que nos títulos. */
+  letter-spacing: calc(var(--title-spacing) - 0.06em);
+  text-transform: var(--title-case);
 }
 .eink-week .day.today .day-name {
   color: var(--accent);
@@ -202,7 +224,7 @@
   margin-top: 0.15em;
 }
 .eink-week .lbl {
-  font-weight: 700;
+  font-weight: min(900, calc(var(--text-weight) + 300));
 }
 
 .eink-list {
@@ -231,6 +253,9 @@
 .eink-list .who,
 .eink-list .from {
   font-size: 0.8em;
+}
+.eink-list strong {
+  font-weight: min(900, calc(var(--text-weight) + 300));
 }
 .eink-list .note {
   font-style: italic;
@@ -268,7 +293,8 @@
   gap: 0.5em;
 }
 .eink-montessori .kid-name {
-  font-weight: 800;
+  font-family: var(--title-font);
+  font-weight: var(--title-weight);
   margin-bottom: 0.2em;
 }
 
@@ -309,7 +335,8 @@
 }
 .w-temp {
   font-size: 2.3em;
-  font-weight: 800;
+  font-family: var(--title-font);
+  font-weight: var(--title-weight);
   line-height: 1;
   letter-spacing: -0.02em;
 }
@@ -418,7 +445,8 @@
   border-left: 1px solid currentColor;
 }
 .w-d-name {
-  font-weight: 800;
+  font-family: var(--title-font);
+  font-weight: var(--title-weight);
   text-transform: uppercase;
   font-size: 0.85em;
 }
@@ -470,6 +498,45 @@
   display: grid;
   justify-items: center;
   overflow: hidden;
+}
+.display-stage.faithful {
+  overflow: auto;
+  justify-items: start;
+}
+.display-stage.faithful .eink-frame {
+  box-shadow: 0 0 0 2px #2b2d2a;
+}
+.type-group {
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  padding: 10px 12px 12px;
+  margin: 0;
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+}
+.type-group > legend {
+  padding: 0 4px;
+}
+.type-check {
+  display: grid;
+  gap: 6px;
+  padding: 10px 12px;
+  border-radius: var(--r-md);
+  background: var(--muted-surface);
+  font-size: var(--fs-sm);
+}
+.type-check.warn {
+  background: var(--amber-light);
+}
+.type-warn {
+  display: flex;
+  gap: 6px;
+  align-items: flex-start;
+}
+.type-warn svg {
+  flex: none;
+  margin-top: 3px;
 }
 .display-stage .eink-frame {
   box-shadow: 0 0 0 8px #2b2d2a, 0 0 0 9px #111, var(--shadow-lg);

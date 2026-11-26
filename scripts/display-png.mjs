@@ -31,7 +31,7 @@
 //   --perfil PASTA  onde guardar o login do navegador no modo 2 (padrão: ~/.panelai-display)
 //   --cinza         tons de cinza (modo 2)
 //   --pb            preto e branco puro, 1 bit (modo 2; no modo 1 é sempre assim)
-//   --limiar N      claridade (0–255) a partir da qual o pixel fica branco no preto e branco (padrão: 150)
+//   --limiar N      claridade (0–255) a partir da qual o pixel fica branco no preto e branco (padrão: a "Espessura no aparelho" do layout, ou 150)
 //   --girar 90      gira a imagem (90, 180 ou 270), para telas montadas de lado (modo 2)
 //   --fuso ZONA     fuso usado até ler o da casa (padrão: America/Sao_Paulo)
 //
@@ -86,6 +86,12 @@ const PORT = args.servir ? Number(args.servir === true ? 8080 : args.servir) : n
 const EVERY_MIN = Number(args['a-cada'] ?? 15);
 const ROTATE = [90, 180, 270].includes(Number(args.girar)) ? Number(args.girar) : 0;
 const THRESHOLD = Math.min(255, Math.max(1, Number(args.limiar ?? 150) || 150));
+/** Limiar da imagem: --limiar manda; senão a "Espessura no aparelho" do layout (Letras); senão 150. */
+const thresholdFor = (info) => {
+  if (args.limiar != null) return THRESHOLD;
+  const t = Number(info?.layout?.threshold);
+  return Number.isFinite(t) && t >= 1 && t <= 255 ? t : THRESHOLD;
+};
 const MODE = args.pb ? 'bw' : args.cinza ? 'gray' : 'color';
 const START_TZ = String(args.fuso ?? process.env.PANELAI_FUSO ?? DEFAULT_TIMEZONE);
 
@@ -309,7 +315,7 @@ async function publish(outRoot) {
     const moment = Math.floor(refMs / 1000);
     info = await readScreenInfo(page, screenUrl({ publish: true, moment }), moment * 1000);
 
-    const png = await toOneBit(context, await shoot(page), THRESHOLD);
+    const png = await toOneBit(context, await shoot(page), thresholdFor(info));
     const size = pngSize(png);
     if (size.width !== info.layout.width || size.height !== info.layout.height) {
       throw new UserError(`imagem com tamanho inesperado: ${size.width}×${size.height} (layout ${info.layout.width}×${info.layout.height}).`);
@@ -327,7 +333,7 @@ async function publish(outRoot) {
         let slotPng = png;
         if (sec !== moment) {
           await readScreenInfo(page, screenUrl({ publish: true, moment: sec }), sec * 1000);
-          slotPng = await toOneBit(context, await shoot(page), THRESHOLD);
+          slotPng = await toOneBit(context, await shoot(page), thresholdFor(info));
         }
         await writeAtomic(path.join(dir, slotImageFile(sec)), slotPng);
         slots++;
