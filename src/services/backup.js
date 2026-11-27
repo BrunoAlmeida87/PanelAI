@@ -1,6 +1,6 @@
 // Exportação e importação de dados em JSON, com validação antes de qualquer gravação.
 
-import { CATEGORY_IDS, MARMITA_STATUS, MEAL_SLOT_IDS } from '../models/constants.js';
+import { CATEGORY_IDS, MARMITA_STATUS, MEAL_SLOT_IDS, sanitizeCustomCategories } from '../models/constants.js';
 import { validateRecipe } from '../models/recipe.js';
 import { isUnit } from '../models/units.js';
 import { isValidISODate, weekStartOf } from '../utils/dates.js';
@@ -79,13 +79,15 @@ export function validateBackup(raw) {
   }
 
   const ingredients = {};
+  // Categorias criadas pela casa (vêm nas configurações do próprio backup).
+  const customIds = new Set(sanitizeCustomCategories(d.settings?.customCategories).map((c) => c.id));
   d.ingredients.forEach((ing, idx) => {
     if (!isObj(ing) || !isStr(ing.id) || !isStr(ing.name)) {
       errors.push(`Ingrediente #${idx + 1}: id e nome são obrigatórios.`);
       return;
     }
     if (!isUnit(ing.baseUnit)) errors.push(`Ingrediente "${ing.name}": unidade-base inválida.`);
-    if (!CATEGORY_IDS.includes(ing.category)) errors.push(`Ingrediente "${ing.name}": categoria inválida.`);
+    if (!CATEGORY_IDS.includes(ing.category) && !customIds.has(ing.category)) errors.push(`Ingrediente "${ing.name}": categoria inválida.`);
     if (ingredients[ing.id]) errors.push(`Ingrediente duplicado: ${ing.id}.`);
     ingredients[ing.id] = { flags: [], ...ing };
   });

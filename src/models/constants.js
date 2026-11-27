@@ -35,8 +35,43 @@ export const CATEGORIES = [
   { id: 'outros', label: 'Outros', color: '#A3A6A2' },
 ];
 export const CATEGORY_IDS = CATEGORIES.map((c) => c.id);
-export const categoryLabel = (id) => CATEGORIES.find((c) => c.id === id)?.label ?? 'Outros';
-export const categoryColor = (id) => CATEGORIES.find((c) => c.id === id)?.color ?? '#A3A6A2';
+
+// ---------- Categorias criadas pela casa (settings.customCategories) ----------
+// Ficam nas configurações (nuvem + backup). O store chama setCustomCategories sempre que
+// as configurações mudam; daí em diante allCategories/categoryLabel/categoryColor/isCategory
+// valem em todo o app (lista de compras, estoque, receitas, texto do WhatsApp).
+export const CUSTOM_CATEGORY_COLORS = ['#C9A27E', '#8FA9C9', '#B7C27F', '#D69AA8', '#9FC3B0', '#C4B08C', '#A89BC9', '#D1A36A'];
+let customCategories = [];
+
+/** Limpa a lista salva: id começando com "c-", nome até 30 letras, sem repetir. */
+export function sanitizeCustomCategories(list) {
+  const out = [];
+  const seen = new Set(CATEGORY_IDS);
+  for (const c of Array.isArray(list) ? list : []) {
+    const id = typeof c?.id === 'string' ? c.id : '';
+    const label = typeof c?.label === 'string' ? c.label.replace(/\s+/g, ' ').trim().slice(0, 30) : '';
+    if (!/^c-[a-z0-9-]{1,40}$/.test(id) || !label || seen.has(id)) continue;
+    seen.add(id);
+    const color = typeof c.color === 'string' && /^#[0-9a-f]{6}$/i.test(c.color) ? c.color : CUSTOM_CATEGORY_COLORS[out.length % CUSTOM_CATEGORY_COLORS.length];
+    out.push({ id, label, color, custom: true });
+  }
+  return out;
+}
+export function setCustomCategories(list) {
+  customCategories = sanitizeCustomCategories(list);
+}
+/** Fixas + criadas pela casa; "Outros" sempre no fim. */
+export function allCategories() {
+  const fixed = CATEGORIES.filter((c) => c.id !== 'outros');
+  return [...fixed, ...customCategories, CATEGORIES.find((c) => c.id === 'outros')];
+}
+export const isCategory = (id) => CATEGORY_IDS.includes(id) || customCategories.some((c) => c.id === id);
+export const categoryOrder = (id) => {
+  const i = allCategories().findIndex((c) => c.id === id);
+  return i === -1 ? 999 : i;
+};
+export const categoryLabel = (id) => allCategories().find((c) => c.id === id)?.label ?? 'Outros';
+export const categoryColor = (id) => allCategories().find((c) => c.id === id)?.color ?? '#A3A6A2';
 
 export const SPEEDS = [
   { id: 'ultrarrapida', label: 'Ultrarrápida', max: 15 },
@@ -107,6 +142,8 @@ export const MOVEMENT_TYPES = {
 
 export const DEFAULT_SETTINGS = {
   people: 2,
+  // Categorias de produto criadas pela casa (Mercado do mês → Estoque): [{ id: 'c-…', label, color }].
+  customCategories: [],
   // Dias da semana em que a família costuma ir ao mercado (0 = domingo).
   marketDays: [0, 3],
   // Lista de compras: true = gerada pelo cardápio (ingredientes das receitas);

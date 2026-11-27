@@ -4,7 +4,7 @@ import { useMemo, useRef, useState } from 'preact/hooks';
 import { ArrowLeft, ImagePlus, Plus, Save, Trash2, X } from 'lucide-preact';
 import { useStore } from '../storage/store.js';
 import { saveRecipe, saveIngredient } from '../storage/actions.js';
-import { CATEGORIES, COMPOSITION, DIFFICULTIES, PROTEINS } from '../models/constants.js';
+import { COMPOSITION, DIFFICULTIES, PROTEINS, allCategories } from '../models/constants.js';
 import { emptyRecipe, validateRecipe } from '../models/recipe.js';
 import { compatibleUnits, formatNumber, parseQty, UNITS, UNIT_IDS } from '../models/units.js';
 import { normalizeText, uid } from '../utils/id.js';
@@ -449,7 +449,7 @@ function NewIngredientModal({ name: initial, onClose, onCreated }) {
         <label class="field">
           <span class="label">Categoria (na lista de compras)</span>
           <select class="select" value={category} onChange={(e) => setCategory(e.currentTarget.value)}>
-            {CATEGORIES.map((c) => (
+            {allCategories().map((c) => (
               <option key={c.id} value={c.id}>{c.label}</option>
             ))}
           </select>

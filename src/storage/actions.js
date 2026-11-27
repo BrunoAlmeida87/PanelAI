@@ -13,10 +13,10 @@ import {
   updateEntry,
   findEntry,
 } from '../services/planning.js';
-import { applyStockDelta, newPantryItem, setStock } from '../services/pantry.js';
+import { addCustomCategory, applyStockDelta, newPantryItem, setStock } from '../services/pantry.js';
 import { buildBackup } from '../services/backup.js';
 import { hiddenItem, mealTagFields, mealTextKey, mergeMealTexts, rememberedItem } from '../services/mealTexts.js';
-import { DEFAULT_SETTINGS } from '../models/constants.js';
+import { CUSTOM_CATEGORY_COLORS, DEFAULT_SETTINGS, allCategories, sanitizeCustomCategories } from '../models/constants.js';
 import { convert } from '../models/units.js';
 import { addDays, todayISO } from '../utils/dates.js';
 import { normalizeText, uid, uniqueSlug } from '../utils/id.js';
@@ -407,6 +407,75 @@ export function quickAddPantryProduct({ name, qty, category }) {
   }
   savePantryItem(newPantryItem(ing, { qty: qty ?? 1 }), { recordMovement: false });
   return { ing, created, existed: false, qty: qty ?? 1 };
+}
+
+// ---------- Categorias criadas pela casa ----------
+
+/** Cria uma categoria de produto. Devolve { category } ou { error }. */
+export function createCategory(label) {
+  const s = getState();
+  const current = sanitizeCustomCategories(s.settings.customCategories);
+  const r = addCustomCategory(current, label, allCategories(), CUSTOM_CATEGORY_COLORS);
+  if (r.error) return r;
+  updateSettings({ customCategories: r.list.map(({ id, label: l, color }) => ({ id, label: l, color })) });
+  return { category: r.category };
+}
+
+export function renameCategory(id, label) {
+  const s = getState();
+  const name = String(label ?? '').replace(/\s+/g, ' ').trim().slice(0, 30);
+  if (!name) return { error: 'Escreva o nome da categoria.' };
+  const dup = allCategories().find((c) => c.id !== id && normalizeText(c.label) === normalizeText(name));
+  if (dup) return { error: `Já existe a categoria "${dup.label}".` };
+  const list = sanitizeCustomCategories(s.settings.customCategories).map(({ id: cid, label: l, color }) => ({ id: cid, label: cid === id ? name : l, color }));
+  updateSettings({ customCategories: list });
+  return {};
+}
+
+/**
+ * Apaga uma categoria criada pela casa. Os produtos dela vão para "Outros"
+ * (nada some do estoque nem das receitas). Devolve o que precisa para desfazer.
+ */
+export function deleteCategory(id) {
+  const s = getState();
+  const before = { customCategories: s.settings.customCategories, moved: [] };
+  const ops = [];
+  const ingredients = { ...s.ingredients };
+  for (const ing of Object.values(s.ingredients)) {
+    if (ing.category !== id) continue;
+    before.moved.push(ing.id);
+    ingredients[ing.id] = { ...ing, category: 'outros' };
+    ops.push({ store: 'ingredients', type: 'put', value: ingredients[ing.id] });
+  }
+  if (ops.length) {
+    setState({ ingredients });
+    persist(ops);
+  }
+  updateSettings({ customCategories: (s.settings.customCategories ?? []).filter((c) => c.id !== id) });
+  return before;
+}
+
+export function undoDeleteCategory(id, before) {
+  updateSettings({ customCategories: before.customCategories });
+  const s = getState();
+  const ingredients = { ...s.ingredients };
+  const ops = [];
+  for (const ingId of before.moved) {
+    if (!ingredients[ingId]) continue;
+    ingredients[ingId] = { ...ingredients[ingId], category: id };
+    ops.push({ store: 'ingredients', type: 'put', value: ingredients[ingId] });
+  }
+  if (ops.length) {
+    setState({ ingredients });
+    persist(ops);
+  }
+}
+
+/** Muda a categoria de um produto (ex.: levar para uma categoria nova). */
+export function setIngredientCategory(ingredientId, category) {
+  const ing = getState().ingredients[ingredientId];
+  if (!ing || ing.category === category) return;
+  saveIngredient({ ...ing, category });
 }
 
 export function deletePantryItem(ingredientId) {

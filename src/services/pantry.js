@@ -1,7 +1,7 @@
 // Estoque (despensa): leitura em unidade-base, movimentações e reposição.
 
 import { convert, roundForPurchase, factorToBase } from '../models/units.js';
-import { uid } from '../utils/id.js';
+import { normalizeText, uid } from '../utils/id.js';
 
 export function newPantryItem(ingredient, extra = {}) {
   return {
@@ -153,4 +153,23 @@ export function pantryBoard(pantry, ingredients, categories) {
     ...c,
     items: (groups.get(c.id) ?? []).sort((a, b) => a.ing.name.localeCompare(b.ing.name, 'pt-BR')),
   }));
+}
+
+/**
+ * Nova categoria criada pela casa. Devolve { list, category } ou { error }.
+ * Nome repetido (sem ligar para acento/maiúscula), inclusive de categoria fixa, não vale.
+ */
+export function addCustomCategory(list, label, existingAll, colors) {
+  const name = String(label ?? '').replace(/\s+/g, ' ').trim().slice(0, 30);
+  if (!name) return { error: 'Escreva o nome da categoria.' };
+  const dup = existingAll.find((c) => normalizeText(c.label) === normalizeText(name));
+  if (dup) return { error: `Já existe a categoria "${dup.label}".` };
+  const base = `c-${normalizeText(name).replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'categoria'}`.slice(0, 36);
+  const ids = new Set(existingAll.map((c) => c.id));
+  let id = base;
+  for (let i = 2; ids.has(id); i++) id = `${base}-${i}`;
+  const used = new Set((list ?? []).map((c) => c.color));
+  const color = colors.find((c) => !used.has(c)) ?? colors[(list ?? []).length % colors.length];
+  const category = { id, label: name, color };
+  return { list: [...(list ?? []), category], category };
 }

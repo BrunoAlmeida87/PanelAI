@@ -238,6 +238,39 @@ async function flows(browser, label, opts) {
     return 'Limpeza: "Sabão de coco E2E 3" adicionado com 3 e salvo';
   });
 
+  await step(`[${label}] 9c. estoque: criar, usar e apagar categoria`, async () => {
+    await page.goto(`${BASE}#/despensa/estoque`);
+    await page.getByRole('button', { name: 'Nova categoria' }).click();
+    await page.getByRole('dialog').getByLabel('Nome da categoria').fill('Pet E2E');
+    await page.getByRole('dialog').getByRole('button', { name: 'Criar categoria' }).click();
+    const col = page.getByRole('region', { name: 'Pet E2E' });
+    await col.waitFor();
+    // Nome repetido é recusado.
+    await page.getByRole('button', { name: 'Nova categoria' }).click();
+    await page.getByRole('dialog').getByLabel('Nome da categoria').fill('pet e2e');
+    await page.getByRole('dialog').getByRole('button', { name: 'Criar categoria' }).click();
+    await page.getByRole('dialog').getByRole('alert').filter({ hasText: 'Já existe' }).waitFor();
+    await page.getByRole('dialog').getByRole('button', { name: 'Cancelar' }).click();
+    // Produto na categoria nova, salvo depois de recarregar.
+    await col.getByLabel('Adicionar produto em Pet E2E').fill('Ração E2E 2');
+    await col.getByRole('button', { name: 'Adicionar em Pet E2E' }).click();
+    await page.getByText('Ração E2E adicionado').waitFor();
+    await page.reload();
+    await page.getByRole('region', { name: 'Pet E2E' }).getByRole('button', { name: 'Opções de Ração E2E' }).waitFor();
+    await shot('estoque-categoria-nova');
+    // Apagar: o produto vai para Outros; Desfazer traz de volta.
+    await page.getByRole('button', { name: 'Apagar categoria Pet E2E' }).click();
+    await page.getByRole('dialog').getByRole('button', { name: 'Apagar categoria' }).click();
+    await page.getByRole('region', { name: 'Outros' }).getByRole('button', { name: 'Opções de Ração E2E' }).waitFor();
+    await page.getByRole('button', { name: 'Desfazer' }).last().click();
+    await page.getByRole('region', { name: 'Pet E2E' }).getByRole('button', { name: 'Opções de Ração E2E' }).waitFor();
+    // Limpa para os próximos testes.
+    await page.getByRole('button', { name: 'Apagar categoria Pet E2E' }).click();
+    await page.getByRole('dialog').getByRole('button', { name: 'Apagar categoria' }).click();
+    await page.getByRole('region', { name: 'Pet E2E' }).waitFor({ state: 'detached' });
+    return 'criada, nome repetido recusado, produto salvo nela, apagada (produto foi para Outros) e desfeita';
+  });
+
   await step(`[${label}] 10. contagem da despensa`, async () => {
     await page.goto(`${BASE}#/despensa/contagem`);
     await page.getByRole('textbox', { name: /Quantidade contada de Sal/ }).fill('0,8');

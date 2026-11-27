@@ -190,6 +190,14 @@ Publicado em https://brunoalmeida87.github.io/PanelAI/ (GitHub Pages), com dados
   `quickAddPantryProduct` (reaproveita produto do catálogo pelo nome; novo vai com unidade `un`; grava em
   `ingredients` + `pantry`, ou seja, no banco). Categorias vazias ficam recolhidas. Mínimo, unidade e
   remover continuam no modal (toque no nome). A busca/filtros e a tabela antiga saíram.
+- **Categorias de produto criadas pela casa** (`settings.customCategories = [{ id: 'c-…', label, color }]`;
+  vai junto com as configurações para a nuvem e o backup). `constants.js` guarda a lista em memória
+  (`setCustomCategories`, chamado pelo `setState` do store quando `settings` muda) e expõe `allCategories()`
+  (fixas + criadas, "Outros" no fim), `isCategory`, `categoryOrder`, `categoryLabel`, `categoryColor` — use
+  essas, não `CATEGORIES`/`CATEGORY_IDS`, em telas e listas. Backup aceita produto de categoria criada se
+  ela está nas configurações do próprio backup. Estoque: "Nova categoria" (`createCategory`), lápis
+  (`renameCategory`) e lixeira (`deleteCategory`: produtos vão para "Outros", com Desfazer); modal do
+  produto ganhou "Categoria" (`setIngredientCategory`). Categoria criada aparece sempre, mesmo vazia.
 
 ## Montessori (decisões já tomadas)
 

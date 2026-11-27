@@ -8,7 +8,7 @@
 
 import { useEffect, useReducer, useRef } from 'preact/hooks';
 import { DEMO_DB_NAME, initDB, loadAll, writeBatch } from './db.js';
-import { DEFAULT_SETTINGS } from '../models/constants.js';
+import { DEFAULT_SETTINGS, setCustomCategories } from '../models/constants.js';
 import { cloudConfigured } from '../cloud/firebase-config.js';
 
 const listeners = new Set();
@@ -58,7 +58,10 @@ let state = {
 export const getState = () => state;
 
 export function setState(patch) {
+  const prevSettings = state.settings;
   state = { ...state, ...(typeof patch === 'function' ? patch(state) : patch) };
+  // Categorias criadas pela casa valem para as funções de categoria de todo o app.
+  if (state.settings !== prevSettings) setCustomCategories(state.settings?.customCategories);
   for (const l of listeners) l(state);
 }
 

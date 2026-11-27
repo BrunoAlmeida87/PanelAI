@@ -13,6 +13,8 @@ import {
   ShoppingBasket,
   Trash2,
   Repeat,
+  Pencil,
+  FolderPlus,
 } from 'lucide-preact';
 import { useStore } from '../storage/store.js';
 import {
@@ -27,8 +29,13 @@ import {
   finalizeMonthly,
   resetMonthly,
   quickAddPantryProduct,
+  createCategory,
+  renameCategory,
+  deleteCategory,
+  undoDeleteCategory,
+  setIngredientCategory,
 } from '../storage/actions.js';
-import { CATEGORIES, categoryLabel } from '../models/constants.js';
+import { allCategories, categoryLabel } from '../models/constants.js';
 import { compatibleUnits, convert, formatNumber, formatQty, parseQty, unitLabel, UNITS } from '../models/units.js';
 import { isBelowMin, monthlyList, newPantryItem, pantryBoard, parseQuickProduct } from '../services/pantry.js';
 import { monthlyToText, whatsappUrl, copyText } from '../services/share.js';
@@ -84,23 +91,44 @@ export function PantryPage({ tab, weekId }) {
 
 function StockView({ onEdit }) {
   const s = useStore();
-  const board = useMemo(() => pantryBoard(s.pantry, s.ingredients, CATEGORIES), [s.pantry, s.ingredients]);
+  // Sem memo: lê s.settings (categorias criadas) para redesenhar quando elas mudam; é barato.
+  void s.settings;
+  const board = pantryBoard(s.pantry, s.ingredients, allCategories());
   const total = board.reduce((n, c) => n + c.items.length, 0);
-  // Categorias vazias ficam recolhidas no fim, para o quadro mostrar primeiro o que existe.
+  // Categorias fixas vazias ficam recolhidas no fim; as criadas pela casa aparecem sempre.
   const [showEmpty, setShowEmpty] = useState(false);
-  const filled = board.filter((c) => c.items.length);
-  const empty = board.filter((c) => !c.items.length);
+  const [catModal, setCatModal] = useState(null); // { id?, label }
+  const filled = board.filter((c) => c.items.length || c.custom);
+  const empty = board.filter((c) => !c.items.length && !c.custom);
+  const removeCat = async (cat) => {
+    const n = cat.items.length;
+    const ok = await confirmDialog({
+      title: `Apagar a categoria "${cat.label}"?`,
+      message: n ? `${n === 1 ? 'O produto dela vai' : `Os ${n} produtos dela vão`} para "Outros". Nada some do estoque.` : 'Ela está vazia.',
+      confirmLabel: 'Apagar categoria',
+      danger: true,
+    });
+    if (!ok) return;
+    const before = deleteCategory(cat.id);
+    toast(`Categoria "${cat.label}" apagada`, { action: { label: 'Desfazer', onClick: () => undoDeleteCategory(cat.id, before) } });
+  };
   return (
     <>
-      <p class="small muted" style="margin:0 0 12px">
-        {total} {total === 1 ? 'produto' : 'produtos'}. Toque no nome para mais opções (mínimo, unidade, remover). Para adicionar, escreva na categoria, ex.: "Leite 6".
-      </p>
+      <div class="stock-head">
+        <p class="small muted" style="margin:0">
+          {total} {total === 1 ? 'produto' : 'produtos'}. Toque no nome para mais opções (categoria, mínimo, unidade, remover). Para adicionar, escreva na categoria, ex.: "Leite 6".
+        </p>
+        <button type="button" class="btn btn-secondary btn-sm" onClick={() => setCatModal({ label: '' })}>
+          <FolderPlus size={16} /> Nova categoria
+        </button>
+      </div>
       <div class="stock-board">
         {filled.map((c) => (
-          <StockColumn key={c.id} cat={c} onEdit={onEdit} />
+          <StockColumn key={c.id} cat={c} onEdit={onEdit} onRename={() => setCatModal({ id: c.id, label: c.label })} onRemove={() => removeCat(c)} />
         ))}
         {showEmpty && empty.map((c) => <StockColumn key={c.id} cat={c} onEdit={onEdit} />)}
       </div>
+      {catModal && <CategoryModal initial={catModal} onClose={() => setCatModal(null)} />}
       {empty.length > 0 && (
         <button type="button" class="btn btn-ghost btn-sm stock-empty-toggle" onClick={() => setShowEmpty((v) => !v)}>
           {showEmpty ? 'Esconder categorias vazias' : `Mostrar categorias vazias (${empty.map((c) => c.label).join(', ')})`}
@@ -110,7 +138,51 @@ function StockView({ onEdit }) {
   );
 }
 
-function StockColumn({ cat, onEdit }) {
+/** Criar ou renomear uma categoria da casa. */
+function CategoryModal({ initial, onClose }) {
+  const [label, setLabel] = useState(initial.label ?? '');
+  const [error, setError] = useState('');
+  const save = (e) => {
+    e?.preventDefault();
+    const r = initial.id ? renameCategory(initial.id, label) : createCategory(label);
+    if (r.error) return setError(r.error);
+    toast(initial.id ? 'Categoria renomeada' : `Categoria "${label.trim()}" criada`);
+    onClose();
+  };
+  return (
+    <Modal
+      open
+      onClose={onClose}
+      title={initial.id ? 'Renomear categoria' : 'Nova categoria'}
+      subtitle={initial.id ? '' : 'Aparece no estoque, na lista de compras e nas receitas.'}
+      footer={
+        <>
+          <button type="button" class="btn btn-secondary" onClick={onClose}>Cancelar</button>
+          <button type="button" class="btn btn-primary" onClick={save}>{initial.id ? 'Salvar' : 'Criar categoria'}</button>
+        </>
+      }
+    >
+      <form onSubmit={save} class="field">
+        <span class="label">Nome</span>
+        <input
+          class="input"
+          value={label}
+          maxLength={30}
+          placeholder="Ex.: Bebê, Pet, Festa"
+          aria-label="Nome da categoria"
+          onInput={(e) => {
+            setLabel(e.currentTarget.value);
+            setError('');
+          }}
+          autoFocus
+        />
+        {error && <p class="form-error" role="alert">{error}</p>}
+      </form>
+    </Modal>
+  );
+}
+
+function StockColumn({ cat, onEdit, onRename, onRemove }) {
   const [text, setText] = useState('');
   const add = (e) => {
     e.preventDefault();
@@ -128,6 +200,16 @@ function StockColumn({ cat, onEdit }) {
       <h2 class="stock-col-title">
         <i class="dot" style={`background:${cat.color}`} /> {cat.label}
         <span class="muted">{cat.items.length || ''}</span>
+        {cat.custom && onRename && (
+          <span class="stock-col-actions">
+            <button type="button" class="icon-btn sm" aria-label={`Renomear categoria ${cat.label}`} title="Renomear" onClick={onRename}>
+              <Pencil size={15} />
+            </button>
+            <button type="button" class="icon-btn sm" aria-label={`Apagar categoria ${cat.label}`} title="Apagar categoria" onClick={onRemove}>
+              <Trash2 size={15} />
+            </button>
+          </span>
+        )}
       </h2>
       <ul class="stock-col-list">
         {cat.items.map(({ p, ing }) => (
@@ -233,7 +315,7 @@ function CountView() {
       if (!map.has(ing.category)) map.set(ing.category, []);
       map.get(ing.category).push({ p, ing });
     }
-    return CATEGORIES.filter((c) => map.has(c.id)).map((c) => ({
+    return allCategories().filter((c) => map.has(c.id)).map((c) => ({
       cat: c,
       items: map.get(c.id).sort((a, b) => a.ing.name.localeCompare(b.ing.name, 'pt-BR')),
     }));
@@ -379,7 +461,7 @@ function MarketView({ weekId, onEdit }) {
       if (!map.has(i.category)) map.set(i.category, []);
       map.get(i.category).push(i);
     }
-    return CATEGORIES.filter((c) => map.has(c.id)).map((c) => ({ cat: c, items: map.get(c.id) }));
+    return allCategories().filter((c) => map.has(c.id)).map((c) => ({ cat: c, items: map.get(c.id) }));
   };
 
   const text = () => monthlyToText(needed.filter((i) => i.suggested > 0));
@@ -606,7 +688,7 @@ function ProductModal({ ingredientId, monthlyDefault, onClose }) {
             <span class="label">Produto</span>
             <select class="select" value={pick} onChange={(e) => setPick(e.currentTarget.value)}>
               <option value="">Escolha…</option>
-              {CATEGORIES.map((c) => {
+              {allCategories().map((c) => {
                 const opts = available.filter((i) => i.category === c.id);
                 if (!opts.length) return null;
                 return (
@@ -629,7 +711,7 @@ function ProductModal({ ingredientId, monthlyDefault, onClose }) {
             <label class="field">
               <span class="label">Categoria</span>
               <select class="select" value={newCat} onChange={(e) => setNewCat(e.currentTarget.value)}>
-                {CATEGORIES.map((c) => (
+                {allCategories().map((c) => (
                   <option key={c.id} value={c.id}>{c.label}</option>
                 ))}
               </select>
@@ -643,6 +725,23 @@ function ProductModal({ ingredientId, monthlyDefault, onClose }) {
               </select>
             </label>
           </>
+        )}
+        {existing && ing && (
+          <label class="field span-all">
+            <span class="label">Categoria</span>
+            <select
+              class="select"
+              value={ing.category}
+              onChange={(e) => {
+                setIngredientCategory(ing.id, e.currentTarget.value);
+                toast(`${ing.name} agora em ${categoryLabel(e.currentTarget.value)}`);
+              }}
+            >
+              {allCategories().map((c) => (
+                <option key={c.id} value={c.id}>{c.label}</option>
+              ))}
+            </select>
+          </label>
         )}
         {(ing || mode === 'new') && (
           <>

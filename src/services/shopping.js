@@ -10,7 +10,7 @@
 //   a lista tem só o que a pessoa escreveu (avulsos), cada um no dia escolhido
 //   (qualquer dia da semana, não só os dias de mercado).
 
-import { CATEGORY_IDS } from '../models/constants.js';
+import { categoryOrder, isCategory } from '../models/constants.js';
 import { convert, roundForPurchase } from '../models/units.js';
 import { addDays, weekdayIndex } from '../utils/dates.js';
 import { stockInBase } from './pantry.js';
@@ -99,7 +99,7 @@ export function buildShoppingList({ weekId, week, demand, pantry, ingredientsByI
         key,
         ingredientId: ing.id,
         name: ing.name,
-        category: CATEGORY_IDS.includes(ing.category) ? ing.category : 'outros',
+        category: isCategory(ing.category) ? ing.category : 'outros',
         unit,
         need,
         stock,
@@ -169,10 +169,7 @@ export function groupByMarketAndCategory(list) {
   for (const t of list.toCheck) if (t.missing) push(t.marketDate, { type: 'check', ...t });
   for (const e of list.extras) push(e.marketDate, { type: 'extra', key: e.id, ...e });
 
-  const order = (cat) => {
-    const idx = CATEGORY_IDS.indexOf(cat);
-    return idx === -1 ? 999 : idx;
-  };
+  const order = categoryOrder;
   return [...groups.entries()]
     .sort(([a], [b]) => (a === 'semana' ? 1 : b === 'semana' ? -1 : a.localeCompare(b)))
     .map(([marketDate, cats]) => ({
