@@ -231,7 +231,8 @@ async function flows(browser, label, opts) {
     assert(q === '3', `quantidade = ${q}`);
     // Sem unidade ao lado da quantidade.
     assert(!(await col.locator('.stepper .unit').count()), 'mostra unidade');
-    // Fica salvo: recarrega a página e continua lá.
+    // Fica salvo: espera o "Salvo" (gravação no aparelho termina) e recarrega a página.
+    await page.locator('.save-indicator.saved').waitFor({ state: 'attached' });
     await page.reload();
     await page.getByRole('region', { name: 'Limpeza' }).getByRole('button', { name: 'Opções de Sabão de coco E2E' }).waitFor();
     await shot('estoque-quadro');
@@ -255,6 +256,7 @@ async function flows(browser, label, opts) {
     await col.getByLabel('Adicionar produto em Pet E2E').fill('Ração E2E 2');
     await col.getByRole('button', { name: 'Adicionar em Pet E2E' }).click();
     await page.getByText('Ração E2E adicionado').waitFor();
+    await page.locator('.save-indicator.saved').waitFor({ state: 'attached' });
     await page.reload();
     await page.getByRole('region', { name: 'Pet E2E' }).getByRole('button', { name: 'Opções de Ração E2E' }).waitFor();
     await shot('estoque-categoria-nova');

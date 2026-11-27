@@ -192,7 +192,11 @@ await step('publica tela.png, as imagens de cada horário (1 bit, 800 × 480) e 
   for (let i = 1; i < cfg.proximas.length; i++) assert(cfg.proximas[i] > cfg.proximas[i - 1], 'próximas em ordem');
   // Pedido de "Atualizar a tela agora" e conferência a cada 15 min, das 6h às 23h.
   assert(cfg.pedido === Math.floor(REQUESTED / 1000), `pedido: ${cfg.pedido}`);
-  assert(cfg.conferir_cada === 900 && cfg.conferir.length === 16 && cfg.conferir[1] - cfg.conferir[0] <= 17 * 3600, 'janelas de conferência');
+  // 8 dias de janelas (6h–23h); depois das 23h a de hoje já passou e ficam 7 (14 números).
+  assert(
+    cfg.conferir_cada === 900 && [14, 16].includes(cfg.conferir.length) && cfg.conferir[1] - cfg.conferir[0] <= 17 * 3600,
+    `janelas de conferência (${cfg.conferir.length})`,
+  );
   // Uma imagem pronta para cada horário, no mesmo formato.
   const files = (await readdir(dir)).sort();
   const expected = ['config.json', 'tela.png', ...cfg.proximas.map(slotImageFile)].sort();
