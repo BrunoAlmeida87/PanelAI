@@ -184,6 +184,13 @@ Publicado em https://brunoalmeida87.github.io/PanelAI/ (GitHub Pages), com dados
   feijão, lentilha, grão-de-bico), `massa`. Batata/mandioca contam como Carboidrato; tomate como Legumes e
   verduras (uso na cozinha). Barras do equilíbrio usam `subgrid` para o nome maior caber numa linha.
 
+- **Estoque simples** (aba Estoque do Mercado do mês, 27/11/2026, pedido do dono): quadro com uma coluna por
+  categoria (`pantryBoard`, CSS `columns`), produto + quantidade **sem unidade** (stepper `bare`), campo
+  "Adicionar…" em cada categoria (`parseQuickProduct`: "Leite 6", "6 leite", "2x pão"; sem número = 1) →
+  `quickAddPantryProduct` (reaproveita produto do catálogo pelo nome; novo vai com unidade `un`; grava em
+  `ingredients` + `pantry`, ou seja, no banco). Categorias vazias ficam recolhidas. Mínimo, unidade e
+  remover continuam no modal (toque no nome). A busca/filtros e a tabela antiga saíram.
+
 ## Montessori (decisões já tomadas)
 
 - **Livro de referência** (Maria Stampfer, *Montessori – O guia para bebês e crianças de 0 a 3 anos*,

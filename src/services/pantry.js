@@ -121,3 +121,36 @@ export function monthlyList({ pantry, ingredientsById, demand }) {
   }
   return out.sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'));
 }
+
+// ---------- Estoque simples (quadro por categoria) ----------
+
+/**
+ * Texto do campo "Adicionar" do quadro: "Leite 6", "6 leite", "Arroz" (sem número = 1).
+ * Devolve { name, qty } ou null se não tem nome.
+ */
+export function parseQuickProduct(text) {
+  const t = String(text ?? '').replace(/\s+/g, ' ').trim();
+  if (!t) return null;
+  const num = '(\\d+(?:[.,]\\d+)?)';
+  let m = t.match(new RegExp(`^(.*\\S)\\s+${num}$`));
+  if (m) return { name: m[1].trim().slice(0, 80), qty: Number(m[2].replace(',', '.')) };
+  m = t.match(new RegExp(`^${num}\\s*x?\\s+(.+)$`, 'i'));
+  if (m) return { name: m[2].trim().slice(0, 80), qty: Number(m[1].replace(',', '.')) };
+  return { name: t.slice(0, 80), qty: null };
+}
+
+/** Produtos da despensa agrupados nas categorias, na ordem de CATEGORIES (vazias também). */
+export function pantryBoard(pantry, ingredients, categories) {
+  const known = new Set(categories.map((c) => c.id));
+  const groups = new Map(categories.map((c) => [c.id, []]));
+  for (const p of Object.values(pantry ?? {})) {
+    const ing = ingredients?.[p.ingredientId];
+    if (!ing) continue;
+    const cat = known.has(ing.category) ? ing.category : 'outros';
+    (groups.get(cat) ?? groups.get('outros'))?.push({ p, ing });
+  }
+  return categories.map((c) => ({
+    ...c,
+    items: (groups.get(c.id) ?? []).sort((a, b) => a.ing.name.localeCompare(b.ing.name, 'pt-BR')),
+  }));
+}

@@ -2,14 +2,12 @@
 
 import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import {
-  AlertTriangle,
   ChevronRight,
   ClipboardCheck,
   Copy,
   MessageCircle,
   Package,
   PackageCheck,
-  Pencil,
   Plus,
   Search,
   ShoppingBasket,
@@ -28,16 +26,16 @@ import {
   setMonthlyQty,
   finalizeMonthly,
   resetMonthly,
+  quickAddPantryProduct,
 } from '../storage/actions.js';
-import { CATEGORIES, categoryColor, categoryLabel } from '../models/constants.js';
+import { CATEGORIES, categoryLabel } from '../models/constants.js';
 import { compatibleUnits, convert, formatNumber, formatQty, parseQty, unitLabel, UNITS } from '../models/units.js';
-import { isBelowMin, monthlyList, newPantryItem } from '../services/pantry.js';
+import { isBelowMin, monthlyList, newPantryItem, pantryBoard, parseQuickProduct } from '../services/pantry.js';
 import { monthlyToText, whatsappUrl, copyText } from '../services/share.js';
-import { formatDateTime, formatWeekRange } from '../utils/dates.js';
+import { formatWeekRange } from '../utils/dates.js';
 import { normalizeText } from '../utils/id.js';
-import { useIsDesktop } from '../utils/hooks.js';
 import { navigate } from '../utils/router.js';
-import { Modal, Stepper, Chip, Segmented, toast, confirmDialog, EmptyState } from '../components/ui.jsx';
+import { Modal, Stepper, Segmented, toast, confirmDialog, EmptyState } from '../components/ui.jsx';
 import { useWeekShopping } from './useWeekData.js';
 
 const TABS = [
@@ -59,7 +57,7 @@ export function PantryPage({ tab, weekId }) {
       <div class="page-head">
         <div class="grow">
           <h1>Mercado do mês</h1>
-          <p class="sub">Despensa, contagem e compras recorrentes</p>
+          <p class="sub">O que tem em casa, por categoria</p>
         </div>
         <button type="button" class="btn btn-primary" onClick={() => setEditing(tab === 'mercado' ? 'new-monthly' : 'new')}>
           <Plus size={16} /> Produto
@@ -82,138 +80,84 @@ export function PantryPage({ tab, weekId }) {
   );
 }
 
-// ---------- Estoque ----------
+// ---------- Estoque (quadro simples: colunas por categoria) ----------
 
 function StockView({ onEdit }) {
   const s = useStore();
-  const isDesktop = useIsDesktop();
-  const [q, setQ] = useState('');
-  const [cat, setCat] = useState('');
-  const [filter, setFilter] = useState('all');
-
-  const items = useMemo(() => {
-    const nq = normalizeText(q);
-    return Object.values(s.pantry)
-      .map((p) => ({ p, ing: s.ingredients[p.ingredientId] }))
-      .filter(({ ing }) => ing)
-      .filter(({ ing }) => !nq || normalizeText(ing.name).includes(nq))
-      .filter(({ ing }) => !cat || ing.category === cat)
-      .filter(({ p }) =>
-        filter === 'low' ? isBelowMin(p) : filter === 'monthly' ? p.monthly : filter === 'empty' ? Number(p.qty) === 0 : true,
-      )
-      .sort((a, b) => a.ing.name.localeCompare(b.ing.name, 'pt-BR'));
-  }, [s.pantry, s.ingredients, q, cat, filter]);
-
-  const lowCount = Object.values(s.pantry).filter(isBelowMin).length;
-
+  const board = useMemo(() => pantryBoard(s.pantry, s.ingredients, CATEGORIES), [s.pantry, s.ingredients]);
+  const total = board.reduce((n, c) => n + c.items.length, 0);
+  // Categorias vazias ficam recolhidas no fim, para o quadro mostrar primeiro o que existe.
+  const [showEmpty, setShowEmpty] = useState(false);
+  const filled = board.filter((c) => c.items.length);
+  const empty = board.filter((c) => !c.items.length);
   return (
     <>
-      {lowCount > 0 && filter !== 'low' && (
-        <button type="button" class="notice" style="width:100%;border:0;text-align:left;margin-bottom:12px;cursor:pointer" onClick={() => setFilter('low')}>
-          <AlertTriangle size={18} /> {lowCount} {lowCount === 1 ? 'produto está' : 'produtos estão'} abaixo do estoque mínimo. Ver
+      <p class="small muted" style="margin:0 0 12px">
+        {total} {total === 1 ? 'produto' : 'produtos'}. Toque no nome para mais opções (mínimo, unidade, remover). Para adicionar, escreva na categoria, ex.: "Leite 6".
+      </p>
+      <div class="stock-board">
+        {filled.map((c) => (
+          <StockColumn key={c.id} cat={c} onEdit={onEdit} />
+        ))}
+        {showEmpty && empty.map((c) => <StockColumn key={c.id} cat={c} onEdit={onEdit} />)}
+      </div>
+      {empty.length > 0 && (
+        <button type="button" class="btn btn-ghost btn-sm stock-empty-toggle" onClick={() => setShowEmpty((v) => !v)}>
+          {showEmpty ? 'Esconder categorias vazias' : `Mostrar categorias vazias (${empty.map((c) => c.label).join(', ')})`}
         </button>
-      )}
-      <div class="filters-bar">
-        <div class="search-input">
-          <Search size={18} />
-          <input class="input" type="search" data-search placeholder="Buscar produto" value={q} onInput={(e) => setQ(e.currentTarget.value)} aria-label="Buscar produto" />
-        </div>
-        <select class="select" style="width:auto" value={cat} onChange={(e) => setCat(e.currentTarget.value)} aria-label="Categoria">
-          <option value="">Todas as categorias</option>
-          {CATEGORIES.map((c) => (
-            <option key={c.id} value={c.id}>{c.label}</option>
-          ))}
-        </select>
-      </div>
-      <div class="chip-row scroll" role="group" aria-label="Filtros" style="margin-bottom:12px">
-        <Chip pressed={filter === 'all'} onClick={() => setFilter('all')}>Todos ({Object.keys(s.pantry).length})</Chip>
-        <Chip pressed={filter === 'low'} onClick={() => setFilter('low')}>Abaixo do mínimo ({lowCount})</Chip>
-        <Chip pressed={filter === 'monthly'} onClick={() => setFilter('monthly')}>Mercado do mês</Chip>
-        <Chip pressed={filter === 'empty'} onClick={() => setFilter('empty')}>Zerados</Chip>
-      </div>
-
-      {items.length === 0 ? (
-        <div class="card">
-          <EmptyState icon={Package} title="Nenhum produto encontrado">
-            Cadastre produtos para acompanhar o estoque e calcular a lista de compras.
-          </EmptyState>
-        </div>
-      ) : isDesktop ? (
-        <div class="card table-wrap">
-          <table class="table stock-table">
-            <thead>
-              <tr>
-                <th>Produto</th>
-                <th>Categoria</th>
-                <th>Quantidade</th>
-                <th>Mínimo</th>
-                <th>Desejado</th>
-                <th>Atualizado</th>
-                <th><span class="sr-only">Ações</span></th>
-              </tr>
-            </thead>
-            <tbody>
-              {items.map(({ p, ing }) => (
-                <tr key={p.ingredientId}>
-                  <td class="name-cell">
-                    <strong>{ing.name}</strong>
-                    <span>
-                      {p.monthly && 'Mercado do mês'}
-                      {isBelowMin(p) && <span class="badge badge-danger" style="margin-left:6px">abaixo do mínimo</span>}
-                    </span>
-                  </td>
-                  <td>
-                    <span style="display:inline-flex;gap:6px;align-items:center">
-                      <i class="dot" style={`background:${categoryColor(ing.category)}`} /> {categoryLabel(ing.category)}
-                    </span>
-                  </td>
-                  <td>
-                    <QtyControl item={p} name={ing.name} />
-                  </td>
-                  <td class="num">{p.min ? formatQty(p.min, p.unit) : '—'}</td>
-                  <td class="num">{p.desired ? formatQty(p.desired, p.unit) : '—'}</td>
-                  <td class="muted xsmall nowrap">{formatDateTime(p.updatedAt)}</td>
-                  <td>
-                    <button type="button" class="icon-btn sm" aria-label={`Editar ${ing.name}`} onClick={() => onEdit(p.ingredientId)}>
-                      <Pencil size={16} />
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      ) : (
-        <div class="stock-cards">
-          {items.map(({ p, ing }) => (
-            <article key={p.ingredientId} class="card stock-card">
-              <div>
-                <div class="sc-name">{ing.name}</div>
-                <div class="sc-meta">
-                  <i class="dot" style={`background:${categoryColor(ing.category)}`} /> {categoryLabel(ing.category)}
-                  {p.monthly && <span class="badge badge-green">mensal</span>}
-                  {isBelowMin(p) && <span class="badge badge-danger">abaixo do mínimo</span>}
-                </div>
-              </div>
-              <button type="button" class="icon-btn" aria-label={`Editar ${ing.name}`} onClick={() => onEdit(p.ingredientId)}>
-                <Pencil size={18} />
-              </button>
-              <div class="sc-controls">
-                <QtyControl item={p} name={ing.name} />
-                <span class="xsmall muted" style="text-align:right">
-                  {p.desired ? `desejado ${formatQty(p.desired, p.unit)}` : ''}
-                </span>
-              </div>
-            </article>
-          ))}
-        </div>
       )}
     </>
   );
 }
 
+function StockColumn({ cat, onEdit }) {
+  const [text, setText] = useState('');
+  const add = (e) => {
+    e.preventDefault();
+    const parsed = parseQuickProduct(text);
+    if (!parsed) return;
+    const r = quickAddPantryProduct({ ...parsed, category: cat.id });
+    if (!r) return;
+    setText('');
+    const where = r.ing.category !== cat.id ? ` (fica em ${categoryLabel(r.ing.category)})` : '';
+    if (r.existed) toast(parsed.qty != null ? `${r.ing.name}: quantidade agora ${formatNumber(r.qty, 2)}${where}` : `${r.ing.name} já está no estoque${where}`);
+    else toast(`${r.ing.name} adicionado${where}`);
+  };
+  return (
+    <section class="card stock-col" aria-label={cat.label}>
+      <h2 class="stock-col-title">
+        <i class="dot" style={`background:${cat.color}`} /> {cat.label}
+        <span class="muted">{cat.items.length || ''}</span>
+      </h2>
+      <ul class="stock-col-list">
+        {cat.items.map(({ p, ing }) => (
+          <li key={p.ingredientId} class={isBelowMin(p) ? 'low' : ''}>
+            <button type="button" class="sc-name" onClick={() => onEdit(p.ingredientId)} aria-label={`Opções de ${ing.name}`}>
+              {ing.name}
+            </button>
+            <QtyControl item={p} name={ing.name} bare />
+          </li>
+        ))}
+      </ul>
+      <form class="stock-col-add" onSubmit={add}>
+        <input
+          class="input"
+          value={text}
+          maxLength={90}
+          placeholder="Adicionar…"
+          aria-label={`Adicionar produto em ${cat.label}`}
+          onInput={(e) => setText(e.currentTarget.value)}
+        />
+        <button type="submit" class="icon-btn" aria-label={`Adicionar em ${cat.label}`} disabled={!text.trim()}>
+          <Plus size={18} />
+        </button>
+      </form>
+    </section>
+  );
+}
+
 /** Stepper de quantidade com gravação agrupada (evita uma movimentação por toque). */
-function QtyControl({ item, name }) {
+function QtyControl({ item, name, bare = false }) {
   const [value, setValue] = useState(item.qty);
   const timer = useRef(null);
   const pendingFlush = useRef(null);
@@ -243,7 +187,7 @@ function QtyControl({ item, name }) {
       min={0}
       step={stepFor(item.unit)}
       size="sm"
-      unit={unitLabel(item.unit)}
+      unit={bare ? '' : unitLabel(item.unit)}
       label={`Quantidade de ${name}`}
       decimals={item.unit === 'g' || item.unit === 'ml' ? 0 : 2}
       onChange={change}

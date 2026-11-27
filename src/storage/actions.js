@@ -19,7 +19,7 @@ import { hiddenItem, mealTagFields, mealTextKey, mergeMealTexts, rememberedItem 
 import { DEFAULT_SETTINGS } from '../models/constants.js';
 import { convert } from '../models/units.js';
 import { addDays, todayISO } from '../utils/dates.js';
-import { uid, uniqueSlug } from '../utils/id.js';
+import { normalizeText, uid, uniqueSlug } from '../utils/id.js';
 
 // ---------- Semanas ----------
 
@@ -385,6 +385,28 @@ export function savePantryItem(item, { recordMovement = true } = {}) {
   ops.push({ store: 'pantry', type: 'put', value: next });
   persist(ops);
   return next;
+}
+
+/**
+ * Adiciona um produto escrito no quadro do estoque (grava no banco: catálogo + despensa).
+ * Produto já existente no catálogo é reaproveitado (pelo nome, sem acento); se já está na
+ * despensa, só muda a quantidade quando ela foi escrita.
+ * Devolve { ing, created, existed, qty } ou null.
+ */
+export function quickAddPantryProduct({ name, qty, category }) {
+  const s = getState();
+  const clean = String(name ?? '').trim();
+  if (!clean) return null;
+  let ing = Object.values(s.ingredients).find((i) => normalizeText(i.name) === normalizeText(clean));
+  const created = !ing;
+  if (!ing) ing = saveIngredient({ name: clean, category: category ?? 'outros', baseUnit: 'un' });
+  const current = getState().pantry[ing.id];
+  if (current) {
+    if (qty != null && Number(current.qty) !== qty) savePantryItem({ ...current, qty });
+    return { ing, created, existed: true, qty: qty ?? current.qty };
+  }
+  savePantryItem(newPantryItem(ing, { qty: qty ?? 1 }), { recordMovement: false });
+  return { ing, created, existed: false, qty: qty ?? 1 };
 }
 
 export function deletePantryItem(ingredientId) {

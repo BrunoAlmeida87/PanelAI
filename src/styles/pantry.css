@@ -20,50 +20,92 @@
     flex: 1;
   }
 }
-.stock-table .name-cell strong {
-  display: block;
+/* Estoque: quadro com uma coluna por categoria (no celular, uma embaixo da outra). */
+.stock-board {
+  columns: 280px;
+  column-gap: 12px;
 }
-.stock-table .name-cell span {
-  font-size: var(--fs-xs);
-  color: var(--text-2);
-}
-.stock-table td.num {
-  white-space: nowrap;
-}
-.stock-cards {
+.stock-col {
+  break-inside: avoid;
+  margin: 0 0 12px;
+  padding: 12px 12px 10px;
   display: grid;
-  gap: 8px;
-}
-@media (min-width: 600px) {
-  .stock-cards {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-}
-.stock-card {
-  display: grid;
-  grid-template-columns: 1fr auto;
-  gap: 10px;
-  align-items: center;
-  padding: 12px;
-}
-.stock-card .sc-name {
-  font-weight: 600;
-}
-.stock-card .sc-meta {
-  display: flex;
-  flex-wrap: wrap;
   gap: 6px;
-  align-items: center;
-  margin-top: 4px;
-  font-size: var(--fs-xs);
-  color: var(--text-2);
 }
-.stock-card .sc-controls {
-  grid-column: 1 / -1;
+.stock-col-title {
+  margin: 0;
   display: flex;
   align-items: center;
   gap: 8px;
-  justify-content: space-between;
+  font-size: var(--fs-sm);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--border);
+}
+.stock-col-title .muted {
+  margin-left: auto;
+  font-weight: 500;
+}
+.stock-col-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+}
+.stock-col-list li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  border-bottom: 1px dashed var(--border);
+}
+.stock-col-list li:last-child {
+  border-bottom: 0;
+}
+.stock-col-list .sc-name {
+  flex: 1;
+  min-width: 0;
+  text-align: left;
+  border: 0;
+  background: transparent;
+  padding: 6px 0;
+  color: inherit;
+  font-weight: 500;
+  overflow-wrap: anywhere;
+}
+.stock-col-list li.low .stepper input {
+  color: var(--danger);
+}
+.stock-col-list .stepper {
+  flex: none;
+  height: 36px;
+}
+.stock-col-list .stepper button {
+  width: 34px;
+}
+.stock-col-list .stepper input {
+  width: 52px;
+}
+.stock-empty-toggle {
+  margin-top: 12px;
+  white-space: normal;
+  text-align: left;
+  height: auto;
+  min-height: 40px;
+  max-width: 100%;
+}
+.stock-col-add {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+  margin-top: 2px;
+}
+.stock-col-add .input {
+  flex: 1;
+  min-width: 0;
+  min-height: 40px;
 }
 
 .count-list {

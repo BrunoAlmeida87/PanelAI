@@ -211,7 +211,6 @@ async function flows(browser, label, opts) {
 
   await step(`[${label}] 9. atualizar estoque (stepper + histórico)`, async () => {
     await page.goto(`${BASE}#/despensa/estoque`);
-    await page.getByRole('searchbox', { name: 'Buscar produto' }).fill('Ovos');
     const input = page.getByRole('textbox', { name: 'Quantidade de Ovos' });
     const before = Number(await input.inputValue());
     await page.getByRole('button', { name: 'Aumentar Quantidade de Ovos' }).click();
@@ -219,6 +218,24 @@ async function flows(browser, label, opts) {
     const after = Number(await input.inputValue());
     assert(after === before + 1, `${before} → ${after}`);
     await shot('pantry');
+  });
+
+  await step(`[${label}] 9b. estoque por categoria: adicionar produto escrito`, async () => {
+    await page.goto(`${BASE}#/despensa/estoque`);
+    const col = page.getByRole('region', { name: 'Limpeza' });
+    if (!(await col.count())) await page.getByRole('button', { name: /Mostrar categorias vazias/ }).click();
+    await col.getByLabel('Adicionar produto em Limpeza').fill('Sabão de coco E2E 3');
+    await col.getByRole('button', { name: 'Adicionar em Limpeza' }).click();
+    await page.getByText('Sabão de coco E2E adicionado').waitFor();
+    const q = await col.getByRole('textbox', { name: 'Quantidade de Sabão de coco E2E' }).inputValue();
+    assert(q === '3', `quantidade = ${q}`);
+    // Sem unidade ao lado da quantidade.
+    assert(!(await col.locator('.stepper .unit').count()), 'mostra unidade');
+    // Fica salvo: recarrega a página e continua lá.
+    await page.reload();
+    await page.getByRole('region', { name: 'Limpeza' }).getByRole('button', { name: 'Opções de Sabão de coco E2E' }).waitFor();
+    await shot('estoque-quadro');
+    return 'Limpeza: "Sabão de coco E2E 3" adicionado com 3 e salvo';
   });
 
   await step(`[${label}] 10. contagem da despensa`, async () => {
