@@ -72,17 +72,33 @@ describe('clima: códigos e endereços', () => {
 });
 
 describe('clima: resumo do card', () => {
-  it('começa na hora atual, de hora em hora, com chance de chuva', () => {
-    const raw = fakeForecast({ probs: { '2026-11-25T16:00': 40, '2026-11-25T17:00': 70 } });
-    const v = forecastView(raw, at('2026-11-25T14:45'), '2026-11-25', { hours: 4, hourStep: 1, days: 3 });
-    expect(v.hours.map((h) => h.label)).toEqual(['Agora', '15h', '16h', '17h']);
-    expect(v.hours.map((h) => h.prob)).toEqual([0, 0, 40, 70]);
+  it('chuva ao longo de hoje: da hora atual até 23h, com a hora do relógio', () => {
+    const raw = fakeForecast({ probs: { '2026-11-25T16:00': 40, '2026-11-25T17:00': 70, '2026-11-25T22:00': 10 } });
+    const v = forecastView(raw, at('2026-11-25T14:45'), '2026-11-25', { hours: 12, hourStep: 1, days: 3 });
+    expect(v.hours.map((h) => h.label)).toEqual(['14h', '15h', '16h', '17h', '18h', '19h', '20h', '21h', '22h', '23h']);
+    expect(v.hours.map((h) => h.prob)).toEqual([0, 0, 40, 70, 0, 0, 0, 0, 10, 0]);
     expect(v.current).toMatchObject({ temp: 28, feels: 30, humidity: 61, desc: 'Nublado' });
   });
 
-  it('pula horas conforme o intervalo escolhido', () => {
-    const v = forecastView(fakeForecast(), at('2026-11-25T08:10'), '2026-11-25', { hours: 3, hourStep: '3' });
-    expect(v.hours.map((h) => h.label)).toEqual(['Agora', '11h', '14h']);
+  it('em blocos de 3 h alinhados ao relógio; cada bloco mostra a maior chance dele', () => {
+    const raw = fakeForecast({ probs: { '2026-11-25T10:00': 30, '2026-11-25T13:00': 80, '2026-11-25T20:00': 15 } });
+    const v = forecastView(raw, at('2026-11-25T08:10'), '2026-11-25', { hours: 8, hourStep: '3' });
+    expect(v.hours.map((h) => h.label)).toEqual(['8h', '9h', '12h', '15h', '18h', '21h']);
+    expect(v.hours.map((h) => h.prob)).toEqual([0, 30, 80, 0, 15, 0]);
+  });
+
+  it('se não cabe, o intervalo aumenta sozinho; amanhã não entra', () => {
+    const v = forecastView(fakeForecast(), at('2026-11-25T06:05'), '2026-11-25', { hours: 6, hourStep: '1' });
+    expect(v.hours.map((h) => h.label)).toEqual(['6h', '9h', '12h', '15h', '18h', '21h']);
+    const late = forecastView(fakeForecast(), at('2026-11-25T23:20'), '2026-11-25', { hours: 6, hourStep: '1' });
+    expect(late.hours.map((h) => h.label)).toEqual(['23h']);
+  });
+
+  it('horários que já passaram não aparecem (a imagem seguinte não tem o das 14h)', () => {
+    const cedo = forecastView(fakeForecast(), at('2026-11-25T14:10'), '2026-11-25', { hours: 12, hourStep: '2' });
+    const depois = forecastView(fakeForecast(), at('2026-11-25T18:00'), '2026-11-25', { hours: 12, hourStep: '2' });
+    expect(cedo.hours[0].label).toBe('14h');
+    expect(depois.hours.map((h) => h.label)).toEqual(['18h', '20h', '22h']);
   });
 
   it('dias: hoje, amanhã e os próximos', () => {

@@ -148,6 +148,11 @@ Publicado em https://brunoalmeida87.github.io/PanelAI/ (GitHub Pages), com dados
   campo `type: 'place'` no editor). `#/display/tela?publicar=1` só expõe `#panelai-publicacao` depois que
   a previsão chegou (ou após 20 s), para a foto não sair sem o clima. Aqui no ambiente do Claude os hosts
   do Open-Meteo costumam estar bloqueados: teste com `page.route` (Playwright) simulando a resposta.
+- **Clima: chuva ao longo do dia** (27/11/2026, pedido do dono): a faixa de horas não é mais "Agora, +2h…".
+  `rainAcrossToday` (weather.js) mostra só **hoje**, da hora atual até 23h, com a hora do relógio; horários
+  passados somem na próxima imagem. Colunas alinhadas ao intervalo (9h, 12h, 15h…), a primeira é a hora
+  atual; cada coluna = **maior** chance do bloco. `options.hours` = máximo de colunas; se não couber, o
+  intervalo sobe sozinho (1, 2, 3, 4, 6, 8, 12 h).
 - **Tarefas fixas no display:** `buildDisplayData` inclui ocorrências ainda não criadas
   (`missingRecurring`) sem gravar — a conta de tela não grava.
 - **CI do firmware:** `.github/workflows/esphome.yml` testa as regras (g++), valida e compila com

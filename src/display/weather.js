@@ -138,6 +138,46 @@ export function rainOutlook(hours, today) {
   return { level: 'no', max, mm, text: `Sem chuva prevista ${when}`, when };
 }
 
+const STEPS = [1, 2, 3, 4, 6, 8, 12];
+
+/**
+ * Chance de chuva ao longo de HOJE (pedido do dono, 27/11/2026): do horário atual até as
+ * 23h, com a hora do relógio (14h, 15h, 18h…), sem "daqui a 2 h". Horários que já passaram
+ * não aparecem — somem na próxima atualização da tela.
+ * Colunas nas horas múltiplas do intervalo (3 em 3: 9h, 12h, 15h…); a primeira é a hora
+ * atual. Cada coluna mostra a MAIOR chance do seu bloco de horas, para nenhuma pancada sumir
+ * entre uma coluna e outra. Se não couber em `o.hours` colunas, o intervalo aumenta sozinho.
+ * @param ahead horas a partir da atual: [{ time, hour, prob, mm, temp, code, isDay }]
+ */
+export function rainAcrossToday(ahead, today, o = {}) {
+  const max = Math.max(0, Math.min(12, Number(o.hours ?? 8)));
+  const list = ahead.filter((h) => String(h.time).startsWith(today));
+  if (!max || !list.length) return [];
+  const h0 = list[0].hour;
+  const blocks = (st) => {
+    const starts = [h0];
+    for (let h = (Math.floor(h0 / st) + 1) * st; h <= 23; h += st) starts.push(h);
+    return starts;
+  };
+  const wanted = Math.max(1, Math.min(12, Number(o.hourStep) || 1));
+  const st = STEPS.find((s) => s >= wanted && blocks(s).length <= max) ?? 24;
+  const starts = blocks(st);
+  return starts.map((start, i) => {
+    const end = starts[i + 1] ?? 24;
+    const inBlock = list.filter((h) => h.hour >= start && h.hour < end);
+    const first = inBlock[0] ?? list.find((h) => h.hour === start);
+    const probs = inBlock.map((h) => h.prob).filter((p) => p != null);
+    const mms = inBlock.map((h) => h.mm).filter((m) => m != null);
+    return {
+      ...first,
+      label: `${start}h`,
+      prob: probs.length ? Math.max(...probs) : null,
+      mm: mms.length ? Math.round(mms.reduce((a, b) => a + b, 0) * 10) / 10 : null,
+      step: st,
+    };
+  });
+}
+
 /**
  * Resposta do Open-Meteo → o que o card desenha.
  * @param raw   JSON da previsão
@@ -166,13 +206,7 @@ export function forecastView(raw, now, today, o = {}) {
   const ahead = [];
   for (let i = i0; i < times.length && ahead.length < 24; i++) ahead.push(hourAt(i));
 
-  const step = Math.max(1, Math.min(6, Number(o.hourStep) || 1));
-  const count = Math.max(0, Math.min(24, Number(o.hours ?? 6)));
-  const hours = [];
-  for (let k = 0; k < ahead.length && hours.length < count; k += step) {
-    const h = ahead[k];
-    hours.push({ ...h, label: k === 0 ? 'Agora' : `${h.hour}h`, ...sky(h.code, h.isDay) });
-  }
+  const hours = rainAcrossToday(ahead, today, o).map((h) => ({ ...h, ...sky(h.code, h.isDay) }));
 
   const dTimes = D.time ?? [];
   let d0 = dTimes.indexOf(today);

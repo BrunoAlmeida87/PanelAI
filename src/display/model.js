@@ -244,10 +244,11 @@ export const CARD_TYPES = [
       { key: 'place', label: 'Cidade', type: 'place', default: null },
       { key: 'showNow', label: 'Mostrar o tempo agora', type: 'toggle', default: true },
       { key: 'showRain', label: 'Aviso "vai chover?"', type: 'toggle', default: true },
-      { key: 'hours', label: 'Próximas horas (chance de chuva; 0 = esconder)', type: 'number', default: 6, min: 0, max: 12 },
+      // Chance de chuva ao longo de hoje (de agora até 23h; horários passados saem): weather.js → rainAcrossToday.
+      { key: 'hours', label: 'Chuva ao longo do dia: no máximo quantos horários (0 = esconder)', type: 'number', default: 6, min: 0, max: 12 },
       {
         key: 'hourStep',
-        label: 'De quanto em quanto tempo',
+        label: 'De quanto em quanto tempo (aumenta sozinho se não couber)',
         type: 'select',
         default: '1',
         choices: [

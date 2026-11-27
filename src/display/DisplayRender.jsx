@@ -444,7 +444,7 @@ function Weather({ o, data }) {
         </div>
       )}
       {view.hours.length > 0 && (
-        <div class="w-hours" style={{ gridTemplateColumns: `repeat(${view.hours.length}, minmax(0, 1fr))` }} aria-label="Chance de chuva por hora">
+        <div class="w-hours" style={{ gridTemplateColumns: `repeat(${view.hours.length}, minmax(0, 1fr))` }} aria-label="Chance de chuva ao longo de hoje">
           {view.hours.map((h) => (
             <div key={h.time} class="w-hour">
               <span class="w-h-pct">{h.prob ?? 0}%</span>
