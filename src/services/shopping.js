@@ -75,6 +75,7 @@ export function buildShoppingList({ weekId, week, demand, pantry, ingredientsByI
           sources: d.sources,
           missing: !!state.missing?.[key],
           checked: !!state.checked?.[key],
+          checkedAt: state.checkedAt?.[key] ?? null,
           marketDate,
         });
       }
@@ -113,6 +114,8 @@ export function buildShoppingList({ weekId, week, demand, pantry, ingredientsByI
         firstDate: d.firstDate,
         marketDate,
         checked: !!state.checked?.[key],
+        // Quando foi marcado como comprado (a tela e-ink mostra o ✓ por um tempo).
+        checkedAt: state.checkedAt?.[key] ?? null,
         toTaste: d.toTaste,
       };
       if (item.monthly) {

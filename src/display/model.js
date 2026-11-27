@@ -307,7 +307,23 @@ export const CARD_TYPES = [
     options: [
       { key: 'day', label: 'Mostrar', type: 'select', default: 'week', choices: [{ id: 'week', label: 'A semana toda' }, ...DAY_CHOICES.map((d) => ({ ...d, label: `Só ${d.label.toLowerCase()}` }))] },
       { key: 'showQty', label: 'Mostrar quantidade', type: 'toggle', default: true },
-      { key: 'showChecked', label: 'Mostrar já comprados', type: 'toggle', default: false },
+      // Comprados aparecem com ✓ no fim da lista até o tempo escolhido (data.js → checkedStillVisible).
+      // Cards antigos sem `checkedFor`: "Mostrar já comprados" ligado = sempre; desligado = 24 h.
+      {
+        key: 'checkedFor',
+        label: 'Comprados (marcados ✓) somem da tela',
+        type: 'select',
+        default: '24',
+        choices: [
+          { id: '24', label: '24 horas depois de marcar' },
+          { id: '6', label: '6 horas depois de marcar' },
+          { id: '12', label: '12 horas depois de marcar' },
+          { id: '48', label: '2 dias depois de marcar' },
+          { id: '72', label: '3 dias depois de marcar' },
+          { id: 'always', label: 'Só quando saírem da lista' },
+          { id: 'never', label: 'Na hora (não mostrar comprados)' },
+        ],
+      },
       { key: 'columns', label: 'Colunas de texto', type: 'number', default: 2, min: 1, max: 4 },
       { key: 'max', label: 'Máximo de itens', type: 'number', default: 30, min: 1, max: 80 },
     ],

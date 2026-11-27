@@ -18,7 +18,7 @@ import {
   rescaleCards,
   screenSize,
 } from '../../src/display/model.js';
-import { buildDisplayData, doneStillVisible } from '../../src/display/data.js';
+import { buildDisplayData, checkedStillVisible, doneStillVisible, shoppingCheckedFor } from '../../src/display/data.js';
 import { buildSeed } from '../../src/data/seed.js';
 
 const grid = { cols: 12, rows: 8, gap: 8, padding: 12 };
@@ -244,5 +244,39 @@ describe('display: trocar e adicionar cards', () => {
     const l = newLayout({ presetId: 'cozinha' });
     expect(hasRoomFor(l.cards, l.grid, 'montessori')).toBe(false);
     expect(hasRoomFor(l.cards.filter((c) => c.type !== 'pending'), l.grid, 'montessori')).toBe(true);
+  });
+});
+
+describe('display: compras marcadas como comprado', () => {
+  const now = new Date('2026-11-27T17:00:00');
+  const item = (checkedAt, checked = true) => ({ name: 'Leite', checked, checkedAt });
+
+  it('aparece com ✓ até o tempo escolhido depois de marcar', () => {
+    expect(checkedStillVisible(item('2026-11-27T09:00:00'), now, '24')).toBe(true);
+    expect(checkedStillVisible(item('2026-11-26T16:00:00'), now, '24')).toBe(false);
+    expect(checkedStillVisible(item('2026-11-27T09:00:00'), now, '6')).toBe(false);
+    expect(checkedStillVisible(item('2026-11-20T09:00:00'), now, 'always')).toBe(true);
+    expect(checkedStillVisible(item('2026-11-27T16:59:00'), now, 'never')).toBe(false);
+    expect(checkedStillVisible(item(null, false), now, 'never')).toBe(true);
+    // Marcado antes de existir a hora da compra: continua aparecendo.
+    expect(checkedStillVisible(item(null), now, '6')).toBe(true);
+  });
+
+  it('cards antigos: "Mostrar já comprados" ligado = sempre; desligado = 24 h', () => {
+    expect(shoppingCheckedFor({ showChecked: true })).toBe('always');
+    expect(shoppingCheckedFor({ showChecked: false })).toBe('24');
+    expect(shoppingCheckedFor({ showChecked: false, checkedFor: 'never' })).toBe('never');
+  });
+
+  it('a lista de compras leva a hora da compra até a tela', () => {
+    const s = buildSeed(now);
+    const wid = Object.keys(s.weeks)[0];
+    const week = s.weeks[wid];
+    week.shopping = { ...(week.shopping ?? {}), checked: {}, checkedAt: {}, extras: [{ id: 'x', name: 'Pão E2E', checked: true, checkedAt: '2026-11-27T10:00:00', marketDate: wid }] };
+    const d = buildDisplayData(s, now);
+    const pao = d.shopping(wid).find((i) => i.name === 'Pão E2E');
+    expect(pao).toMatchObject({ checked: true, checkedAt: '2026-11-27T10:00:00' });
+    expect(d.boughtVisible(pao, '24')).toBe(true);
+    expect(d.boughtVisible(pao, '6')).toBe(false);
   });
 });

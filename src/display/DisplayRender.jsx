@@ -4,6 +4,7 @@
 import { Sun, CloudSun, Cloud, CloudFog, CloudDrizzle, CloudRain, CloudRainWind, CloudSnow, CloudLightning, CloudHail, Moon, CloudMoon, Umbrella, Droplets, Wind, Sunrise, Sunset } from 'lucide-preact';
 import { cardType, colorMode, screenSize, typographyVars } from './model.js';
 import './fonts.js';
+import { shoppingCheckedFor } from './data.js';
 import { forecastView, formatMm } from './weather.js';
 import { useForecast } from './useWeather.js';
 import { formatDayMonth, weekdayName, weekdayShort, addDays, weekStartOf, formatWeekRange, parseISODate } from '../utils/dates.js';
@@ -268,8 +269,10 @@ function Pending({ o, data }) {
 
 function Shopping({ o, data }) {
   const byDay = o.day === 'today' || o.day === 'tomorrow';
-  let list = byDay ? data.shopping(data.dayOf(o.day), true) : data.shopping();
-  if (!o.showChecked) list = list.filter((i) => !i.checked);
+  const all = byDay ? data.shopping(data.dayOf(o.day), true) : data.shopping();
+  const checkedFor = shoppingCheckedFor(o);
+  // Falta comprar primeiro; comprados (✓) no fim, até o tempo escolhido.
+  let list = [...all.filter((i) => !i.checked), ...all.filter((i) => i.checked && data.boughtVisible(i, checkedFor))];
   const extra = Math.max(0, list.length - (o.max ?? 30));
   list = list.slice(0, o.max ?? 30);
   if (!list.length) return <Empty>{byDay ? `Nada a comprar ${o.day === 'tomorrow' ? 'amanhã' : 'hoje'}.` : 'Nada a comprar.'}</Empty>;

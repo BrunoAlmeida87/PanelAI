@@ -266,6 +266,12 @@ Publicado em https://brunoalmeida87.github.io/PanelAI/ (GitHub Pages), com dados
   `.eink-box.on::after`) até `doneAt + doneFor`, comparando com o **momento** da imagem; atrasada de outro
   dia ticada aparece em "Tarefas de hoje" como "(de dd/mm)". Regra pura `doneStillVisible` em
   `src/display/data.js`. Cards antigos sem a opção usam 24 h. Some de verdade só na próxima atualização da tela.
+- **Compras marcadas na tela** (27/11/2026, pedido do dono): `setChecked`/`updateExtra` guardam a hora da compra
+  (`week.shopping.checkedAt[key]` / `extra.checkedAt`); a lista leva `checkedAt` até o display. Card `shopping`
+  tem `checkedFor` (`'24'` padrão, 6/12/48/72, `'always'` = enquanto estiver na lista, `'never'`); comprados vão
+  para o fim com ✓ (`checkedStillVisible` em data.js). Card antigo sem `checkedFor`: `showChecked` ligado =
+  `always`, desligado = 24 h (`shoppingCheckedFor`). O ✓ (`.eink-box.on::after`) não pode sair acima da linha do
+  item: em lista com colunas, o que sai acima aparece no pé da coluna anterior.
 - **Nome da refeição (1.8):** `menuDay.options.labelStyle` = `underline` (padrão: negrito e sublinhado),
   `band` (tarja preta), `divider` (linha entre refeições) ou `plain` (como antes).
 - **Letras do display** (`layout.typography`, opcional; `normalizeTypography`/`typographyVars`/

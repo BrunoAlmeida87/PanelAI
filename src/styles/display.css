@@ -271,14 +271,15 @@
 .eink-box {
   position: relative;
 }
-/* Feita: caixinha com um ✓ (tique) grosso, que passa um pouco da borda. */
+/* Feita: caixinha com um ✓ (tique) grosso, que passa um pouco da borda de cima, mas não sai
+   da linha do item (em listas com colunas, o que sai acima aparecia no pé da coluna anterior). */
 .eink-box.on::after {
   content: '';
   position: absolute;
   left: 0.24em;
-  top: -0.36em;
-  width: 0.36em;
-  height: 0.86em;
+  top: -0.14em;
+  width: 0.34em;
+  height: 0.74em;
   border: solid currentColor;
   border-width: 0 0.2em 0.2em 0;
   transform: rotate(40deg);

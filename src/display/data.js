@@ -46,6 +46,21 @@ export function doneStillVisible(task, now, doneFor = '24') {
 }
 
 /**
+ * Compras: item marcado como comprado ainda aparece na tela (✓)?
+ * `checkedFor`: horas ('24', '6'…), 'always' (enquanto estiver na lista) ou 'never'.
+ * Item marcado antes de existir a hora da compra (`checkedAt`) segue aparecendo.
+ */
+export function checkedStillVisible(item, now, checkedFor = '24') {
+  if (!item.checked) return true;
+  if (checkedFor === 'never') return false;
+  if (checkedFor === 'always') return true;
+  return doneStillVisible({ status: 'done', doneAt: item.checkedAt }, now, checkedFor);
+}
+
+/** Opção de comprados de um card antigo: "Mostrar já comprados" ligado = sempre; senão 24 h. */
+export const shoppingCheckedFor = (o) => o.checkedFor ?? (o.showChecked ? 'always' : '24');
+
+/**
  * @param now       instante "da tela" (dia de hoje, horas do clima…). Perto de um horário
  *                  agendado, a imagem é feita para ele (ex.: 00:00, para já mostrar o dia novo).
  * @param updatedAt quando a imagem foi realmente gerada ("Atualizado às" do card de data).
@@ -79,9 +94,9 @@ export function buildDisplayData(s, now = new Date(), updatedAt = now) {
       const demand = computeDemand({ weekId: wid, week, recipesById: s.recipes, ingredientsById: s.ingredients, marmitas: Object.values(s.marmitas) });
       const list = buildShoppingList({ weekId: wid, week, demand, pantry: s.pantry, ingredientsById: s.ingredients, settings: s.settings });
       shoppingCache.set(wid, [
-        ...list.buyItems.map((i) => ({ name: i.name, qty: formatQty(i.toBuy, i.unit), checked: i.checked, category: i.category, date: i.marketDate })),
-        ...list.extras.map((e) => ({ name: e.name, qty: e.qty ? formatQty(e.qty, e.unit) : '', checked: e.checked, category: e.category ?? 'outros', date: e.marketDate })),
-        ...list.toCheck.filter((t) => t.missing).map((t) => ({ name: t.name, qty: '', checked: t.checked, category: t.category, date: t.marketDate })),
+        ...list.buyItems.map((i) => ({ name: i.name, qty: formatQty(i.toBuy, i.unit), checked: i.checked, checkedAt: i.checkedAt, category: i.category, date: i.marketDate })),
+        ...list.extras.map((e) => ({ name: e.name, qty: e.qty ? formatQty(e.qty, e.unit) : '', checked: e.checked, checkedAt: e.checkedAt ?? null, category: e.category ?? 'outros', date: e.marketDate })),
+        ...list.toCheck.filter((t) => t.missing).map((t) => ({ name: t.name, qty: '', checked: t.checked, checkedAt: t.checkedAt, category: t.category, date: t.marketDate })),
       ]);
     }
     const all = shoppingCache.get(wid);
@@ -143,6 +158,8 @@ export function buildDisplayData(s, now = new Date(), updatedAt = now) {
       return [...list, ...late].sort((a, b) => a.date.localeCompare(b.date));
     },
     shopping: getShopping,
+    /** Item comprado ainda aparece (✓) na tela? Ver checkedStillVisible. */
+    boughtVisible: (item, checkedFor) => checkedStillVisible(item, now, checkedFor),
     shoppingFromMenu: s.settings?.shoppingFromMenu !== false,
     pantryLow,
     marmitas,

@@ -578,8 +578,14 @@ function updateShopping(weekId, fn) {
   return saveWeek({ ...w, shopping });
 }
 
+/** Marca/desmarca um item da lista; guarda a hora da compra (a tela mostra o ✓ por um tempo). */
 export function setChecked(weekId, key, checked) {
-  updateShopping(weekId, (sh) => ({ ...sh, checked: { ...sh.checked, [key]: checked } }));
+  updateShopping(weekId, (sh) => {
+    const checkedAt = { ...(sh.checkedAt ?? {}) };
+    if (checked) checkedAt[key] = new Date().toISOString();
+    else delete checkedAt[key];
+    return { ...sh, checked: { ...sh.checked, [key]: checked }, checkedAt };
+  });
 }
 
 export function setOverride(weekId, key, qty) {
@@ -609,7 +615,9 @@ export function addExtras(weekId, list) {
 }
 
 export function updateExtra(weekId, id, patch) {
-  updateShopping(weekId, (sh) => ({ ...sh, extras: sh.extras.map((e) => (e.id === id ? { ...e, ...patch } : e)) }));
+  // Marcar como comprado guarda a hora (a tela mostra o ✓ por um tempo).
+  const stamp = 'checked' in patch ? { checkedAt: patch.checked ? new Date().toISOString() : null } : {};
+  updateShopping(weekId, (sh) => ({ ...sh, extras: sh.extras.map((e) => (e.id === id ? { ...e, ...patch, ...stamp } : e)) }));
 }
 
 export function removeExtra(weekId, id) {
@@ -622,7 +630,7 @@ export function removeCheckedExtras(weekId) {
 }
 
 export function clearChecked(weekId) {
-  updateShopping(weekId, (sh) => ({ ...sh, checked: {}, extras: sh.extras.map((e) => ({ ...e, checked: false })) }));
+  updateShopping(weekId, (sh) => ({ ...sh, checked: {}, checkedAt: {}, extras: sh.extras.map((e) => ({ ...e, checked: false, checkedAt: null })) }));
 }
 
 // ---------- Mercado do mês ----------
