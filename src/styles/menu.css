@@ -67,14 +67,16 @@
 }
 .bars {
   display: grid;
-  gap: 7px;
+  /* Uma grade só para todas as barras: a coluna do nome tem a largura do maior nome. */
+  grid-template-columns: max-content 1fr 24px;
+  gap: 7px 8px;
   margin-top: 10px;
 }
 .bar {
   display: grid;
-  grid-template-columns: 88px 1fr 24px;
+  grid-column: 1 / -1;
+  grid-template-columns: subgrid;
   align-items: center;
-  gap: 8px;
   font-size: var(--fs-sm);
 }
 .bar .track {

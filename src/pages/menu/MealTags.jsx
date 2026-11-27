@@ -1,5 +1,5 @@
 // Categorias opcionais de uma comida escrita à mão (as mesmas das receitas):
-// Proteína (e o tipo), Vegetal, Carboidrato, Leguminosa, Massa. Entram no equilíbrio da semana.
+// Proteína (e o tipo), Legumes e verduras, Frutas, Carboidrato, Leguminosa, Massa. Entram no equilíbrio da semana.
 
 import { Chip } from '../../components/ui.jsx';
 import { COMPOSITION, PROTEINS } from '../../models/constants.js';

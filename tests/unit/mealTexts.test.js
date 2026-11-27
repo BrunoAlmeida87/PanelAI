@@ -120,3 +120,11 @@ describe('comidas escritas: categorias opcionais (equilíbrio da semana)', () =>
     expect(b.proteins.ovos).toBe(1);
   });
 });
+
+describe('categorias: Frutas e Legumes e verduras', () => {
+  it('fruta é uma categoria e conta no equilíbrio', () => {
+    expect(cleanMealTags({ composition: ['fruta', 'vegetal'] })).toEqual({ composition: ['vegetal', 'fruta'], protein: null });
+    const week = { meals: { '2026-11-23': { lanche_manha: [{ id: 'f', kind: 'text', text: 'Kiwi', composition: ['fruta'] }] } } };
+    expect(balanceStats({ week, recipesById: {} }).composition.fruta).toBe(1);
+  });
+});

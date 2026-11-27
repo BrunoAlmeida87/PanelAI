@@ -63,7 +63,9 @@ export const proteinLabel = (id) => PROTEINS.find((p) => p.id === id)?.label ?? 
 
 export const COMPOSITION = [
   { id: 'proteina', label: 'Proteína' },
-  { id: 'vegetal', label: 'Vegetal' },
+  // id 'vegetal' fica (dados salvos); o nome mostrado é "Legumes e verduras".
+  { id: 'vegetal', label: 'Legumes e verduras' },
+  { id: 'fruta', label: 'Frutas' },
   { id: 'carboidrato', label: 'Carboidrato' },
   { id: 'leguminosa', label: 'Leguminosa' },
   { id: 'massa', label: 'Massa' },

@@ -336,7 +336,7 @@ const PROTEIN_COLORS = {
   ovos: '#E2C77E',
   'sem-carne': '#7FA27A',
 };
-const COMP_COLORS = { proteina: '#C98B80', vegetal: '#7FA27A', carboidrato: '#D9B76E', leguminosa: '#A88B6A', massa: '#9C8CB5' };
+const COMP_COLORS = { proteina: '#C98B80', vegetal: '#7FA27A', fruta: '#E39A6B', carboidrato: '#D9B76E', leguminosa: '#A88B6A', massa: '#9C8CB5' };
 
 function BalanceCard({ balance, bare }) {
   const maxComp = Math.max(1, ...Object.values(balance.composition));
@@ -370,7 +370,7 @@ function BalanceCard({ balance, bare }) {
             ))}
           </div>
           {balance.composition.vegetal < Math.ceil(balance.meals / 3) && (
-            <p class="xsmall" style="margin-top:8px;color:var(--coral-dark)">Poucas refeições com vegetais nesta semana.</p>
+            <p class="xsmall" style="margin-top:8px;color:var(--coral-dark)">Poucas refeições com legumes e verduras nesta semana.</p>
           )}
         </>
       )}
@@ -454,7 +454,7 @@ function SummaryStrip({ stats, tasks, balance, onOpen }) {
       </button>
       <button type="button" onClick={() => onOpen('balance')} aria-label="Ver equilíbrio alimentar">
         <strong>{balance.composition.vegetal}</strong>
-        <span>com vegetais · {proteins} proteínas</span>
+        <span>com legumes e verduras · {proteins} proteínas</span>
       </button>
       <button type="button" onClick={() => onOpen('prep')} aria-label="Ver preparo antecipado">
         <strong>{pendingTasks}</strong>

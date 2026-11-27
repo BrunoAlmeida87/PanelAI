@@ -179,6 +179,10 @@ Publicado em https://brunoalmeida87.github.io/PanelAI/ (GitHub Pages), com dados
   conta a escrita que tem categoria. O histórico guarda as categorias (`rememberedItem` com `tags`; sem
   `tags` mantém as anteriores; `count: false` ao só mudar categoria) e o seletor pré-marca pela comida igual
   (`knownMealTags`). Componente `src/pages/menu/MealTags.jsx` (aba Escrever e detalhe da refeição).
+- **Composição** (`COMPOSITION`): `proteina`, `vegetal` (mostrado como **"Legumes e verduras"**; o id fica
+  por causa dos dados salvos), `fruta` ("Frutas", desde 27/11/2026), `carboidrato`, `leguminosa` (grãos:
+  feijão, lentilha, grão-de-bico), `massa`. Batata/mandioca contam como Carboidrato; tomate como Legumes e
+  verduras (uso na cozinha). Barras do equilíbrio usam `subgrid` para o nome maior caber numa linha.
 
 ## Montessori (decisões já tomadas)
 
