@@ -1,30 +1,32 @@
 /* Tokens de design do PanelAI */
 :root {
   /* Paleta oficial */
-  --bg: #faf9f6;
+  /* Contraste reforçado em 27/11/2026 (pedido do dono): mesmos tons, um pouco mais escuros.
+     Texto secundário 6,8:1 no branco (antes 4,5:1), bordas e fundo mais marcados. */
+  --bg: #f4f3ee;
   --surface: #ffffff;
-  --green: #789582;
-  --green-dark: #52765d;
-  --green-light: #e7efe8;
+  --green: #5f7f69;
+  --green-dark: #3f6449;
+  --green-light: #e2ece3;
   --green-xlight: #f2f6f2;
-  --coral: #dca49b;
-  --coral-dark: #a8645a;
-  --coral-light: #f9e9e5;
-  --text: #30332f;
-  --text-2: #747874;
-  --border: #e8e7e2;
-  --border-strong: #d6d5cf;
+  --coral: #cf8f84;
+  --coral-dark: #8f4d43;
+  --coral-light: #f7e3de;
+  --text: #232621;
+  --text-2: #585c57;
+  --border: #dddbd4;
+  --border-strong: #bfbdb5;
 
   /* Cores de apoio (estados e categorias) */
-  --amber: #b8893a;
-  --amber-light: #f7efdc;
-  --blue: #5f7f96;
+  --amber: #8f6620;
+  --amber-light: #f5ebd3;
+  --blue: #4b6a80;
   --blue-light: #e8eff4;
-  --danger: #b5524a;
-  --danger-light: #f7e4e1;
-  --muted-surface: #f4f3ef;
+  --danger: #9e3d35;
+  --danger-light: #f5dfdb;
+  --muted-surface: #ecebe5;
 
-  --focus: 0 0 0 3px rgba(82, 118, 93, 0.35);
+  --focus: 0 0 0 3px rgba(63, 100, 73, 0.4);
 
   /* Tipografia */
   --font: 'Inter Variable', Inter, ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
@@ -40,8 +42,8 @@
   --r-md: 12px;
   --r-lg: 16px;
   --r-xl: 22px;
-  --shadow-sm: 0 1px 2px rgba(48, 51, 47, 0.05);
-  --shadow-md: 0 2px 4px rgba(48, 51, 47, 0.04), 0 6px 18px rgba(48, 51, 47, 0.06);
+  --shadow-sm: 0 1px 2px rgba(35, 38, 33, 0.08);
+  --shadow-md: 0 2px 4px rgba(35, 38, 33, 0.06), 0 6px 18px rgba(35, 38, 33, 0.08);
   --shadow-lg: 0 12px 40px rgba(48, 51, 47, 0.16);
 
   /* Espaçamento */

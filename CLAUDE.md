@@ -226,6 +226,13 @@ Publicado em https://brunoalmeida87.github.io/PanelAI/ (GitHub Pages), com dados
 - Card "Montessori hoje" no Cardápio (preferência por aparelho `panelai.montessoriHomeCard`) e card
   `montessori` no display (layout sugerido "Família").
 
+## Visual do app
+
+- **Contraste reforçado (27/11/2026, pedido do dono: "as cores são boas, mas quero mais contraste"):** mesmos
+  tons em `src/styles/tokens.css`, um pouco mais escuros — texto secundário `--text-2` #585c57 (6,8:1 no
+  branco; antes 4,5:1), `--green-dark` #3f6449 (botão primário 6,7:1), bordas #dddbd4/#bfbdb5, fundo
+  #f4f3ee (cartões brancos se destacam mais), sombras um pouco mais fortes. Não clarear de volta sem pedir.
+
 ## Armadilhas conhecidas
 
 - **Agendamento do GitHub não é confiável** (atrasa horas ou pula): nada de importante pode depender

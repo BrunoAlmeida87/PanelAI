@@ -16,7 +16,7 @@ const ICONS = {
 /** Ícone da categoria num círculo com a cor (discreta) da categoria. */
 export function CategoryIcon({ id, size = 16 }) {
   const Icon = ICONS[id] ?? Shapes;
-  const color = montessoriCategory(id)?.color ?? '#747874';
+  const color = montessoriCategory(id)?.color ?? '#585c57';
   return (
     <span class="mt-cat-icon" style={{ '--cat': color }} aria-hidden="true">
       <Icon size={size} />

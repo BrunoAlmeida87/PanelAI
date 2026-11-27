@@ -31,7 +31,7 @@
   color: #fff;
 }
 .btn-primary:hover:not(:disabled) {
-  background: #466852;
+  background: #33533c;
 }
 .btn-secondary {
   background: var(--surface);
