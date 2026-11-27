@@ -22,9 +22,12 @@ import {
   TriangleAlert,
   Pencil,
   ListChecks,
+  Loader2,
+  RefreshCw,
 } from 'lucide-preact';
 import { useStore } from '../storage/store.js';
-import { createLayout, deleteLayout, duplicateLayout, saveLayout, setActiveLayout } from '../storage/displayActions.js';
+import { createLayout, deleteLayout, duplicateLayout, requestScreenUpdate, saveLayout, setActiveLayout } from '../storage/displayActions.js';
+import { isValidGithubToken } from '../display/github.js';
 import {
   BORDERS,
   CARD_TYPES,
@@ -336,6 +339,7 @@ function Editor({ layout: stored, layouts, activeId, onSwitch }) {
         <button type="button" class="btn btn-ghost" onClick={doUndo} disabled={!undoCount} title="Desfazer (Ctrl+Z)">
           <Undo2 size={16} /> Desfazer
         </button>
+        <SendToScreen layoutId={layout.id} isActive={isActive} />
         <Chip pressed={showGrid} onClick={() => setShowGrid((v) => !v)}>
           <Grid3x3 size={14} /> Grade
         </Chip>
@@ -501,6 +505,46 @@ function Editor({ layout: stored, layouts, activeId, onSwitch }) {
         </div>
       </Modal>
     </div>
+  );
+}
+
+/**
+ * Atalho do "Atualizar a tela agora" (Configurações → Tela e-ink) no editor: pede ao GitHub a
+ * imagem nova com este layout. Se o layout aberto não é o do display, passa a ser antes de pedir.
+ * Só aparece com a nuvem (sem ela não há imagem publicada).
+ */
+function SendToScreen({ layoutId, isActive }) {
+  const s = useStore();
+  const [busy, setBusy] = useState(false);
+  const [sentAt, setSentAt] = useState(0);
+  if (s.mode !== 'cloud' || s.cloud?.readOnly) return null;
+  const ready = isValidGithubToken(s.githubToken);
+  const send = async () => {
+    if (!ready) {
+      toast('Falta a chave do GitHub: salve uma vez em Ajustes → Tela e-ink.', { type: 'error', action: { label: 'Abrir', onClick: () => (location.hash = '#/ajustes') } });
+      return;
+    }
+    if (Date.now() - sentAt < 60_000) return toast('Pedido já enviado há menos de 1 minuto. A imagem fica pronta em uns 3 minutos.');
+    if (!isActive) {
+      const ok = await confirmDialog({
+        title: 'Mandar este layout para a tela?',
+        message: 'Ele passa a ser o layout do display (no lugar do atual) e a imagem nova é gerada agora.',
+        confirmLabel: 'Usar e atualizar',
+      });
+      if (!ok) return;
+      setActiveLayout(layoutId);
+    }
+    setBusy(true);
+    const r = await requestScreenUpdate();
+    setBusy(false);
+    if (!r.ok) return toast(r.message, { type: 'error' });
+    setSentAt(Date.now());
+    toast('Pedido enviado ao GitHub. A imagem nova fica pronta em uns 3 minutos; a tela mostra na próxima conferência.');
+  };
+  return (
+    <button type="button" class="btn btn-secondary" onClick={send} disabled={busy} title="Pede ao GitHub a imagem nova da tela agora">
+      {busy ? <Loader2 size={16} class="spin" /> : <RefreshCw size={16} />} Atualizar a tela agora
+    </button>
   );
 }
 

@@ -282,3 +282,7 @@ Publicado em https://brunoalmeida87.github.io/PanelAI/ (GitHub Pages), com dados
   editar, lixeira, "Trocar por" = `changeCardType`, mantém lugar/tamanho/aparência). "Adicionar card" com
   a tela cheia (`hasRoomFor` falso) abre "A tela está cheia" para escolher qual card substituir (ou pôr por
   cima). No celular, tocar num card rola até o painel (`selectCard`).
+- **Atalho "Atualizar a tela agora" no editor do Display** (`SendToScreen` em `DisplayPage.jsx`, barra de cima):
+  mesmo pedido do botão de Ajustes → Tela e-ink (`requestScreenUpdate`). Só com a nuvem e sem `readOnly`. Sem
+  a chave do GitHub, avisa e oferece abrir Ajustes. Se o layout aberto não é o do display, pergunta e o
+  torna ativo antes de pedir. 1 minuto entre pedidos.
